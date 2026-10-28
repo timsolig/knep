@@ -1,0 +1,10 @@
+[Unit]
+Description=Nederbördsnowcast: radar, prognos och publicering
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/nowcast
+EnvironmentFile=%h/.config/nowcast.env
+ExecStart=%h/nowcast/deploy/run.sh
+TimeoutStartSec=4min
+Nice=5

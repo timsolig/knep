@@ -1,0 +1,23 @@
+[project]
+name = "nowcast"
+version = "0.1.0"
+description = "Nederbördsnowcast från SMHI:s radarkomposit, körs på en Raspberry Pi"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "requests",
+    "rasterio",
+    "pillow",
+    "pysteps",
+    "opencv-python-headless",
+]
+
+[project.scripts]
+nowcast = "nowcast.cli:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

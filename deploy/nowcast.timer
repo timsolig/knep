@@ -1,0 +1,11 @@
+[Unit]
+Description=Kör nowcast var femte minut
+
+[Timer]
+# SMHI lägger normalt upp bilden 1,5 till 3 min efter mättiden.
+# Start 2 min efter, sedan väntar nowcast upp till 2 min på bilden.
+OnCalendar=*:02/5
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

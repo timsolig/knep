@@ -1,0 +1,39 @@
+name: pages
+
+# Startas av Pi:n efter varje ny prognos, och när sidan ändras på main.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: web
+      - uses: actions/checkout@v6
+        continue-on-error: true  # grenen finns inte före första prognosen
+        with:
+          ref: data
+          path: web/data
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v5

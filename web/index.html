@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nederbördsprognos</title>
+<meta name="description" content="Radar och nowcast för nederbörd de kommande två timmarna">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1b1f24; --muted: #6a737d; --line: #e3e6ea; --accent: #1f6feb; --warn: #b54708;
+    --shadow: 0 2px 16px rgba(0,0,0,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16191d; --fg: #e8eaed; --muted: #9aa3ad; --line: #2c3238; --accent: #58a6ff; --warn: #f0a35e; --shadow: 0 2px 16px rgba(0,0,0,.5); }
+  }
+  html, body { height: 100%; margin: 0; }
+  body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
+  #map { position: fixed; inset: 0; }
+  .rain { image-rendering: pixelated; }
+
+  #panel {
+    position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+    max-width: 440px; z-index: 1000; background: var(--bg); border-radius: 14px; box-shadow: var(--shadow);
+    padding: 14px 16px 12px; box-sizing: border-box;
+  }
+  .row { display: flex; align-items: center; gap: 12px; }
+  #time { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  #kind { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #kind.fc { color: var(--accent); }
+
+  #play {
+    flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--bg); color: var(--fg); font-size: 15px; cursor: pointer; display: grid; place-items: center;
+  }
+  #play:focus-visible, #slider:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #slider { flex: 1; accent-color: var(--accent); height: 32px; margin: 0; }
+
+  #legend { display: flex; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  #legend div { flex: 1; }
+  #legend span { display: block; height: 6px; }
+  #legend div:first-child span { border-radius: 3px 0 0 3px; }
+  #legend div:last-child span { border-radius: 0 3px 3px 0; }
+
+  #status { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  #status.warn { color: var(--warn); }
+
+  #locate {
+    position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 1000;
+    width: 40px; height: 40px; border-radius: 10px; border: 0; background: var(--bg); color: var(--fg);
+    box-shadow: var(--shadow); font-size: 18px; cursor: pointer;
+  }
+  .leaflet-control-attribution { font-size: 10px; }
+  @media (min-width: 700px) { #panel { right: auto; width: 440px; } }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<button id="locate" title="Visa min plats" aria-label="Visa min plats">◎</button>
+
+<div id="panel">
+  <div class="row" style="justify-content: space-between; align-items: baseline;">
+    <div id="time">--:--</div>
+    <div id="kind">Laddar</div>
+  </div>
+  <div class="row" style="margin-top: 6px;">
+    <button id="play" aria-label="Spela upp">▶</button>
+    <input id="slider" type="range" min="0" max="0" value="0" aria-label="Tid">
+  </div>
+  <div id="legend" aria-label="Intensitet i mm/h"></div>
+  <div id="status"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const DATA = 'data/';
+const STALE_MIN = 20;
+const $ = id => document.getElementById(id);
+const clock = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' });
+const num = v => v.toLocaleString('sv-SE');
+
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+const map = L.map('map', { zoomControl: false, minZoom: 4, maxZoom: 11 }).setView([62.5, 16], 5);
+L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
+  subdomains: 'abcd', maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · Radar: <a href="https://www.smhi.se/data">SMHI</a> (CC BY 4.0)',
+}).addTo(map);
+
+let manifest = null, overlays = [], idx = 0, timer = null;
+
+const lastObs = m => m.frames.map(f => f.kind).lastIndexOf('obs');
+
+function show(i) {
+  if (!manifest) return;
+  i = Math.max(0, Math.min(i, overlays.length - 1));
+  overlays[idx]?.setOpacity(0);
+  overlays[i].setOpacity(1);
+  idx = i;
+  $('slider').value = i;
+  const f = manifest.frames[i];
+  const lead = Math.round((new Date(f.time) - new Date(manifest.analysis)) / 60000);
+  $('time').textContent = clock.format(new Date(f.time));
+  $('kind').textContent = f.kind === 'fc' ? `Prognos +${lead} min` : lead === 0 ? 'Senaste radarbild' : `Radar ${lead} min`;
+  $('kind').className = f.kind;
+}
+
+function legend(items) {
+  $('legend').innerHTML = items.map(l => `<div><span style="background:${l.color}"></span>${num(l.min)}</div>`).join('')
+    + '<div style="flex:none;padding-left:6px;align-self:flex-end">mm/h</div>';
+}
+
+function status() {
+  if (!manifest) return;
+  const age = Math.round((Date.now() - new Date(manifest.analysis)) / 60000);
+  const el = $('status');
+  el.className = age > STALE_MIN ? 'warn' : '';
+  el.textContent = age > STALE_MIN
+    ? `Ingen ny radarbild på ${age} min. Prognosen kan vara inaktuell.`
+    : `Analys ${clock.format(new Date(manifest.analysis))}, uppdateras var femte minut`;
+}
+
+async function load() {
+  let m;
+  try {
+    const r = await fetch(`${DATA}manifest.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    m = await r.json();
+  } catch (e) {
+    if (!manifest) { $('kind').textContent = 'Ingen prognos ännu'; }
+    return;
+  }
+  if (manifest && m.analysis === manifest.analysis) { status(); return; }
+
+  const lead = manifest ? idx - lastObs(manifest) : 0;
+  const fresh = m.frames.map(f => L.imageOverlay(`${DATA}${f.file}?v=${encodeURIComponent(m.analysis)}`, m.bounds,
+    { opacity: 0, interactive: false, className: 'rain' }).addTo(map));
+  overlays.forEach(o => o.remove());
+  overlays = fresh;
+  idx = 0;
+  if (!manifest) legend(m.legend);
+  manifest = m;
+  $('slider').max = m.frames.length - 1;
+  show(lastObs(m) + lead);
+  status();
+}
+
+function play() {
+  const btn = $('play');
+  if (timer) { clearInterval(timer); timer = null; btn.textContent = '▶'; btn.setAttribute('aria-label', 'Spela upp'); return; }
+  btn.textContent = '❚❚'; btn.setAttribute('aria-label', 'Pausa');
+  if (idx >= overlays.length - 1) show(0);
+  let hold = 0;
+  timer = setInterval(() => {
+    if (idx < overlays.length - 1) return show(idx + 1);
+    if (++hold > 3) { hold = 0; show(0); }
+  }, 450);
+}
+
+$('slider').addEventListener('input', e => show(+e.target.value));
+$('play').addEventListener('click', play);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') show(idx + 1);
+  if (e.key === 'ArrowLeft') show(idx - 1);
+  if (e.key === ' ') { e.preventDefault(); play(); }
+});
+
+let me = null;
+$('locate').addEventListener('click', () => map.locate({ setView: true, maxZoom: 9 }));
+map.on('locationfound', e => {
+  me?.remove();
+  me = L.circleMarker(e.latlng, { radius: 6, weight: 2, color: '#fff', fillColor: '#1f6feb', fillOpacity: 1 }).addTo(map);
+});
+
+load();
+setInterval(load, 60000);
+setInterval(status, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+</script>
+</body>
+</html>
