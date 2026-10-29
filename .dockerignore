@@ -1,0 +1,12 @@
+.git
+.venv
+.pytest_cache
+**/__pycache__
+cache
+out
+web
+experiments
+docs
+models/*.pkl
+models/*.npz
+deploy/.env
