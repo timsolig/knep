@@ -17,9 +17,10 @@ Nederbördsnowcast 0 till 2 h från SMHI:s radarkomposit. Körs på en Raspberry
 - `src/knep/bias.py` volymkorrektion mot SMHI:s regnmätare (`knep-bias`); kartan ligger i `models/bias.npz`, underlaget, veckofaktorn och kandidaten till ny karta i `cache/bias/`
 - `src/knep/models.py` modellversioner (`knep-models`): filerna ligger i GitHub Releases, `models/models.json` låser tagg och sha256; nya versioner med `deploy/release_model.sh`
 - `src/knep/composite.py` och `sources.py` kompositen: SMHI, OPERA och enskilda radarvolymer som reserv, lagrangesk utfyllnad vid bortfall
+- `src/knep/compare.py` MET Norges nowcast (thredds, OPeNDAP med 4 km) och SMHI:s SNOW (multipoint på MEPS rutnät) som kartor till mosaiken, under `compare` i manifestet
 - `src/knep/cases.py` namngivna händelser (`knep-case`), skriver till `web/cases/`
 - `src/knep/render.py` omprojicering till EPSG:3857, PNG per ruta i 5 min, kvart och timme, värdefil (`values.bin.gz`) och manifest.json
-- `web/index.html` sidan med flikarna Prognos och Händelser (Leaflet från cdnjs, ingen byggkedja); punktserien hämtar MET Norge och SMHI SNOW direkt från webbläsaren
+- `web/index.html` sidan med flikarna Prognos (mosaik med min modell, MET Norge och SNOW i tre kartor som följer varandra, avgränsade till MEPS-området) och Händelser (Leaflet från cdnjs, ingen byggkedja); punktserien hämtar MET Norge och SMHI SNOW direkt från webbläsaren
 - `deploy/` driften som en container: `Dockerfile` (beroenden och låsta modeller), `compose.yaml` (byggs från `main` på GitHub), `loop.sh` (en cykel var femte minut) och `publish.sh` som tvingar grenen `data`
 - `.github/workflows/pages.yml` slår ihop `web/` och grenen `data` och publicerar
 - `experiments/` jämförelsen mot en KNEP-proxy på öppna radarfall, med resultat i `experiments/results/`. Kör om den innan en ändring av modellen tas in

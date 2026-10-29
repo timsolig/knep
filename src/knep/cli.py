@@ -6,6 +6,8 @@ models/bias.npz finns (se bias.py); radarns timsummor vid mätarna samlas varje 
 en gång per dygn räknas veckofaktorn och en kandidat till ny karta. Modellen är kedjan i model.Chain, med sannolikheter
 för kraftig nederbörd om models/extremes.pkl finns.
 
+Till mosaiken på sidan hämtas också MET Norges nowcast och SMHI:s SNOW som kartor (compare.py).
+
 Avslutar med kod 75 när det inte finns någon ny radarbild att räkna på.
 """
 
@@ -21,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from . import bias, composite, model, models, radar, render
+from . import bias, compare, composite, model, models, radar, render
 
 NO_NEW_DATA = 75
 log = logging.getLogger("knep")
@@ -128,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--fallback", action="store_true", help="fyll radarbortfall med OPERA-kompositen")
     p.add_argument("--reference", action="store_true", help="kör referensmodellen i stället för kedjan")
     p.add_argument("--keep-cache", action="store_true", help="rensa inte gamla radarbilder")
+    p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")
     args = p.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -191,6 +194,10 @@ def main(argv: list[str] | None = None) -> int:
         for name, code in (("smhi", composite.SOURCE_SMHI), ("opera", composite.SOURCE_OPERA),
                            ("volymer", composite.SOURCE_VOLUME), ("flyttad", composite.SOURCE_ADVECTED)):
             share[name] = round(float((sources == code).sum() / max(valid.sum(), 1)), 4)
+    if not args.time and not args.no_compare:  # källorna har bara senaste loppet
+        started = time.monotonic()
+        extra["compare"] = compare.update(args.out, session, t0)
+        log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
     extra["models"] = models.versions()  # vilka släppta versioner som räknade den här prognosen
     render.Renderer(grid).write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)
     log.info("skrev %d rutor till %s", len(frames), args.out)

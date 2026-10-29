@@ -13,7 +13,7 @@ SMHI radar (GeoTIFF, var 5:e min)
   → GitHub Actions: web/ från main plus data → GitHub Pages
 ```
 
-Sidan har två flikar. **Prognos** visar senaste körningen i tre upplösningar: momentan intensitet var 5:e minut, summa per kvart (som KNEP) och summa per timme (som SNOW). Samma färg betyder samma medelintensitet i alla tre; legenden för summorna är i mm per period. Ett klick på kartan ger en tidsserie i punkten med radarn, min modell, MET Norges nowcast (5 min) och SMHI:s SNOW (median per timme med min till max i ensemblen), och en tabell med timsummorna sida vid sida. MET Norge och SNOW hämtas direkt från deras öppna API:er av webbläsaren när man klickar. **Händelser** spelar upp namngivna väderhändelser med radarn, kedjans och KNEP-proxyns prognos sedda 30 och 60 min i förväg, i samma tre upplösningar, med risken för kraftig nederbörd och poäng per horisont (ETS, SEDI och volym).
+Sidan har två flikar. **Prognos** är en mosaik med tre kartor sida vid sida: min modell, MET Norges nowcast och SMHI:s SNOW, avgränsade till MEPS-området. Drar eller zoomar man i en karta följer de andra med, och tidsreglaget styr alla tre. Senaste radarbilden kan ligga svagt i bakgrunden under prognoserna. Kartorna finns i tre upplösningar: momentan intensitet var 5:e minut, summa per kvart (som KNEP) och summa per timme (som SNOW). Samma färg betyder samma medelintensitet i alla tre och i alla källor; legenden för summorna är i mm per period, och SNOW, som bara finns per timme, visas som timmens medel även i 5 och 15 min. Ett klick på en karta ger en tidsserie i punkten med radarn, min modell, MET Norges nowcast (5 min) och SNOW (median per timme med min till max i ensemblen), och en tabell med timsummorna sida vid sida. **Händelser** spelar upp namngivna väderhändelser med radarn, kedjans och KNEP-proxyns prognos sedda 30 och 60 min i förväg, i samma tre upplösningar, med risken för kraftig nederbörd och poäng per horisont (ETS, SEDI och volym).
 
 KNEP är inte fri öppen data hos SMHI (realtidsfilerna levereras mot avgift), så den jämförs via proxyn i händelseflikarna.
 
@@ -54,6 +54,15 @@ uv run knep-case index                    # skriver web/cases/index.json
 ```
 
 En ny händelse läggs till i `EVENTS` i `src/knep/cases.py` med namn, tidsfönster i UTC och en kort text med källa. Kedjan körs var 5:e minut över hela fönstret, så ett dygn tar några timmar på en Pi 5; kör det gärna över natten.
+
+## Jämförelsekällorna i mosaiken
+
+Driften hämtar MET Norge och SNOW som kartor (`src/knep/compare.py`) och ritar dem med samma färgskala som min modell, i `out/data/met/` och `out/data/snow/`. Manifestet får dem under `compare`.
+
+- **MET Norge**: radarnowcasten på thredds.met.no, 24 steg om 5 min på 1 km. Hela filen är 73 MB och servern komprimerar inte utsnitt, så var 4:e punkt hämtas via OPeNDAP (4 km, cirka 22 MB per lopp), och ett nytt lopp högst var 15:e minut. Det blir cirka 2 GB per dygn.
+- **SNOW**: SMHI:s median per timme ur ensemblen, som hela fält på MEPS rutnät (2,5 km) utan koordinater, cirka 35 KB per timme. Rutnätet avgränsar också kartan på sidan.
+
+Hämtningen tar cirka 15 sekunder när ett nytt MET-lopp hämtas och någon sekund annars. Fallerar en källa saknas den bara den cykeln, och prognosen publiceras ändå. `--no-compare` stänger av hämtningen, och historiska körningar (`--time`) hämtar inget eftersom källorna bara har senaste loppet.
 
 ## Radarbortfall
 

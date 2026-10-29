@@ -18,6 +18,23 @@
   html, body { height: 100%; margin: 0; }
   body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
   #map { position: fixed; inset: 0; }
+  #mosaic { position: fixed; inset: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; background: var(--line); }
+  .pane { position: relative; min-width: 0; }
+  .pmap { position: absolute; inset: 0; background: var(--bg); }
+  .plabel {
+    position: absolute; z-index: 800; left: 8px; bottom: 8px; max-width: calc(100% - 32px); pointer-events: none;
+    background: var(--bg); border-radius: 8px; box-shadow: var(--shadow); padding: 4px 9px; font-size: 12px; line-height: 1.3;
+  }
+  .plabel span { display: block; color: var(--muted); font-size: 11px; }
+  .plabel.missing span { color: var(--warn); }
+  @media (min-width: 1000px) {
+    #mosaic { left: 484px; }
+    #live { top: calc(64px + env(safe-area-inset-top)); bottom: auto; }
+  }
+  @media (max-width: 999px) {
+    #mosaic { bottom: 44vh; }
+    #live { max-height: calc(44vh - 24px); }
+  }
   .rain { image-rendering: pixelated; }
   button { font: inherit; color: inherit; }
 
@@ -62,6 +79,7 @@
   .meta { color: var(--muted); font-size: 12px; }
   .text { font-size: 13px; margin: 6px 0 8px; }
   .text a { color: var(--accent); }
+  .status a { color: inherit; }
   table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 8px; }
   th, td { padding: 3px 4px; text-align: right; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
@@ -95,7 +113,12 @@
 </style>
 </head>
 <body>
-<div id="map"></div>
+<div id="mosaic" aria-label="Min modell, MET Norge och SNOW sida vid sida">
+  <div class="pane"><div class="pmap" id="map-ours"></div><div class="plabel" id="lab-ours"><strong>Min modell</strong><span></span></div></div>
+  <div class="pane"><div class="pmap" id="map-met"></div><div class="plabel" id="lab-met"><strong>MET Norge</strong><span></span></div></div>
+  <div class="pane"><div class="pmap" id="map-snow"></div><div class="plabel" id="lab-snow"><strong>SNOW</strong><span></span></div></div>
+</div>
+<div id="map" hidden></div>
 <nav id="tabs" role="tablist" aria-label="Vy">
   <button role="tab" id="tab-live" aria-selected="true">Prognos</button>
   <button role="tab" id="tab-cases" aria-selected="false">Händelser</button>
@@ -117,6 +140,9 @@
       <button aria-pressed="false" data-res="15" title="Summa per kvart, som KNEP">15 min</button>
       <button aria-pressed="false" data-res="60" title="Summa per timme, som SNOW">1 h</button>
     </div>
+    <div class="chips layers">
+      <button aria-pressed="true" id="bg-toggle" title="Senaste radarbilden svagt under prognoserna">Radar i bakgrunden</button>
+    </div>
     <div class="chips layers" id="live-layers" hidden>
       <button aria-pressed="true" data-layer="rain">Intensitet</button>
       <button aria-pressed="false" data-layer="p10">Risk för minst 10 mm/h</button>
@@ -134,7 +160,12 @@
     <table id="point-table"></table>
     <div class="status" id="point-status"></div>
   </div>
-  <div class="hint" id="point-hint">Klicka på kartan för en tidsserie i punkten, jämförd med SMHI:s SNOW och MET Norges nowcast.</div>
+  <div class="hint" id="point-hint">Dra eller zooma i en karta så följer de andra med. Klicka för en tidsserie i punkten.</div>
+  <div class="status" id="sources"></div>
+  <div class="status">Samma färg är samma medelintensitet i alla tre. SNOW finns per timme och visas som timmens medel även i 5 och 15 min.
+    Karta &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, &copy; OpenStreetMap. Radar: <a href="https://www.smhi.se/data">SMHI</a>,
+    <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0). Jämförelse: <a href="https://opendata.smhi.se/">SMHI SNOW</a>,
+    <a href="https://api.met.no/">MET Norge</a> (CC BY 4.0).</div>
 </section>
 
 <section id="cases" class="panel" aria-label="Väderhändelser" hidden>
@@ -183,12 +214,37 @@ const mm = v => v == null ? '' : v.toLocaleString('sv-SE', { minimumFractionDigi
 const MIN = 60000;
 
 const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-const map = L.map('map', { zoomControl: false, minZoom: 3, maxZoom: 11 }).setView([62.5, 16], 5);
 // Esris gråa bakgrund kräver ingen nyckel (CARTO:s rutor kräver numera en utanför localhost)
-L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${dark ? 'Dark' : 'Light'}_Gray_Base/MapServer/tile/{z}/{y}/{x}`, {
-  maxNativeZoom: 16, maxZoom: 19,
-  attribution: 'Karta &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, &copy; OpenStreetMap · Radar: <a href="https://www.smhi.se/data">SMHI</a>, <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0) · Jämförelse: SMHI SNOW, <a href="https://api.met.no/">MET Norge</a>',
-}).addTo(map);
+const basemap = attribution => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${dark ? 'Dark' : 'Light'}_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
+  { maxNativeZoom: 16, maxZoom: 19, attribution });
+
+// Prognosfliken: tre kartor som följer varandra, avgränsade till MEPS-området (där SNOW finns)
+const MEPS = [[49.75632, -18.17334], [75.23955, 54.29416]];
+const panes = Object.fromEntries(['ours', 'met', 'snow'].map(k => {
+  const pm = L.map(`map-${k}`, { zoomControl: false, attributionControl: false, maxZoom: 11,
+                                 maxBounds: MEPS, maxBoundsViscosity: 1 }).setView([62.5, 16], 4);
+  basemap().addTo(pm);
+  return [k, { map: pm, label: $(`lab-${k}`), bg: null }];
+}));
+const paneMaps = Object.values(panes).map(p => p.map);
+let syncing = false;
+paneMaps.forEach(pm => pm.on('move zoom', () => {
+  if (syncing) return;
+  syncing = true;
+  paneMaps.forEach(o => { if (o !== pm) o.setView(pm.getCenter(), pm.getZoom(), { animate: false }); });
+  syncing = false;
+}));
+function fitMosaic() {
+  paneMaps.forEach(pm => pm.invalidateSize());
+  const z = panes.ours.map.getBoundsZoom(L.latLngBounds(MEPS).pad(-0.15));
+  paneMaps.forEach(pm => pm.setMinZoom(Math.max(2, z - 1)));
+  panes.ours.map.setView([62.5, 16], z);
+}
+fitMosaic();
+
+// Händelsefliken: en karta
+const map = L.map('map', { zoomControl: false, minZoom: 3, maxZoom: 11 }).setView([62.5, 16], 5);
+basemap('Karta &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, &copy; OpenStreetMap · Radar: <a href="https://www.smhi.se/data">SMHI</a>, <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0) · Jämförelse: SMHI SNOW, <a href="https://api.met.no/">MET Norge</a>').addTo(map);
 
 function legendHtml(items, unit) {
   return items.map(l => `<div><span style="background:${l.color}"></span>${unit === '%' ? Math.round(l.min * 100) : num(l.min)}</div>`).join('')
@@ -213,11 +269,19 @@ function sweref99tm(lat, lon) {
   return [E0 + k0 * A * y, k0 * A * x];
 }
 
-/* ---------- aktuell prognos ---------- */
-const live = { manifest: null, overlays: { 5: [], 15: [], 60: [] }, prob: [], res: '5', idx: 0, layer: 'rain', values: null, point: null };
+/* ---------- aktuell prognos: min modell, MET Norge och SNOW ---------- */
+const live = { manifest: null, overlays: { 5: [], 15: [], 60: [] }, prob: [], ext: { met: { 5: [], 15: [], 60: [] }, snow: [] },
+               res: '5', idx: 0, layer: 'rain', bg: true, values: null, point: null };
 const listFor = (m, r) => (r === '5' ? m.frames : r === '15' ? m.frames15 : m.frames60) || [];
+const metFor = (m, r) => { const e = m.compare?.met; return e ? (r === '5' ? e.frames : r === '15' ? e.frames15 : e.frames60) || [] : []; };
 const lastObs = m => m.frames.map(f => f.kind).lastIndexOf('obs');
-const allLive = () => [...Object.values(live.overlays).flat(), ...live.prob].filter(Boolean);
+const allLive = () => [...Object.values(live.overlays).flat(), ...live.prob, ...Object.values(live.ext.met).flat(), ...live.ext.snow,
+                       ...Object.values(panes).map(p => p.bg)].filter(Boolean);
+
+function paneLabel(k, text, missing) {
+  panes[k].label.querySelector('span').textContent = text;
+  panes[k].label.classList.toggle('missing', !!missing);
+}
 
 function liveShow(i) {
   const m = live.manifest;
@@ -231,7 +295,7 @@ function liveShow(i) {
   live.idx = i;
   $('slider').max = list.length - 1;
   $('slider').value = i;
-  const f = list[i];
+  const f = list[i], t = +new Date(f.time);
   $('time').textContent = clock.format(new Date(f.time));
   if (live.res === '5') {
     const lead = Math.round((new Date(f.time) - new Date(m.analysis)) / MIN);
@@ -241,6 +305,23 @@ function liveShow(i) {
     $('kind').textContent = `${what}, summa ${clock.format(new Date(f.start))} till ${clock.format(new Date(f.time))}`;
   }
   $('kind').className = 'kind ' + (f.kind === 'obs' ? 'obs' : 'fc');
+  paneLabel('ours', f.kind === 'obs' ? 'radar' : `analys ${clock.format(new Date(m.analysis))}`);
+
+  // MET Norge: samma tid; SNOW: timmen som innehåller tiden (eller slutar då, för timsummor)
+  const mi = metFor(m, live.res).findIndex(x => +new Date(x.time) === t);
+  live.ext.met[live.res][mi]?.setOpacity(1);
+  const met = m.compare?.met;
+  paneLabel('met', !met ? 'inte hämtad' : mi < 0 ? 'saknas för tiden' : `lopp ${clock.format(new Date(met.reference))}, ${num(met.resolution_km)} km`, !met || mi < 0);
+  const sf = m.compare?.snow?.frames60 || [];
+  const si = sf.findIndex(x => t > +new Date(x.start) && t <= +new Date(x.time));
+  live.ext.snow[si]?.setOpacity(1);
+  paneLabel('snow', !m.compare?.snow ? 'inte hämtad' : si < 0 ? 'saknas för tiden'
+    : `median ${clock.format(new Date(sf[si].start))} till ${clock.format(new Date(sf[si].time))}`, !m.compare?.snow || si < 0);
+
+  // senaste radarbilden svagt under prognoserna
+  const future = t > +new Date(m.analysis);
+  Object.values(panes).forEach(pn => pn.bg?.setOpacity(live.bg && future ? 0.3 : 0));
+
   $('legend').innerHTML = p ? legendHtml(m.prob_legend, '%')
     : legendHtml(m.legends?.[live.res] || m.legend, m.units?.[live.res] || 'mm/h');
   $('live-layers').hidden = live.res !== '5' || !live.prob.some(Boolean);
@@ -271,6 +352,11 @@ function liveStatus() {
   el.textContent = age > STALE_MIN
     ? `Ingen ny radarbild på ${age} min. Prognosen kan vara inaktuell.`
     : `Analys ${clock.format(new Date(m.analysis))}, uppdateras var femte minut.${gaps}${vc}`;
+  const c = m.compare;
+  $('sources').textContent = !c ? '' : [
+    c.met ? `MET Norge: lopp ${clock.format(new Date(c.met.reference))} i ${num(c.met.resolution_km)} km, var femte minut två timmar framåt.` : 'MET Norge kunde inte hämtas.',
+    c.snow ? `SNOW: körning ${clock.format(new Date(c.snow.reference))}, ensemblens median per timme.` : 'SNOW kunde inte hämtas.',
+  ].join(' ');
 }
 
 async function liveLoad() {
@@ -287,14 +373,20 @@ async function liveLoad() {
   const old = live.manifest;
   const keep = old ? listFor(old, live.res)[live.idx] : null;
   const v = encodeURIComponent(m.analysis);
-  const add = file => L.imageOverlay(`${DATA}${file}?v=${v}`, m.bounds, { opacity: 0, interactive: false, className: 'rain' });
-  const fresh = { 5: m.frames.map(f => add(f.file)), 15: (m.frames15 || []).map(f => add(f.file)), 60: (m.frames60 || []).map(f => add(f.file)) };
-  const prob = m.frames.map(f => f.p10 ? add(f.p10) : null);
+  const add = (pane, file, bounds) => L.imageOverlay(`${DATA}${file}?v=${v}`, bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(panes[pane].map);
   allLive().forEach(o => o.remove());
-  Object.assign(live, { overlays: fresh, prob, manifest: m, values: null });
+  // bakgrunden läggs först, så att den hamnar under prognoserna
+  const obs = m.frames[lastObs(m)];
+  for (const k in panes) panes[k].bg = obs ? add(k, obs.file, m.bounds) : null;
+  const ours = (f, file) => add('ours', file, m.bounds);
+  const fresh = { 5: m.frames.map(f => ours(f, f.file)), 15: (m.frames15 || []).map(f => ours(f, f.file)), 60: (m.frames60 || []).map(f => ours(f, f.file)) };
+  const prob = m.frames.map(f => f.p10 ? ours(f, f.p10) : null);
+  const met = m.compare?.met, snow = m.compare?.snow;
+  const ext = { met: Object.fromEntries(['5', '15', '60'].map(r => [r, metFor(m, r).map(f => add('met', f.file, met.bounds))])),
+                snow: (snow?.frames60 || []).map(f => add('snow', f.file, snow.bounds)) };
+  Object.assign(live, { overlays: fresh, prob, ext, manifest: m, values: null });
   $('live-res').hidden = !m.frames15;  // äldre manifest har bara 5 min
   if (!m.frames15) live.res = '5';
-  if (mode === 'live') allLive().forEach(o => o.addTo(map));
   const list = listFor(m, live.res);
   let i = live.res === '5' ? lastObs(m) + (old && keep ? live.idx - lastObs(old) : 0) : list.findIndex(f => f.kind !== 'obs');
   if (live.res !== '5' && keep && old) i = closestIndex(list, new Date(keep.time));
@@ -304,7 +396,8 @@ async function liveLoad() {
 }
 
 /* ---------- punkt: min modell mot SNOW och MET Norge ---------- */
-let pointMarker = null;
+let pointMarkers = [];
+const clearMarkers = () => { pointMarkers.forEach(mk => mk.remove()); pointMarkers = []; };
 
 async function loadValues(m) {
   if (live.values?.analysis === m.analysis) return live.values.codes;
@@ -347,8 +440,8 @@ async function fetchSnow(ll) {
 
 async function pointOpen(ll, quiet) {
   if (!live.manifest) return;
-  pointMarker?.remove();
-  pointMarker = L.circleMarker(ll, { radius: 5, weight: 2, color: dark ? '#fff' : '#1b1f24', fillOpacity: 0 }).addTo(map);
+  clearMarkers();
+  pointMarkers = paneMaps.map(pm => L.circleMarker(ll, { radius: 5, weight: 2, color: dark ? '#fff' : '#1b1f24', fillOpacity: 0, interactive: false }).addTo(pm));
   $('point').hidden = false;
   $('point-hint').hidden = true;
   if (!quiet) $('point-status').textContent = 'Hämtar';
@@ -447,10 +540,10 @@ function pointDraw() {
 }
 
 $('point-close').addEventListener('click', () => {
-  live.point = null; pointMarker?.remove(); pointMarker = null;
+  live.point = null; clearMarkers();
   $('point').hidden = true; $('point-hint').hidden = false;
 });
-map.on('click', e => { if (mode === 'live') pointOpen(e.latlng); });
+paneMaps.forEach(pm => pm.on('click', e => pointOpen(e.latlng)));
 
 /* ---------- händelser ---------- */
 const LAYERS = {
@@ -622,6 +715,11 @@ $('slider').addEventListener('input', e => liveShow(+e.target.value));
 $('case-slider').addEventListener('input', e => caseShow(+e.target.value));
 $('live-res').querySelectorAll('button').forEach(b => b.addEventListener('click', () => liveRes(b.dataset.res)));
 $('case-res').querySelectorAll('button').forEach(b => b.addEventListener('click', () => caseRes(b.dataset.res)));
+$('bg-toggle').addEventListener('click', () => {
+  live.bg = !live.bg;
+  $('bg-toggle').setAttribute('aria-pressed', live.bg);
+  liveShow(live.idx);
+});
 $('live-layers').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   live.layer = b.dataset.layer;
   pressed($('live-layers'), 'layer', live.layer);
@@ -644,27 +742,27 @@ function setMode(m) {
   $('live').hidden = m !== 'live';
   $('cases').hidden = m !== 'cases';
   $('locate').hidden = m !== 'live';
+  $('mosaic').hidden = m !== 'live';
+  $('map').hidden = m !== 'cases';
   if (m === 'live') {
     caseClear();
     cases.current = null;
-    allLive().forEach(o => o.addTo(map));
-    pointMarker?.addTo(map);
+    paneMaps.forEach(pm => pm.invalidateSize());
     liveShow(live.idx);
     if (location.hash) history.replaceState(null, '', location.pathname);
   } else {
-    allLive().forEach(o => o.remove());
-    pointMarker?.remove();
+    map.invalidateSize();
     if (!cases.list.length) casesLoad(); else caseOpen(cases.slug || cases.list[0]?.path);
   }
 }
 $('tab-live').addEventListener('click', () => setMode('live'));
 $('tab-cases').addEventListener('click', () => setMode('cases'));
 
-let me = null;
-$('locate').addEventListener('click', () => map.locate({ setView: true, maxZoom: 9 }));
-map.on('locationfound', e => {
-  me?.remove();
-  me = L.circleMarker(e.latlng, { radius: 6, weight: 2, color: '#fff', fillColor: '#1f6feb', fillOpacity: 1 }).addTo(map);
+let me = [];
+$('locate').addEventListener('click', () => panes.ours.map.locate({ setView: true, maxZoom: 9 }));
+panes.ours.map.on('locationfound', e => {
+  me.forEach(mk => mk.remove());
+  me = paneMaps.map(pm => L.circleMarker(e.latlng, { radius: 6, weight: 2, color: '#fff', fillColor: '#1f6feb', fillOpacity: 1, interactive: false }).addTo(pm));
   if (mode === 'live' && !live.point) pointOpen(e.latlng);
 });
 
@@ -672,6 +770,7 @@ liveLoad();
 setInterval(() => { if (mode === 'live') liveLoad(); }, 60000);
 setInterval(liveStatus, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && mode === 'live') liveLoad(); });
+addEventListener('resize', () => paneMaps.forEach(pm => pm.invalidateSize()));
 if (location.hash.startsWith('#handelser')) setMode('cases');
 </script>
 </body>
