@@ -18,7 +18,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
-from nowcast import model  # noqa: E402
+from knep import model  # noqa: E402
 
 H, W, STEPS = 894, 475, 24
 

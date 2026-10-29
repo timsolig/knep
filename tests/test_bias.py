@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
 
-from nowcast import bias, composite
+from knep import bias, composite
 
 # 8 km över Sverige räcker för testet och går fort
 GRID = composite.TargetGrid(200000.0, 7700000.0, 8000.0, (165, 90))

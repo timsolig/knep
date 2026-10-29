@@ -10,8 +10,8 @@ hunnit bli klar (kedjan 3 min, proxyn 10 min efter sin analystid). Det som skriv
                   momentant var 5:e minut, kvartssumma (som KNEP) och timsumma (som SNOW, med
                   prognosen som fanns när timmen började), samt sannolikhet för minst 10 mm/h
 
-    nowcast-case build hans-2023 --out web/cases
-    nowcast-case index --out web/cases
+    knep-case build hans-2023 --out web/cases
+    knep-case index --out web/cases
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from scipy.ndimage import uniform_filter
 
 from . import composite, model, render
 
-log = logging.getLogger("nowcast.cases")
+log = logging.getLogger("knep.cases")
 STEP = timedelta(minutes=5)
 QUARTER = timedelta(minutes=15)
 HORIZONS = (15, 30, 45, 60)
@@ -333,7 +333,7 @@ def smhi_frames(cache: Path):
     from . import radar
 
     session = requests.Session()
-    session.headers["User-Agent"] = "nowcast/0.1 (hobbyprojekt)"
+    session.headers["User-Agent"] = "knep/0.1 (hobbyprojekt)"
     grid_holder = {}
 
     def get(times):
@@ -352,7 +352,7 @@ def smhi_frames(cache: Path):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="nowcast-case", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(prog="knep-case", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build", help="bygg en händelse")
     b.add_argument("slug", choices=sorted(EVENTS))

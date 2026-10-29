@@ -3,7 +3,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-.venv/bin/nowcast --out out/data --cache cache --fallback "$@"
+.venv/bin/knep --out out/data --cache cache --fallback "$@"
 rc=$?
 case $rc in
   0)  exec deploy/publish.sh out/data ;;

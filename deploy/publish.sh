@@ -15,7 +15,7 @@ cd "$tmp"
 
 git init -q -b data
 git add -A
-git -c user.name=nowcast -c user.email=nowcast@localhost commit -q -m "prognos $(date -u +%FT%H:%MZ)"
+git -c user.name=knep -c user.email=knep@localhost commit -q -m "prognos $(date -u +%FT%H:%MZ)"
 git push -q -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git" data
 
 curl -fsS -X POST \

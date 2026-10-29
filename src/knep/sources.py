@@ -21,7 +21,7 @@ import requests
 
 from . import composite
 
-log = logging.getLogger("nowcast.sources")
+log = logging.getLogger("knep.sources")
 S3 = "https://s3.waw3-1.cloudferro.com"
 BUCKETS = ("openradar-24h", "openradar-archive")
 _NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"

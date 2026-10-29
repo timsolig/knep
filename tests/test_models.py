@@ -2,7 +2,7 @@
 
 import json
 
-from nowcast import models
+from knep import models
 
 
 def test_pin_and_versions(tmp_path):

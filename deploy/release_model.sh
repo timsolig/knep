@@ -12,5 +12,5 @@ target=models/$(basename "$file")
 case $name in extremes) target=models/extremes.pkl ;; bias) target=models/bias.npz ;; esac
 [ "$(realpath "$file")" = "$(realpath -m "$target")" ] || cp "$file" "$target"
 gh release create "$tag" "$target" --title "$tag" --notes-file "$notes"
-uv run nowcast-models pin "$name" "$tag" "$target"
+uv run knep-models pin "$name" "$tag" "$target"
 echo "Skapa en gren, checka in models/models.json och $notes, och öppna en pull request."
