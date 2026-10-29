@@ -1,0 +1,10 @@
+{
+ "repo": "",
+ "models": {
+  "extremes": {
+   "tag": "extremes-v1",
+   "file": "extremes.pkl",
+   "sha256": "ea6d71b485ac570fcec6df711c3fd25a6ddb689defb7ecfa4490044e40105f07"
+  }
+ }
+}
