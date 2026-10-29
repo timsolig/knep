@@ -12,6 +12,7 @@ dependencies = [
     "opencv-python-headless",
     "h5py",
     "scikit-learn==1.9.1",
+    "pyproj>=3.7.2",
 ]
 
 [project.scripts]
