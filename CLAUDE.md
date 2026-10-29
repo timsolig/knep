@@ -21,7 +21,7 @@ Nederbördsnowcast 0 till 2 h från SMHI:s radarkomposit. Körs på en Raspberry
 - `src/knep/cases.py` namngivna händelser (`knep-case`), skriver till `web/cases/`
 - `src/knep/render.py` omprojicering till EPSG:3857, PNG per ruta i 5 min, kvart och timme, värdefil (`values.bin.gz`) och manifest.json
 - `web/index.html` sidan med flikarna Prognos (mosaik med min modell, MET Norge och SNOW i tre kartor som följer varandra, avgränsade till MEPS-området) och Händelser (Leaflet från cdnjs, ingen byggkedja); punktserien hämtar MET Norge och SMHI SNOW direkt från webbläsaren
-- `deploy/` driften som en container: `Dockerfile` (beroenden och låsta modeller), `compose.yaml` (byggs från `main` på GitHub), `loop.sh` (en cykel var femte minut) och `publish.sh` som tvingar grenen `data`
+- `deploy/` driften som en container: `Dockerfile` (bara verktygen), `compose.yaml`, `drift.sh` (följer `main` och installerar varje ny commit, med återgång om den inte fungerar), `cycle.sh` (en cykel) och `publish.sh` som tvingar grenen `data`
 - `.github/workflows/pages.yml` slår ihop `web/` och grenen `data` och publicerar
 - `experiments/` jämförelsen mot en KNEP-proxy på öppna radarfall, med resultat i `experiments/results/`. Kör om den innan en ändring av modellen tas in
 
@@ -31,7 +31,7 @@ pysteps är bara referens, och modellen behöver inte likna KNEP, MET Norge elle
 
 ## Miljö
 
-Claude Code körs i containern i `dev/`. Repot ligger i `/work` och radararkivet i `/data`. Driften går på värden i containern från `deploy/compose.yaml`, byggd från `main`, så ändringar går via grenar och pull requests, aldrig direkt mot driften.
+Claude Code körs i containern i `dev/`. Repot ligger i `/work` och radararkivet i `/data`. Driften går på värden i containern från `deploy/compose.yaml` och följer `main` av sig själv (en sammanslagning är i drift inom fem minuter), så ändringar går via grenar och pull requests, aldrig direkt mot driften.
 
 ## Regler
 
