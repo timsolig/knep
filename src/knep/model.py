@@ -1,6 +1,7 @@
 """Prognosmodellen.
 
 `nowcast` är referensen: Lucas-Kanade och semi-Lagrangesk extrapolering, ingen träning.
+Kedjan extrapolerar med advect.py (samma schema som pysteps, med OpenCV); referensen med pysteps.
 
 `Chain` är modellen som slog KNEP-proxyn i experiments/, plus tränade sannolikheter för extremer:
 
@@ -31,7 +32,7 @@ from pysteps.motion.lucaskanade import dense_lucaskanade
 from pysteps.utils.transformation import dB_transform
 from scipy.ndimage import gaussian_filter
 
-from . import extremes
+from . import advect, extremes
 
 STEP = timedelta(minutes=5)
 
@@ -155,13 +156,13 @@ class Chain:
         state = state if state is not None else State()
         motion = motion_field(obs, self.motion_gap, self.motion_frames)
         analysis = obs[-1]
-        raw = extrapolate(np.nan_to_num(analysis), motion, steps)
+        # bilinjärt för prognosen, och analysens värden flyttade med närmaste granne som mål för
+        # matchningen: samma värden, men bara de som är kvar i området
+        a = np.nan_to_num(analysis)
+        raw, tgt = advect.extrapolate([a, a], motion, steps, orders=[1, 0])
         raw[:, ~np.isfinite(analysis)] = np.nan  # utanför täckningen deltar inte i matchningen
-        if self.target == "advected":
-            # analysens värden flyttade med närmaste granne: samma värden, men bara de som är kvar i området
-            tgt = extrapolate(np.nan_to_num(analysis), motion, steps, interp_order=0)
-            tgt[:, ~np.isfinite(analysis)] = np.nan
-        else:
+        tgt[:, ~np.isfinite(analysis)] = np.nan
+        if self.target != "advected":
             tgt = [analysis] * steps
         corr = location_map(state, now, analysis.shape)
         rain = np.empty(raw.shape, np.float32)
@@ -180,7 +181,7 @@ class Chain:
         prob = None
         if self.models is not None:
             n = min(steps, self.prob_steps or steps)
-            adv = lambda f, s: extrapolate(np.nan_to_num(f), motion, s)
+            adv = lambda f, s: advect.extrapolate(np.nan_to_num(f), motion, s)
             past15 = obs[-4] if len(obs) >= 4 else None
             past30 = obs[-7] if len(obs) >= 7 else None
             t15, t30, speed, dom = extremes.tendencies(analysis, past15, past30, motion, steps, adv)
