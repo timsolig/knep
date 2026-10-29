@@ -82,7 +82,7 @@ class Meps:
             else:
                 r = nwp.Run.load(p)
                 self.cache[run] = (r, r.on(grid))
-            if len(self.cache) > 4:
+            if len(self.cache) > 6:
                 self.cache.pop(next(iter(self.cache)))
         return self.cache[run]
 
@@ -98,16 +98,26 @@ def chain_forecast(day: str, t: datetime, root: Path = CHAIN_DIR):
     return render.decode_values(d["codes"]), d["motion"].astype(np.float32)
 
 
-def meps_quarters(meps: Meps, t: datetime, grid):
-    got = meps.on(nwp.available(t), grid)
+def meps_quarters(meps: Meps, t: datetime, grid, interpolate: bool = False, lag: int = 0):
+    """MEPS som kvartsmedel från körningen som fanns vid t (lag: så många körningar tidigare).
+
+    Utan interpolate gäller timsumman hela timmen; med interpolate tas intensiteten mitt i
+    kvarten, interpolerad mellan timmarnas mitt (seamless.meps_at)."""
+    from knep import seamless
+
+    got = meps.on(nwp.available(t) - lag * timedelta(hours=3), grid)
     if got is None:
         return None
     run, on = got
     out = np.full((NQ,) + tuple(grid.shape), np.nan, np.float32)
     for k in range(NQ):
-        h = run.hour_ending(t + (k + 1) * Q)
-        if h is not None:
-            out[k] = on[h]
+        end = t + (k + 1) * Q
+        if interpolate:
+            out[k] = seamless.meps_at(on, run.run, end - timedelta(minutes=5))
+        else:
+            h = run.hour_ending(end)
+            if h is not None:
+                out[k] = on[h]
     return out
 
 
@@ -189,11 +199,13 @@ def systems_for(names):
         "kedja": lambda c: c["chain"],
         "meps": lambda c: c["meps"],
         "persistens": lambda c: np.repeat(c["analysis"][None], NQ, axis=0),
+        "meps_int": lambda c: c["meps_i"],
+        "meps_lagg": lambda c: c["meps_i"] if c["meps_prev"] is None else 0.5 * (c["meps_i"] + c["meps_prev"]),
     }
-    return {n: base.get(n) or sommodell.SYSTEMS[n] for n in names}
+    return {n: base.get(n) or sommodell.SYSTEMS.get(n) or sommodell.variant(n) for n in names}
 
 
-def run(part: str, names: list[str], limit: int | None = None, chain_dir: Path = CHAIN_DIR) -> dict:
+def run(part: str, names: list[str], limit: int | None = None, chain_dir: Path = CHAIN_DIR, every: int = 1) -> dict:
     systems = systems_for(names)
     sc = Scores(names)
     obs, meps = Obs(), Meps()
@@ -201,18 +213,22 @@ def run(part: str, names: list[str], limit: int | None = None, chain_dir: Path =
     for d in load_days(part):
         day = datetime.fromisoformat(d["day"]).replace(tzinfo=UTC)
         state = {}  # för system som minns mellan utfärdandetiderna (assimilering)
-        for h in range(24):
+        for h in range(0, 24, every):
             t = day + timedelta(hours=h)
             obs.forget(t - timedelta(hours=2))
             fc = chain_forecast(d["day"], t, chain_dir)
+            if fc is None:
+                continue
             analysis = obs.frame(t)
-            if fc is None or analysis is None or obs.grid is None:
+            if analysis is None or obs.grid is None:
                 continue
             chain, motion = fc
             mq = meps_quarters(meps, t, obs.grid)
             if mq is None:
                 continue
             ctx = {"t": t, "chain": chain, "motion": motion, "meps": mq, "analysis": analysis, "grid": obs.grid,
+                   "meps_i": meps_quarters(meps, t, obs.grid, interpolate=True),
+                   "meps_prev": meps_quarters(meps, t, obs.grid, interpolate=True, lag=1),
                    "obs": obs, "state": state, "meps_run": meps.on(nwp.available(t), obs.grid)}
             fcs = {n: fn(ctx) for n, fn in systems.items()}
             mask_base = np.isfinite(chain[0])
@@ -269,10 +285,11 @@ def main() -> None:
     p.add_argument("--part", default="validering")
     p.add_argument("--system", nargs="+", default=["kedja", "meps", "persistens"])
     p.add_argument("--limit", type=int, default=None, help="högst så många utfärdandetider (för att prova)")
+    p.add_argument("--every", type=int, default=1, help="var n:e timme som utfärdandetid")
     p.add_argument("--tag", default=None, help="namn på resultatfilen")
     p.add_argument("--kedja", type=Path, default=CHAIN_DIR, help="katalogen med kedjans prognoser")
     a = p.parse_args()
-    res = run(a.part, a.system, a.limit, a.kedja)
+    res = run(a.part, a.system, a.limit, a.kedja, a.every)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"{a.tag or a.part}.json").write_text(json.dumps(res))
     show(res)

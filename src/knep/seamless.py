@@ -263,3 +263,33 @@ def run_operational(meps_dir, state_path, session, grid, now, obs: np.ndarray, f
         lead = 5 * (k + 1) - 2.5
         out[k] = blend(f, corrected(meps_at(on, run_t, t), lead, st, p), lead, p)
     return out, {"meps_run": run_t.strftime("%Y-%m-%dT%H:%M:%SZ"), "hours": round(len(fc) / 12, 2)}
+
+
+# ---------- vikter efter senaste timmens träffsäkerhet ----------
+
+def skill(f: np.ndarray, o: np.ndarray, thr: float = 1.0, km: float = 30.0, res_km: float = 2.0) -> float | None:
+    """FSS för f mot o vid thr mm/h på skalan km, där båda finns; None om det inte regnar."""
+    m = np.isfinite(f) & np.isfinite(o)
+    if m.sum() < 1000:
+        return None
+    size = int(round(km / res_km)) | 1
+    mf = m.astype(np.float32)
+    box = lambda x: cv2.boxFilter(x, cv2.CV_32F, (size, size), normalize=False, borderType=cv2.BORDER_CONSTANT)
+    den = np.maximum(box(mf), 1e-6)
+    pf = (box(((np.nan_to_num(f) >= thr) & m).astype(np.float32)) / den)[m]
+    po = (box(((np.nan_to_num(o) >= thr) & m).astype(np.float32)) / den)[m]
+    ref = float((pf ** 2 + po ** 2).sum())
+    if ref < 1.0:
+        return None
+    return 1 - float(((pf - po) ** 2).sum()) / ref
+
+
+def adapted(p: Params, skill_chain: float | None, skill_meps: float | None, gamma: float = 1.0) -> Params:
+    """Flytta viktkurvan efter förhållandet mellan kedjans och MEPS:s träffsäkerhet för 1 h sedan:
+    t50 skalas med (kedjans / MEPS:s) ** gamma, begränsat till en halvering eller fördubbling."""
+    from dataclasses import replace
+
+    if skill_chain is None or skill_meps is None:
+        return p
+    f = float(np.clip((max(skill_chain, 0.05) / max(skill_meps, 0.05)) ** gamma, 0.5, 2.0))
+    return replace(p, t50_small=p.t50_small * f, t50_large=p.t50_large * f)

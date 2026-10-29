@@ -105,3 +105,14 @@ def test_run_operational_blends_and_keeps_state(tmp_path, monkeypatch):
     assert np.abs(out[-1] - fc[-1]).sum() > np.abs(out[0] - fc[0]).sum()  # sedan mer av MEPS
     st = seamless.load_state(tmp_path / "st.npz")
     assert st.run == run_t.isoformat() and st.dx is not None and st.qm is not None
+
+
+def test_skill_and_adapted_weights():
+    o = _blob(80, 100)
+    assert seamless.skill(o, o) == 1.0
+    assert seamless.skill(_blob(140, 40), o) < 0.2
+    assert seamless.skill(np.zeros_like(o), np.zeros_like(o)) is None   # inget regn: inget att säga
+    p = seamless.Params()
+    assert seamless.adapted(p, 0.8, 0.2).t50_small == 2 * p.t50_small    # kedjan bättre: längre
+    assert seamless.adapted(p, 0.1, 0.6).t50_large == 0.5 * p.t50_large  # MEPS bättre: kortare
+    assert seamless.adapted(p, None, 0.5) is p

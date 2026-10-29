@@ -18,7 +18,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -48,13 +50,15 @@ class Throttled(requests.Session):
         super().__init__()
         self.headers["User-Agent"] = "knep/0.1 (hobbyprojekt, verifiering)"
         self._last = 0.0
+        self._lock = threading.Lock()
 
     def request(self, *a, **k):
         for _ in range(5):
-            wait = self._last + 1 / self.RATE - time.monotonic()
+            with self._lock:  # taket gäller alla trådar tillsammans
+                wait = self._last + 1 / self.RATE - time.monotonic()
+                self._last = max(self._last + 1 / self.RATE, time.monotonic())
             if wait > 0:
                 time.sleep(wait)
-            self._last = time.monotonic()
             r = super().request(*a, **k)
             if r.status_code != 429:
                 return r
@@ -138,22 +142,25 @@ def load_days(part: str | None = None) -> list[dict]:
 
 
 def radar_days(a) -> None:
-    """Alla bilder var 5:e minut för dagarna, och de sista 90 min före varje dag (för kedjans tillstånd)."""
+    """Alla bilder var 5:e minut för dagarna, de sista 90 min före (för kedjans tillstånd) och
+    5 h efter (för verifieringen). Fyra anrop i taget; svarstiden begränsar, inte taket."""
     s = session()
-    for d in load_days():
-        day = datetime.fromisoformat(d["day"]).replace(tzinfo=UTC)
-        cache = DATA / "radar" / day.strftime("%Y/%m/%d")
-        cache.mkdir(parents=True, exist_ok=True)
-        t, end, missing = day - timedelta(minutes=90), day + timedelta(hours=24 + 5), 0
-        while t <= end:
-            target = DATA / "radar" / t.strftime("%Y/%m/%d") / f"{t:%Y%m%d%H%M}.tif"
-            target.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                radar.fetch(t, target.parent, s)
-            except requests.RequestException:
-                missing += 1
-            t += radar.STEP
-        print(d["day"], "saknas", missing, flush=True)
+
+    def get(t):
+        target = radar_path(t)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            radar.fetch(t, target.parent, s)
+            return 0
+        except requests.RequestException:
+            return 1
+
+    with ThreadPoolExecutor(4) as pool:
+        for d in load_days():
+            day = datetime.fromisoformat(d["day"]).replace(tzinfo=UTC)
+            n = int((timedelta(hours=24 + 5) + timedelta(minutes=90)) / radar.STEP) + 1
+            times = [day - timedelta(minutes=90) + k * radar.STEP for k in range(n)]
+            print(d["day"], "saknas", sum(pool.map(get, times)), flush=True)
 
 
 def radar_path(t: datetime) -> Path:

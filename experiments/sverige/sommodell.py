@@ -8,6 +8,7 @@ radarns senaste timme mot MEPS-timmen som slutar då.
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 
 import numpy as np
 
@@ -23,33 +24,55 @@ def _radar_hour(ctx):
 
 
 def _state(ctx, key, p):
+    """Rättningen för tillståndet key, assimilerad en gång per utfärdandetid (system som delar
+    key delar också rättningen)."""
+    done = ctx.setdefault("assimilated", {})
+    if key in done:
+        return done[key]
     run, on = ctx["meps_run"]
     k = run.hour_ending(ctx["t"])
     st = ctx["state"].get(key, seamless.State())
     rh = _radar_hour(ctx)
     if k is not None and rh is not None:
         st = seamless.assimilate(st, run.run.isoformat(), on[k], rh, p)
-    ctx["state"][key] = st
+    ctx["state"][key] = done[key] = st
     return st
 
 
-def corrected(p: seamless.Params, key: str):
+def _meps(ctx, source):
+    """MEPS-kvartarna: "meps" konstant per timme, "meps_i" interpolerad i tiden, "lagg" medlet av
+    den senaste och den förra körningen (båda interpolerade)."""
+    if source == "lagg":
+        return ctx["meps_i"] if ctx["meps_prev"] is None else 0.5 * (ctx["meps_i"] + ctx["meps_prev"])
+    return ctx[source]
+
+
+def corrected(p: seamless.Params, key: str, source: str = "meps_i"):
     def fn(ctx):
         st = _state(ctx, key, p)
-        return np.stack([seamless.corrected(ctx["meps"][k], 15 * (k + 1), st, p) for k in range(NQ)])
+        m = _meps(ctx, source)
+        return np.stack([seamless.corrected(m[k], 15 * (k + 1) - 7.5, st, p) for k in range(NQ)])
     return fn
 
 
-def blended(p: seamless.Params, key: str):
+def blended(p: seamless.Params, key: str, source: str = "meps_i"):
     def fn(ctx):
         st = _state(ctx, key, p)
+        mq = _meps(ctx, source)
         out = []
         for k in range(NQ):
             lead = 15 * (k + 1) - 7.5  # mitt i kvarten
-            m = seamless.corrected(ctx["meps"][k], lead, st, p)
+            m = seamless.corrected(mq[k], lead, st, p)
             out.append(seamless.blend(ctx["chain"][k], m, lead, p))
         return np.stack(out)
     return fn
+
+
+def variant(name: str):
+    """Ett system ur namnet "s:t50_small:t50_large:shape[:sigma_km]", med den fulla rättningen."""
+    parts = [float(x) for x in name.split(":")[1:]]
+    keys = ["t50_small", "t50_large", "shape", "sigma_km"]
+    return blended(replace(P, **dict(zip(keys, parts))), "rättad")
 
 
 P = seamless.Params()
@@ -57,6 +80,37 @@ SYSTEMS = {
     "meps_läge": corrected(replace(P, correct_amount=False), "läge"),
     "meps_mängd": corrected(replace(P, correct_shift=False), "mängd"),
     "meps_rättad": corrected(P, "rättad"),
+    "meps_lagg_rättad": corrected(P, "rättad", "lagg"),
     "sömlös_rå": blended(replace(P, correct_shift=False, correct_amount=False), "rå"),
-    "sömlös": blended(P, "sömlös"),
+    "sömlös": blended(P, "rättad"),
+    "sömlös_lagg": blended(P, "rättad", "lagg"),
 }
+
+
+def adaptive(p: seamless.Params, gamma: float = 1.0, source: str = "meps_i"):
+    """Som blended, men viktkurvan flyttas efter hur kedjan och den rättade MEPS-prognosen från
+    förra utfärdandetiden (1 h sedan) träffade radarn nu (seamless.adapted)."""
+    key = f"adaptiv_{gamma}"
+
+    def fn(ctx):
+        st = _state(ctx, "rättad", p)
+        mem = ctx["state"].get(key)
+        o = ctx["obs"].quarter(ctx["t"])
+        sc = sm = None
+        if mem is not None and mem["t"] == ctx["t"] - timedelta(hours=1) and o is not None:
+            sc, sm = seamless.skill(mem["chain"], o), seamless.skill(mem["meps"], o)
+        q = seamless.adapted(p, sc, sm, gamma)
+        mq = _meps(ctx, source)
+        out, meps_c = [], []
+        for k in range(NQ):
+            lead = 15 * (k + 1) - 7.5
+            m = seamless.corrected(mq[k], lead, st, p)
+            meps_c.append(m)
+            out.append(seamless.blend(ctx["chain"][k], m, lead, q))
+        # kvart 4 slutar om 1 h: den prövas vid nästa utfärdandetid
+        ctx["state"][key] = {"t": ctx["t"], "chain": ctx["chain"][3], "meps": meps_c[3]}
+        return np.stack(out)
+    return fn
+
+
+SYSTEMS |= {"adaptiv": adaptive(P), "adaptiv_2": adaptive(P, 2.0)}

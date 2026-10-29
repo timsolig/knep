@@ -204,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
             share[name] = round(float((sources == code).sum() / max(valid.sum(), 1)), 4)
     if not args.time and not args.no_compare:  # källorna har bara senaste loppet
         started = time.monotonic()
-        extra["compare"] = compare.update(args.out, session, t0)
+        extra["compare"] = compare.update(args.out, session, t0, args.hours)
         log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
     extra["models"] = models.versions()  # vilka släppta versioner som räknade den här prognosen
     render.Renderer(grid).write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)

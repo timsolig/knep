@@ -45,6 +45,8 @@ def run_day(day: datetime, chain: model.Chain, root: Path = OUT) -> None:
     out.mkdir(parents=True, exist_ok=True)
     if (out / "klar").exists():
         return
+    while not radar_path(day + timedelta(hours=29)).exists():  # hämtningen har inte kommit hit än
+        time.sleep(60)
     state, frames = model.State(), deque(maxlen=HISTORY)
     t, end, started, n_long = day - WARMUP, day + timedelta(hours=24), time.monotonic(), 0
     shape = None
@@ -72,7 +74,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--shard", default="0/1")
     p.add_argument("--part", default=None, help="validering eller test; standard är alla")
-    p.add_argument("--motion-step", type=int, default=1, help="rörelsefältets interpolation på var n:e pixel (model.dense_motion)")
+    p.add_argument("--motion-step", type=int, default=4, help="rörelsefältets interpolation på var n:e pixel (model.dense_motion)")
     p.add_argument("--out", type=Path, default=OUT)
     a = p.parse_args()
     i, n = map(int, a.shard.split("/"))
