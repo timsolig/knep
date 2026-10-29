@@ -1,5 +1,5 @@
 [project]
-name = "nowcast"
+name = "knep"
 version = "0.1.0"
 description = "Nederbördsnowcast från SMHI:s radarkomposit, körs på en Raspberry Pi"
 requires-python = ">=3.11"
@@ -12,13 +12,14 @@ dependencies = [
     "opencv-python-headless",
     "h5py",
     "scikit-learn==1.9.1",
+    "pyproj>=3.7.2",
 ]
 
 [project.scripts]
-nowcast = "nowcast.cli:main"
-nowcast-case = "nowcast.cases:main"
-nowcast-bias = "nowcast.bias:main"
-nowcast-models = "nowcast.models:main"
+knep = "knep.cli:main"
+knep-case = "knep.cases:main"
+knep-bias = "knep.bias:main"
+knep-models = "knep.models:main"
 
 [dependency-groups]
 dev = ["pytest"]

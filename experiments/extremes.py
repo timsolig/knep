@@ -39,7 +39,7 @@ import verify  # noqa: E402
 from generate import NS, encode, quiet  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
-from nowcast.extremes import FEATURES, MONO, THR, USE_THR, calibrate_tail, db, features, predict_proba, recalibrate  # noqa: E402
+from knep.extremes import FEATURES, MONO, THR, USE_THR, calibrate_tail, db, features, predict_proba, recalibrate  # noqa: E402
 
 TRAIN_LEADS = [1, 2, 3, 4, 6, 8, 10, 12]
 RNG = np.random.default_rng(0)
@@ -54,7 +54,7 @@ def load_case(path: Path):
 
 def tendencies(cs, j):
     from pysteps.extrapolation.semilagrangian import extrapolate
-    from nowcast.extremes import tendencies as _tend
+    from knep.extremes import tendencies as _tend
     i = cs.issues[j]
     v = cs.motion[j]
     adv = lambda f, n: quiet(extrapolate, f, v, n)
@@ -178,7 +178,7 @@ def recal(gen: Path, models_dir: Path, final_model: Path | None):
     lägger tabellen för alla fall i den slutliga modellen.
     """
     from sklearn.isotonic import IsotonicRegression
-    from nowcast.extremes import LEAD_BUCKETS, bucket
+    from knep.extremes import LEAD_BUCKETS, bucket
     paths = sorted(p for p in gen.glob("*.npz") if not p.stem.endswith("_ext"))
     samples = {}  # fall -> (tröskel, intervall) -> (p, y, w)
     for path in paths:

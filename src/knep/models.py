@@ -5,10 +5,10 @@ gäller: en tagg, ett filnamn och en sha256 per modell. Taggen pekar på en rele
 filen ligger som tillgång och release-texten beskriver träningen och verifieringen. Repot är
 publikt, så hämtningen behöver ingen token.
 
-    nowcast-models fetch                 hämta de låsta versionerna till models/ och kontrollera dem
-    nowcast-models pin extremes extremes-v2 models/extremes.pkl
+    knep-models fetch                 hämta de låsta versionerna till models/ och kontrollera dem
+    knep-models pin extremes extremes-v2 models/extremes.pkl
                                          lås en ny version (efter att releasen är skapad)
-    nowcast-models status                vilka versioner som är låsta och om filerna stämmer
+    knep-models status                vilka versioner som är låsta och om filerna stämmer
 
 En ny version skapas med deploy/release_model.sh, som laddar upp filen med gh och låser den.
 """
@@ -45,7 +45,7 @@ def versions(manifest: Path = MANIFEST) -> dict:
 def _repo(m: dict) -> str:
     repo = os.environ.get("GITHUB_REPO") or m.get("repo")
     if not repo:
-        raise SystemExit("ange repot i models/models.json (\"repo\": \"ägare/nowcast\") eller GITHUB_REPO")
+        raise SystemExit("ange repot i models/models.json (\"repo\": \"ägare/knep\") eller GITHUB_REPO")
     return repo
 
 
@@ -94,7 +94,7 @@ def status(manifest: Path = MANIFEST) -> int:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="nowcast-models", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(prog="knep-models", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--manifest", type=Path, default=MANIFEST)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("fetch")

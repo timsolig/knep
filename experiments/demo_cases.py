@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 from cases import load  # noqa: E402
 
-from nowcast import cases, model, radar  # noqa: E402
+from knep import cases, model, radar  # noqa: E402
 
 DEMO = {
     "knmi_20100826": ("test-knmi-2010", "Testfall: ihållande regn i Nederländerna", "regn"),

@@ -1,5 +1,5 @@
 # Starta: cd dev && docker compose up -d --build
-# Gå in:  docker exec -it nowcast-dev bash
+# Gå in:  docker exec -it knep-dev bash
 services:
   claude:
     build:
@@ -7,13 +7,13 @@ services:
       args:
         UID: "1000"   # ändra om `id -u` på Pi:n ger något annat
         GID: "1000"
-    image: nowcast-dev
-    container_name: nowcast-dev
+    image: knep-dev
+    container_name: knep-dev
     init: true
     restart: unless-stopped
     volumes:
       - home:/home/dev                        # inloggningar för Claude och gh, verktyg och cacher
-      - ${HOME}/nowcast-dev:/work             # utvecklingsklonen som Claude arbetar i
+      - ${HOME}/knep:/work                    # utvecklingsklonen som Claude arbetar i
       - ${HOME}/radar-arkiv:/data             # radararkiv för träning och verifiering
     # Lämna utrymme åt driften på värden. Sänk till 2g på en Pi med 4 GB.
     mem_limit: 4g

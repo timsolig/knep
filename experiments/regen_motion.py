@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 from generate import NS, decode, encode, mask_outside  # noqa: E402
 
-from nowcast import model  # noqa: E402
+from knep import model  # noqa: E402
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()

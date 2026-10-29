@@ -26,7 +26,7 @@ skyfall som radarn missar inte ändrar nästa veckas nivå.
 Radarns timsummor räknas på den råa analysen (SMHI:s egna pixlar, före korrektionen) vid varje
 station, mätarnas timvärden är SMHI:s automatiska stationer (parameter 7, summa 1 timme, värdet
 gäller timmen som slutar vid tidsstämpeln). Båda sparas per dygn i en katalog, löpande i driften
-och bakåt ur arkivet med `nowcast-bias`.
+och bakåt ur arkivet med `knep-bias`.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from scipy.ndimage import gaussian_filter
 
 from . import composite
 
-log = logging.getLogger("nowcast.bias")
+log = logging.getLogger("knep.bias")
 
 METOBS = "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/7"
 ELEV_DEG = 0.5  # lägsta elevationen i SMHI:s komposit
@@ -660,7 +660,7 @@ def main(argv=None) -> int:
 
     from . import radar
 
-    p = argparse.ArgumentParser(prog="nowcast-bias", description="Volymkorrektion mot SMHI:s regnmätare")
+    p = argparse.ArgumentParser(prog="knep-bias", description="Volymkorrektion mot SMHI:s regnmätare")
     p.add_argument("--store", type=Path, default=Path("cache/bias"))
     sub = p.add_subparsers(dest="cmd", required=True)
     g = sub.add_parser("gauges", help="hämta mätarnas timvärden bakåt (arkiv och senaste månaderna)")
@@ -679,7 +679,7 @@ def main(argv=None) -> int:
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     session = requests.Session()
-    session.headers["User-Agent"] = "nowcast/0.1 (hobbyprojekt)"
+    session.headers["User-Agent"] = "knep/0.1 (hobbyprojekt)"
     store = Store(a.store)
 
     if a.cmd == "gauges":
@@ -699,7 +699,7 @@ def main(argv=None) -> int:
     if a.cmd == "radar":
         stations = Stations.load(a.store / "stations.json")
         if stations is None:
-            log.error("kör först: nowcast-bias gauges")
+            log.error("kör först: knep-bias gauges")
             return 1
         t = datetime(a.start.year, a.start.month, a.start.day, tzinfo=UTC)
         end = datetime(a.end.year, a.end.month, a.end.day, tzinfo=UTC) + timedelta(days=1)

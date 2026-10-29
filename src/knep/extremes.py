@@ -192,6 +192,6 @@ def load(path: Path):
     if d.get("sklearn") and d["sklearn"] != sklearn.__version__:
         import logging
 
-        logging.getLogger("nowcast").warning("%s är tränad med scikit-learn %s men %s är installerad; träna om",
+        logging.getLogger("knep").warning("%s är tränad med scikit-learn %s men %s är installerad; träna om",
                                              path, d["sklearn"], sklearn.__version__)
     return d

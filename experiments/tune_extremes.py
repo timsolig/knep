@@ -4,7 +4,7 @@
 """
 import sys, time, numpy as np
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parents[1] / "src"))
-from nowcast.extremes import FEATURES, MONO
+from knep.extremes import FEATURES, MONO
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import roc_auc_score
 F = sys.argv.pop(1) if len(sys.argv) > 1 and sys.argv[1].endswith("/") else "gen/ext/features/"

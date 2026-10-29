@@ -102,7 +102,7 @@ ETS 1 är oförändrad till 0,008 bättre, inget fall förlorar mer än 0,002 oc
 
 ## Extremer
 
-`extremes.py` tränar en gradient boosting-modell per tröskel (1, 5, 10, 20 mm/h) på lagrangeska särdrag från kedjan: värdet och grannskapet (max, medel, andel över trösklar i 6 till 62 km), intensitetstrenden längs banan de senaste 15 och 30 min, platskartan, ledtid, fart och händelsens nivå (analysens 99- och 99,9-percentil och regnandel). Ut kommer en sannolikhet per pixel, och den förväntade ytan över 5, 10 och 20 mm/h styr en monoton omskalning av kedjans värden (`ext`), så att läge och struktur behålls men frekvensen av extremer anpassas till situationen och ledtiden. `exth` tar halva steget mot den förväntade ytan. Särdragen och omskalningen ligger i `src/nowcast/extremes.py` och delas med driften.
+`extremes.py` tränar en gradient boosting-modell per tröskel (1, 5, 10, 20 mm/h) på lagrangeska särdrag från kedjan: värdet och grannskapet (max, medel, andel över trösklar i 6 till 62 km), intensitetstrenden längs banan de senaste 15 och 30 min, platskartan, ledtid, fart och händelsens nivå (analysens 99- och 99,9-percentil och regnandel). Ut kommer en sannolikhet per pixel, och den förväntade ytan över 5, 10 och 20 mm/h styr en monoton omskalning av kedjans värden (`ext`), så att läge och struktur behålls men frekvensen av extremer anpassas till situationen och ledtiden. `exth` tar halva steget mot den förväntade ytan. Särdragen och omskalningen ligger i `src/knep/extremes.py` och delas med driften.
 
 Utfallet på sex fall, alltid med det testade fallet utanför träningen (`results/extremer.md`):
 

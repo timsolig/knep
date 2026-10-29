@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 from generate import LK, db, decode, quiet  # noqa: E402
 from verify import cat_scores, cdf_match, contingency  # noqa: E402
 
-from nowcast import composite  # noqa: E402
+from knep import composite  # noqa: E402
 
 RADIUS, START, LENGTH = 50, 10, 12  # pixlar à 2 km, bild, antal bilder (5 min)
 SMOOTH = False  # --smooth: även utfyllnad som jämnas ut med åldern

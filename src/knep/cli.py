@@ -24,7 +24,7 @@ import requests
 from . import bias, composite, model, models, radar, render
 
 NO_NEW_DATA = 75
-log = logging.getLogger("nowcast")
+log = logging.getLogger("knep")
 
 
 def _parse_time(s: str) -> datetime:
@@ -114,7 +114,7 @@ def _prune(directory: Path, pattern: str, keep: int) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="nowcast", description=__doc__)
+    p = argparse.ArgumentParser(prog="knep", description=__doc__)
     p.add_argument("--out", type=Path, default=Path("out/data"), help="katalog för PNG-rutor och manifest")
     p.add_argument("--cache", type=Path, default=Path("cache"), help="katalog för hämtade radarbilder och tillstånd")
     p.add_argument("--hours", type=float, default=2.0, help="prognoslängd i timmar")
@@ -134,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
     state_dir = args.cache / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     session = requests.Session()
-    session.headers["User-Agent"] = "nowcast/0.1 (hobbyprojekt)"
+    session.headers["User-Agent"] = "knep/0.1 (hobbyprojekt)"
 
     if args.time:
         t0 = args.time

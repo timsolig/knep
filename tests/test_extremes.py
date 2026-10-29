@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nowcast import extremes
+from knep import extremes
 
 
 def _field():

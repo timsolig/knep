@@ -8,7 +8,7 @@ import numpy as np
 from rasterio.crs import CRS
 from rasterio.transform import from_origin
 
-from nowcast import radar, render
+from knep import radar, render
 
 T0 = datetime(2024, 7, 1, 12, 5, tzinfo=UTC)
 
