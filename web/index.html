@@ -4,178 +4,674 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nederbördsprognos</title>
-<meta name="description" content="Radar och nowcast för nederbörd de kommande två timmarna">
+<meta name="description" content="Radar och nowcast för nederbörd de kommande två timmarna, och hur modellen klarade kända väderhändelser">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
     --bg: #ffffff; --fg: #1b1f24; --muted: #6a737d; --line: #e3e6ea; --accent: #1f6feb; --warn: #b54708;
-    --shadow: 0 2px 16px rgba(0,0,0,.14);
+    --chip: #f2f4f7; --good: #1a7f37; --shadow: 0 2px 16px rgba(0,0,0,.14);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #16191d; --fg: #e8eaed; --muted: #9aa3ad; --line: #2c3238; --accent: #58a6ff; --warn: #f0a35e; --shadow: 0 2px 16px rgba(0,0,0,.5); }
+    :root { --bg: #16191d; --fg: #e8eaed; --muted: #9aa3ad; --line: #2c3238; --accent: #58a6ff; --warn: #f0a35e;
+            --chip: #22272e; --good: #56d364; --shadow: 0 2px 16px rgba(0,0,0,.5); }
   }
   html, body { height: 100%; margin: 0; }
   body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
   #map { position: fixed; inset: 0; }
   .rain { image-rendering: pixelated; }
+  button { font: inherit; color: inherit; }
 
-  #panel {
+  #tabs {
+    position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 12px; z-index: 1001; display: flex;
+    background: var(--bg); border-radius: 10px; box-shadow: var(--shadow); padding: 3px;
+  }
+  #tabs button { border: 0; background: none; padding: 7px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+  #tabs button[aria-selected="true"] { background: var(--chip); color: var(--fg); font-weight: 600; }
+
+  .panel {
     position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
-    max-width: 440px; z-index: 1000; background: var(--bg); border-radius: 14px; box-shadow: var(--shadow);
-    padding: 14px 16px 12px; box-sizing: border-box;
+    max-width: 460px; z-index: 1000; background: var(--bg); border-radius: 14px; box-shadow: var(--shadow);
+    padding: 14px 16px 12px; box-sizing: border-box; max-height: calc(100% - 90px); overflow: auto;
   }
   .row { display: flex; align-items: center; gap: 12px; }
-  #time { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
-  #kind { color: var(--muted); font-variant-numeric: tabular-nums; }
-  #kind.fc { color: var(--accent); }
+  .time { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .kind { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+  .kind.fc { color: var(--accent); }
 
-  #play {
+  .play {
     flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
-    background: var(--bg); color: var(--fg); font-size: 15px; cursor: pointer; display: grid; place-items: center;
+    background: var(--bg); font-size: 15px; cursor: pointer; display: grid; place-items: center;
   }
-  #play:focus-visible, #slider:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  #slider { flex: 1; accent-color: var(--accent); height: 32px; margin: 0; }
+  .play:focus-visible, input[type=range]:focus-visible, .chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); height: 32px; margin: 0; }
 
-  #legend { display: flex; margin-top: 8px; font-size: 11px; color: var(--muted); }
-  #legend div { flex: 1; }
-  #legend span { display: block; height: 6px; }
-  #legend div:first-child span { border-radius: 3px 0 0 3px; }
-  #legend div:last-child span { border-radius: 0 3px 3px 0; }
+  .legend { display: flex; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .legend div { flex: 1; }
+  .legend span { display: block; height: 6px; }
+  .legend div:first-child span { border-radius: 3px 0 0 3px; }
+  .legend div:last-child span { border-radius: 0 3px 3px 0; }
 
-  #status { margin-top: 6px; font-size: 12px; color: var(--muted); }
-  #status.warn { color: var(--warn); }
+  .status { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .status.warn { color: var(--warn); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+  .chips button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 4px 11px; cursor: pointer; font-size: 13px; }
+  .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chips.layers button { border-radius: 8px; font-size: 12px; padding: 4px 9px; }
+  h2 { font-size: 17px; margin: 2px 0 2px; }
+  .meta { color: var(--muted); font-size: 12px; }
+  .text { font-size: 13px; margin: 6px 0 8px; }
+  .text a { color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  th, td { padding: 3px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  td.best { color: var(--good); font-weight: 600; }
+  caption { text-align: left; color: var(--muted); font-size: 11px; padding-bottom: 2px; }
+  [hidden] { display: none !important; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; font-size: 13px; color: var(--accent); }
 
   #locate {
     position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 1000;
-    width: 40px; height: 40px; border-radius: 10px; border: 0; background: var(--bg); color: var(--fg);
+    width: 40px; height: 40px; border-radius: 10px; border: 0; background: var(--bg);
     box-shadow: var(--shadow); font-size: 18px; cursor: pointer;
   }
   .leaflet-control-attribution { font-size: 10px; }
-  @media (min-width: 700px) { #panel { right: auto; width: 440px; } }
+  @media (min-width: 700px) { .panel { right: auto; width: 460px; } }
+  .seg button { border-radius: 8px; font-size: 12px; padding: 4px 10px; }
+  .hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  #point { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  #point .row { justify-content: space-between; }
+  #point-close { border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted); padding: 0 4px; }
+  #point-chart { display: block; width: 100%; height: 160px; margin-top: 4px; }
+  @media (max-width: 500px) { #point-chart { height: 120px; } }
+  #point-chart text { font-size: 10px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  #point-chart .grid { stroke: var(--line); stroke-width: 1; }
+  #point-chart .now { stroke: var(--muted); stroke-dasharray: 2 3; }
+  .keys { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .keys i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  :root { --ours: #1f6feb; --past: #9aa3ad; --met: #2da44e; --snow: #d4731c; }
+  @media (prefers-color-scheme: dark) { :root { --ours: #58a6ff; --past: #6e7781; --met: #56d364; --snow: #f0a35e; } }
 </style>
 </head>
 <body>
 <div id="map"></div>
+<nav id="tabs" role="tablist" aria-label="Vy">
+  <button role="tab" id="tab-live" aria-selected="true">Prognos</button>
+  <button role="tab" id="tab-cases" aria-selected="false">Händelser</button>
+</nav>
 <button id="locate" title="Visa min plats" aria-label="Visa min plats">◎</button>
 
-<div id="panel">
+<section id="live" class="panel" aria-label="Aktuell prognos">
   <div class="row" style="justify-content: space-between; align-items: baseline;">
-    <div id="time">--:--</div>
-    <div id="kind">Laddar</div>
+    <div class="time" id="time">--:--</div>
+    <div class="kind" id="kind">Laddar</div>
   </div>
   <div class="row" style="margin-top: 6px;">
-    <button id="play" aria-label="Spela upp">▶</button>
+    <button class="play" id="play" aria-label="Spela upp">▶</button>
     <input id="slider" type="range" min="0" max="0" value="0" aria-label="Tid">
   </div>
-  <div id="legend" aria-label="Intensitet i mm/h"></div>
-  <div id="status"></div>
-</div>
+  <div class="row" style="justify-content: space-between; flex-wrap: wrap; gap: 0 8px;">
+    <div class="chips seg" id="live-res" role="group" aria-label="Upplösning">
+      <button aria-pressed="true" data-res="5" title="Momentan intensitet var 5:e minut">5 min</button>
+      <button aria-pressed="false" data-res="15" title="Summa per kvart, som KNEP">15 min</button>
+      <button aria-pressed="false" data-res="60" title="Summa per timme, som SNOW">1 h</button>
+    </div>
+    <div class="chips layers" id="live-layers" hidden>
+      <button aria-pressed="true" data-layer="rain">Intensitet</button>
+      <button aria-pressed="false" data-layer="p10">Risk för minst 10 mm/h</button>
+    </div>
+  </div>
+  <div class="legend" id="legend" aria-label="Färgskala"></div>
+  <div class="status" id="status"></div>
+  <div id="point" hidden>
+    <div class="row"><strong id="point-title">Punkt</strong><button id="point-close" aria-label="Stäng punkten">×</button></div>
+    <svg id="point-chart" role="img" aria-label="Tidsserie i punkten"></svg>
+    <div class="keys">
+      <span><i style="background:var(--past)"></i>Radar</span><span><i style="background:var(--ours)"></i>Min modell</span>
+      <span><i style="background:var(--met)"></i>MET Norge nowcast</span><span><i style="background:var(--snow)"></i>SNOW median, min till max</span>
+    </div>
+    <table id="point-table"></table>
+    <div class="status" id="point-status"></div>
+  </div>
+  <div class="hint" id="point-hint">Klicka på kartan för en tidsserie i punkten, jämförd med SMHI:s SNOW och MET Norges nowcast.</div>
+</section>
+
+<section id="cases" class="panel" aria-label="Väderhändelser" hidden>
+  <div class="chips" id="case-list" role="list"></div>
+  <div id="case-body" hidden>
+    <h2 id="case-name"></h2>
+    <div class="meta" id="case-meta"></div>
+    <div class="chips seg" id="case-res" role="group" aria-label="Upplösning" style="margin-top:8px">
+      <button aria-pressed="false" data-res="5">5 min</button>
+      <button aria-pressed="true" data-res="15">15 min</button>
+      <button aria-pressed="false" data-res="60">1 h</button>
+    </div>
+    <div class="chips layers" id="case-layers"></div>
+    <div class="row" style="justify-content: space-between; align-items: baseline;">
+      <div class="time" id="case-time">--:--</div>
+      <div class="kind" id="case-kind"></div>
+    </div>
+    <div class="row" style="margin-top: 4px;">
+      <button class="play" id="case-play" aria-label="Spela upp">▶</button>
+      <input id="case-slider" type="range" min="0" max="0" value="0" aria-label="Tid i händelsen">
+    </div>
+    <div class="legend" id="case-legend"></div>
+    <div class="status" id="case-status"></div>
+    <details id="case-more">
+      <summary>Om händelsen och poäng</summary>
+      <div class="text" id="case-text"></div>
+      <table id="case-scores"></table>
+    </details>
+  </div>
+  <div class="status" id="case-empty">Laddar händelser</div>
+</section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const DATA = 'data/';
+const CASES = 'cases/';  // händelserna ligger i main, inte i data-grenen som skrivs om var 5:e minut
 const STALE_MIN = 20;
 const $ = id => document.getElementById(id);
-const clock = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' });
+const tz = { timeZone: 'Europe/Stockholm' };
+const clock = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit', ...tz });
+const day = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'long', year: 'numeric', ...tz });
+const hour = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', ...tz });
+const dayTime = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', ...tz });
 const num = v => v.toLocaleString('sv-SE');
+const mm = v => v == null ? '' : v.toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const MIN = 60000;
 
 const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-const map = L.map('map', { zoomControl: false, minZoom: 4, maxZoom: 11 }).setView([62.5, 16], 5);
+const map = L.map('map', { zoomControl: false, minZoom: 3, maxZoom: 11 }).setView([62.5, 16], 5);
 L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
   subdomains: 'abcd', maxZoom: 19,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · Radar: <a href="https://www.smhi.se/data">SMHI</a> (CC BY 4.0)',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · Radar: <a href="https://www.smhi.se/data">SMHI</a>, <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0) · Jämförelse: SMHI SNOW, <a href="https://api.met.no/">MET Norge</a>',
 }).addTo(map);
 
-let manifest = null, overlays = [], idx = 0, timer = null;
+function legendHtml(items, unit) {
+  return items.map(l => `<div><span style="background:${l.color}"></span>${unit === '%' ? Math.round(l.min * 100) : num(l.min)}</div>`).join('')
+    + `<div style="flex:none;padding-left:6px;align-self:flex-end">${unit}</div>`;
+}
+function pressed(group, attr, value) {
+  group.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset[attr] === value));
+}
+const closestIndex = (list, t) => list.reduce((best, f, i) =>
+  Math.abs(new Date(f.time) - t) < Math.abs(new Date(list[best].time) - t) ? i : best, 0);
 
+/* SWEREF 99 TM (EPSG:3006), radarns rutnät: transversal Mercator på GRS80 (Krügers serie, mm-noggrann) */
+function sweref99tm(lat, lon) {
+  const a = 6378137, f = 1 / 298.257222101, k0 = 0.9996, lon0 = 15 * Math.PI / 180, E0 = 500000;
+  const n = f / (2 - f), A = a / (1 + n) * (1 + n * n / 4 + n ** 4 / 64);
+  const al = [n / 2 - 2 * n * n / 3 + 5 * n ** 3 / 16, 13 * n * n / 48 - 3 * n ** 3 / 5, 61 * n ** 3 / 240];
+  const phi = lat * Math.PI / 180, dl = lon * Math.PI / 180 - lon0, c = 2 * Math.sqrt(n) / (1 + n);
+  const t = Math.sinh(Math.atanh(Math.sin(phi)) - c * Math.atanh(c * Math.sin(phi)));
+  const xi = Math.atan(t / Math.cos(dl)), eta = Math.atanh(Math.sin(dl) / Math.sqrt(1 + t * t));
+  let x = xi, y = eta;
+  al.forEach((v, j) => { const k = 2 * (j + 1); x += v * Math.sin(k * xi) * Math.cosh(k * eta); y += v * Math.cos(k * xi) * Math.sinh(k * eta); });
+  return [E0 + k0 * A * y, k0 * A * x];
+}
+
+/* ---------- aktuell prognos ---------- */
+const live = { manifest: null, overlays: { 5: [], 15: [], 60: [] }, prob: [], res: '5', idx: 0, layer: 'rain', values: null, point: null };
+const listFor = (m, r) => (r === '5' ? m.frames : r === '15' ? m.frames15 : m.frames60) || [];
 const lastObs = m => m.frames.map(f => f.kind).lastIndexOf('obs');
+const allLive = () => [...Object.values(live.overlays).flat(), ...live.prob].filter(Boolean);
 
-function show(i) {
-  if (!manifest) return;
-  i = Math.max(0, Math.min(i, overlays.length - 1));
-  overlays[idx]?.setOpacity(0);
-  overlays[i].setOpacity(1);
-  idx = i;
+function liveShow(i) {
+  const m = live.manifest;
+  if (!m) return;
+  const list = listFor(m, live.res), ov = live.overlays[live.res];
+  if (!list.length) return;
+  i = Math.max(0, Math.min(i, list.length - 1));
+  allLive().forEach(o => o.setOpacity(0));
+  const p = live.res === '5' && live.layer === 'p10' ? live.prob[i] : null;
+  (p || ov[i])?.setOpacity(1);
+  live.idx = i;
+  $('slider').max = list.length - 1;
   $('slider').value = i;
-  const f = manifest.frames[i];
-  const lead = Math.round((new Date(f.time) - new Date(manifest.analysis)) / 60000);
+  const f = list[i];
   $('time').textContent = clock.format(new Date(f.time));
-  $('kind').textContent = f.kind === 'fc' ? `Prognos +${lead} min` : lead === 0 ? 'Senaste radarbild' : `Radar ${lead} min`;
-  $('kind').className = f.kind;
+  if (live.res === '5') {
+    const lead = Math.round((new Date(f.time) - new Date(m.analysis)) / MIN);
+    $('kind').textContent = f.kind === 'fc' ? `Prognos +${lead} min` : lead === 0 ? 'Senaste radarbild' : `Radar ${lead} min`;
+  } else {
+    const what = { obs: 'Radar', fc: 'Prognos', mix: 'Radar och prognos' }[f.kind];
+    $('kind').textContent = `${what}, summa ${clock.format(new Date(f.start))} till ${clock.format(new Date(f.time))}`;
+  }
+  $('kind').className = 'kind ' + (f.kind === 'obs' ? 'obs' : 'fc');
+  $('legend').innerHTML = p ? legendHtml(m.prob_legend, '%')
+    : legendHtml(m.legends?.[live.res] || m.legend, m.units?.[live.res] || 'mm/h');
+  $('live-layers').hidden = live.res !== '5' || !live.prob.some(Boolean);
 }
 
-function legend(items) {
-  $('legend').innerHTML = items.map(l => `<div><span style="background:${l.color}"></span>${num(l.min)}</div>`).join('')
-    + '<div style="flex:none;padding-left:6px;align-self:flex-end">mm/h</div>';
+function liveRes(r) {
+  const m = live.manifest;
+  const cur = m ? listFor(m, live.res)[live.idx] : null;
+  live.res = r;
+  pressed($('live-res'), 'res', r);
+  if (!m) return;
+  const list = listFor(m, r);
+  if (!list.length) return;
+  let i = cur ? closestIndex(list, new Date(cur.time)) : 0;
+  if (r !== '5' && cur && list[i].kind === 'obs' && cur.kind !== 'obs') i = Math.min(i + 1, list.length - 1);
+  liveShow(i);
+  if (live.point) pointDraw();
 }
 
-function status() {
-  if (!manifest) return;
-  const age = Math.round((Date.now() - new Date(manifest.analysis)) / 60000);
+function liveStatus() {
+  const m = live.manifest;
+  if (!m) return;
+  const age = Math.round((Date.now() - new Date(m.analysis)) / MIN);
   const el = $('status');
-  el.className = age > STALE_MIN ? 'warn' : '';
+  const gaps = m.missing_radars?.length ? ` Radar saknas: ${m.missing_radars.join(', ')}, området fylls med flyttad analys och grannländernas radar.` : '';
+  const vc = m.volume_correction ? ` Volymkorrigerad mot regnmätarna, medianfaktor ${num(m.volume_correction.median)}.` : '';
+  el.className = 'status' + (age > STALE_MIN || gaps ? ' warn' : '');
   el.textContent = age > STALE_MIN
     ? `Ingen ny radarbild på ${age} min. Prognosen kan vara inaktuell.`
-    : `Analys ${clock.format(new Date(manifest.analysis))}, uppdateras var femte minut`;
+    : `Analys ${clock.format(new Date(m.analysis))}, uppdateras var femte minut.${gaps}${vc}`;
 }
 
-async function load() {
+async function liveLoad() {
   let m;
   try {
     const r = await fetch(`${DATA}manifest.json?t=${Date.now()}`, { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
     m = await r.json();
   } catch (e) {
-    if (!manifest) { $('kind').textContent = 'Ingen prognos ännu'; }
+    if (!live.manifest) $('kind').textContent = 'Ingen prognos ännu';
     return;
   }
-  if (manifest && m.analysis === manifest.analysis) { status(); return; }
-
-  const lead = manifest ? idx - lastObs(manifest) : 0;
-  const fresh = m.frames.map(f => L.imageOverlay(`${DATA}${f.file}?v=${encodeURIComponent(m.analysis)}`, m.bounds,
-    { opacity: 0, interactive: false, className: 'rain' }).addTo(map));
-  overlays.forEach(o => o.remove());
-  overlays = fresh;
-  idx = 0;
-  if (!manifest) legend(m.legend);
-  manifest = m;
-  $('slider').max = m.frames.length - 1;
-  show(lastObs(m) + lead);
-  status();
+  if (live.manifest && m.analysis === live.manifest.analysis) { liveStatus(); return; }
+  const old = live.manifest;
+  const keep = old ? listFor(old, live.res)[live.idx] : null;
+  const v = encodeURIComponent(m.analysis);
+  const add = file => L.imageOverlay(`${DATA}${file}?v=${v}`, m.bounds, { opacity: 0, interactive: false, className: 'rain' });
+  const fresh = { 5: m.frames.map(f => add(f.file)), 15: (m.frames15 || []).map(f => add(f.file)), 60: (m.frames60 || []).map(f => add(f.file)) };
+  const prob = m.frames.map(f => f.p10 ? add(f.p10) : null);
+  allLive().forEach(o => o.remove());
+  Object.assign(live, { overlays: fresh, prob, manifest: m, values: null });
+  $('live-res').hidden = !m.frames15;  // äldre manifest har bara 5 min
+  if (!m.frames15) live.res = '5';
+  if (mode === 'live') allLive().forEach(o => o.addTo(map));
+  const list = listFor(m, live.res);
+  let i = live.res === '5' ? lastObs(m) + (old && keep ? live.idx - lastObs(old) : 0) : list.findIndex(f => f.kind !== 'obs');
+  if (live.res !== '5' && keep && old) i = closestIndex(list, new Date(keep.time));
+  liveShow(Math.max(0, i));
+  liveStatus();
+  if (live.point) pointOpen(live.point.ll, true);
 }
 
-function play() {
-  const btn = $('play');
-  if (timer) { clearInterval(timer); timer = null; btn.textContent = '▶'; btn.setAttribute('aria-label', 'Spela upp'); return; }
-  btn.textContent = '❚❚'; btn.setAttribute('aria-label', 'Pausa');
-  if (idx >= overlays.length - 1) show(0);
-  let hold = 0;
-  timer = setInterval(() => {
-    if (idx < overlays.length - 1) return show(idx + 1);
-    if (++hold > 3) { hold = 0; show(0); }
-  }, 450);
+/* ---------- punkt: min modell mot SNOW och MET Norge ---------- */
+let pointMarker = null;
+
+async function loadValues(m) {
+  if (live.values?.analysis === m.analysis) return live.values.codes;
+  if (!m.values || typeof DecompressionStream === 'undefined') throw new Error('värdefil saknas');
+  const r = await fetch(`${DATA}${m.values.file}?v=${encodeURIComponent(m.analysis)}`);
+  if (!r.ok) throw new Error(r.status);
+  const codes = new Uint8Array(await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  live.values = { analysis: m.analysis, codes };
+  return codes;
 }
 
-$('slider').addEventListener('input', e => show(+e.target.value));
-$('play').addEventListener('click', play);
+function sampleOurs(m, codes, ll) {
+  const v = m.values, [n, H, W] = v.shape;
+  const [x, y] = sweref99tm(ll.lat, ll.lng);
+  const col = Math.floor((x - v.west) / v.res), row = Math.floor((v.north - y) / v.res);
+  if (row < 0 || row >= H || col < 0 || col >= W) return null;
+  return v.times.map((t, k) => {
+    const c = codes[k * H * W + row * W + col];
+    return { t: +new Date(t), r: c === 255 ? null : c === 0 ? 0 : v.base * 10 ** ((c - 1) * v.step_db / 10), kind: m.frames[k]?.kind };
+  });
+}
+
+async function fetchMet(ll) {
+  const r = await fetch(`https://api.met.no/weatherapi/nowcast/2.0/complete?lat=${ll.lat.toFixed(4)}&lon=${ll.lng.toFixed(4)}`);
+  if (!r.ok) throw new Error(r.status);
+  const d = await r.json();
+  return { coverage: d.properties.meta.radar_coverage,
+           series: d.properties.timeseries.map(e => ({ t: +new Date(e.time), r: e.data.instant.details.precipitation_rate ?? null })) };
+}
+
+async function fetchSnow(ll) {
+  const r = await fetch(`https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/${ll.lng.toFixed(4)}/lat/${ll.lat.toFixed(4)}/data.json`);
+  if (!r.ok) throw new Error(r.status);
+  const d = await r.json();
+  const ok = v => v == null || v === 9999 ? null : v;
+  return d.timeSeries.map(e => ({ end: +new Date(e.time), start: +new Date(e.intervalParametersStartTime || (new Date(e.time) - 3600000)),
+    med: ok(e.data.precipitation_amount_median), lo: ok(e.data.precipitation_amount_min), hi: ok(e.data.precipitation_amount_max) }))
+    .filter(e => e.end - e.start === 3600000);
+}
+
+async function pointOpen(ll, quiet) {
+  if (!live.manifest) return;
+  pointMarker?.remove();
+  pointMarker = L.circleMarker(ll, { radius: 5, weight: 2, color: dark ? '#fff' : '#1b1f24', fillOpacity: 0 }).addTo(map);
+  $('point').hidden = false;
+  $('point-hint').hidden = true;
+  if (!quiet) $('point-status').textContent = 'Hämtar';
+  $('point-title').textContent = `Punkt ${ll.lat.toFixed(2).replace('.', ',')}° N, ${ll.lng.toFixed(2).replace('.', ',')}° E`;
+  const m = live.manifest;
+  const [ours, met, snow] = await Promise.allSettled([loadValues(m).then(c => sampleOurs(m, c, ll)), fetchMet(ll), fetchSnow(ll)]);
+  live.point = { ll, ours: ours.value || null, met: met.value || null, snow: snow.value || null,
+                 errors: { ours: ours.status === 'rejected', met: met.status === 'rejected', snow: snow.status === 'rejected' } };
+  pointDraw();
+}
+
+// medel av 5-minutersvärden per period (värdet vid t gäller de fem minuterna före t); null om något saknas
+function periodMean(series, end, minutes) {
+  let s = 0;
+  for (let k = 0; k < minutes / 5; k++) {
+    const e = series.find(x => x.t === end - k * 5 * MIN);
+    if (!e || e.r == null) return null;
+    s += e.r;
+  }
+  return s / (minutes / 5);
+}
+
+function pointDraw() {
+  const P = live.point, m = live.manifest;
+  if (!P || !m) return;
+  const res = +live.res, f = res === 5 ? 1 : res / 60;  // 5 min i mm/h, annars mm per period
+  const periods = res === 5 ? m.frames.map(x => ({ end: +new Date(x.time), start: +new Date(x.time) - 5 * MIN, kind: x.kind }))
+    : listFor(m, live.res).map(x => ({ end: +new Date(x.time), start: +new Date(x.start), kind: x.kind }));
+  if (!periods.length) return;
+  const val = (series, p) => series ? (res === 5 ? series.find(x => x.t === p.end)?.r ?? null : periodMean(series, p.end, res)) : null;
+  const ours = periods.map(p => ({ ...p, v: P.ours ? (v => v == null ? null : v * f)(val(P.ours, p)) : null }));
+  const met = P.met ? periods.map(p => ({ ...p, v: (v => v == null ? null : v * f)(val(P.met.series, p)) })) : [];
+  const snowIn = (P.snow || []).filter(h => h.end > periods[0].start && h.start < periods.at(-1).end);
+  const snow = [];
+  for (const h of snowIn) {  // timvärdet som medelintensitet (5 min) eller fördelat på kvartarna
+    const g = res === 60 ? 1 : res === 15 ? 0.25 : 1;
+    snow.push({ start: Math.max(h.start, periods[0].start), end: Math.min(h.end, periods.at(-1).end),
+                med: h.med == null ? null : h.med * g, lo: h.lo == null ? null : h.lo * g, hi: h.hi == null ? null : h.hi * g });
+  }
+
+  const svg = $('point-chart'), Wd = svg.clientWidth || 420, Hd = svg.clientHeight || 160, L0 = 30, R0 = 14, T0 = 8, B0 = 18;
+  const x0 = periods[0].start, x1 = periods.at(-1).end;
+  const vals = [...ours, ...met].map(p => p.v).concat(snow.flatMap(s => [s.med, s.hi])).filter(v => v != null);
+  const ymax = Math.max(res === 15 ? 0.25 : 1, ...vals) * 1.1;
+  const X = t => L0 + (t - x0) / (x1 - x0) * (Wd - L0 - R0), Y = v => Hd - B0 - v / ymax * (Hd - T0 - B0);
+  let g = '';
+  for (const v of [0, ymax / 2, ymax / 1.1]) {
+    g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 4}" y="${Y(v) + 3}" text-anchor="end">${num(+v.toPrecision(2))}</text>`;
+  }
+  const step = res === 60 ? 60 : 30;
+  for (let t = Math.ceil(x0 / (step * MIN)) * step * MIN; t <= x1; t += step * MIN) {
+    g += `<text x="${X(t)}" y="${Hd - 4}" text-anchor="middle">${clock.format(new Date(t))}</text>`;
+  }
+  for (const s of snow) {  // spridningen under allt annat, medianen ovanpå staplarna
+    if (s.lo != null && s.hi != null) g += `<rect x="${X(s.start)}" width="${X(s.end) - X(s.start)}" y="${Y(s.hi)}" height="${Math.max(1, Y(s.lo) - Y(s.hi))}" fill="var(--snow)" opacity=".18"/>`;
+  }
+  const snowMed = snow.filter(s => s.med != null).map(s => `<line x1="${X(s.start)}" x2="${X(s.end)}" y1="${Y(s.med)}" y2="${Y(s.med)}" stroke="var(--snow)" stroke-width="2.5"/>`).join('');
+  if (res === 5) {
+    const path = pts => pts.length ? 'M' + pts.map(p => `${X(p.end).toFixed(1)},${Y(p.v).toFixed(1)}`).join('L') : '';
+    const obs = ours.filter(p => p.kind === 'obs' && p.v != null), fc = ours.filter(p => p.kind !== 'obs' && p.v != null);
+    g += `<path d="${path(obs)}" fill="none" stroke="var(--past)" stroke-width="2"/>`;
+    g += `<path d="${path(obs.slice(-1).concat(fc))}" fill="none" stroke="var(--ours)" stroke-width="2"/>`;
+    g += `<path d="${path(met.filter(p => p.v != null))}" fill="none" stroke="var(--met)" stroke-width="1.5"/>`;
+  } else {
+    for (const p of ours) {
+      if (p.v == null) continue;
+      g += `<rect x="${X(p.start) + 1}" width="${Math.max(1, X(p.end) - X(p.start) - 2)}" y="${Y(p.v)}" height="${Y(0) - Y(p.v)}" fill="var(${p.kind === 'obs' ? '--past' : '--ours'})" opacity="${p.kind === 'mix' ? 0.7 : 0.9}"/>`;
+    }
+    for (const p of met) if (p.v != null) g += `<line x1="${X(p.start)}" x2="${X(p.end)}" y1="${Y(p.v)}" y2="${Y(p.v)}" stroke="var(--met)" stroke-width="2"/>`;
+  }
+  g += snowMed;
+  const now = +new Date(m.analysis);
+  g += `<line class="now" x1="${X(now)}" x2="${X(now)}" y1="${T0}" y2="${Hd - B0}"/>`;
+  svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
+  svg.innerHTML = g;
+
+  // hela kommande timmar: min modell, MET Norge och SNOW i mm
+  const hours = (m.frames60 || []).filter(h => h.kind !== 'obs').map(h => ({ end: +new Date(h.time), start: +new Date(h.start) }));
+  let t = '<caption>Summa per timme, mm</caption><tr><th>Timme</th><th>Min modell</th><th>MET Norge</th><th>SNOW median</th></tr>';
+  for (const h of hours) {
+    const o = P.ours ? periodMean(P.ours, h.end, 60) : null, mt = P.met ? periodMean(P.met.series, h.end, 60) : null;
+    const sn = (P.snow || []).find(x => x.end === h.end);
+    t += `<tr><td>${hour.format(new Date(h.start))} till ${hour.format(new Date(h.end))}</td><td>${mm(o)}</td><td>${mm(mt)}</td>`
+       + `<td>${sn?.med != null ? `${mm(sn.med)} (${mm(sn.lo)} till ${mm(sn.hi)})` : ''}</td></tr>`;
+  }
+  $('point-table').innerHTML = hours.length ? t : '';
+
+  const notes = [];
+  if (P.errors.ours || !P.ours) notes.push('Min modell saknar värden här (utanför radarns rutnät).');
+  if (P.errors.met) notes.push('MET Norge svarade inte.');
+  else if (P.met && P.met.coverage !== 'ok') notes.push('MET Norge har ingen radartäckning här.');
+  if (P.errors.snow) notes.push('SNOW svarade inte (punkten kan ligga utanför SMHI:s område).');
+  notes.push(res === 5 ? 'mm/h var 5:e minut; SNOW:s timvärde ritas som medelintensitet.' :
+             res === 15 ? 'mm per kvart; SNOW:s timvärde är fördelat jämnt på kvartarna.' : 'mm per timme.');
+  $('point-status').textContent = notes.join(' ');
+}
+
+$('point-close').addEventListener('click', () => {
+  live.point = null; pointMarker?.remove(); pointMarker = null;
+  $('point').hidden = true; $('point-hint').hidden = false;
+});
+map.on('click', e => { if (mode === 'live') pointOpen(e.latlng); });
+
+/* ---------- händelser ---------- */
+const LAYERS = {
+  5: [['radar', 'Radar'], ['kedja30', 'Prognos 30 min före'], ['proxy30', 'KNEP-proxy 30 min före'], ['p10', 'Risk ≥ 10 mm/h, 30 min före']],
+  15: [['radar', 'Radar'], ['kedja30', 'Prognos 30 min före'], ['kedja60', 'Prognos 60 min före'], ['proxy30', 'KNEP-proxy 30 min före']],
+  60: [['radar', 'Radar'], ['kedja', 'Prognos från timmens början'], ['proxy', 'KNEP-proxy från timmens början']],
+};
+const cases = { list: [], current: null, cache: new Map(), idx: 0, res: '15', layer: 'radar', shown: null };
+const caseFrames = m => m.res?.[cases.res] || (cases.res === '15' ? m.frames : null) || [];
+
+async function casesLoad() {
+  try {
+    const r = await fetch(`${CASES}index.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    cases.list = await r.json();
+  } catch (e) {
+    $('case-empty').textContent = 'Inga händelser byggda ännu. Kör nowcast-case build på Pi:n.';
+    return;
+  }
+  $('case-empty').hidden = true;
+  $('case-list').innerHTML = cases.list.map(c =>
+    `<button role="listitem" aria-pressed="false" data-slug="${c.path}">${c.name}</button>`).join('');
+  $('case-list').querySelectorAll('button').forEach(b => b.addEventListener('click', () => caseOpen(b.dataset.slug)));
+  const want = location.hash.match(/^#handelser\/(.+)$/)?.[1];
+  caseOpen(cases.list.some(c => c.path === want) ? want : cases.list[0]?.path);
+}
+
+function caseClear() {
+  cases.cache.forEach(o => o.remove());
+  cases.cache.clear();
+  cases.shown = null;
+}
+
+// rutorna läggs till när de visas, plus några framåt; en händelse kan ha över tusen
+function caseOverlay(i) {
+  const m = cases.current, f = caseFrames(m)[i];
+  const file = f?.[cases.layer];
+  if (!file) return null;
+  if (!cases.cache.has(file)) {
+    cases.cache.set(file, L.imageOverlay(`${CASES}${cases.slug}/${file}`, m.bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(map));
+    if (cases.cache.size > 80) {
+      const [k, o] = cases.cache.entries().next().value;
+      if (o !== cases.shown) { o.remove(); cases.cache.delete(k); }
+    }
+  }
+  return cases.cache.get(file);
+}
+
+function caseLayers() {
+  const m = cases.current, frames = caseFrames(m);
+  const available = LAYERS[cases.res].filter(([k]) => frames.some(f => f[k]));
+  if (!available.some(([k]) => k === cases.layer)) cases.layer = cases.res === '60' && available.some(([k]) => k === 'kedja') ? 'kedja' : 'radar';
+  $('case-layers').innerHTML = available.map(([k, label]) =>
+    `<button aria-pressed="${k === cases.layer}" data-layer="${k}">${label}</button>`).join('');
+  $('case-layers').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    cases.layer = b.dataset.layer;
+    pressed($('case-layers'), 'layer', cases.layer);
+    caseShow(cases.idx);
+  }));
+  $('case-slider').max = Math.max(0, frames.length - 1);
+}
+
+async function caseOpen(slug) {
+  if (!slug) return;
+  const m = await (await fetch(`${CASES}${slug}/manifest.json`, { cache: 'no-store' })).json();
+  caseClear();
+  cases.current = m;
+  cases.slug = slug;
+  if (!m.res) cases.res = '15';
+  history.replaceState(null, '', `#handelser/${slug}`);
+  $('case-list').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.slug === slug));
+  $('case-body').hidden = false;
+  $('case-name').textContent = m.name;
+  $('case-meta').textContent = `${dayTime.format(new Date(m.start))} till ${dayTime.format(new Date(m.end))}`;
+  $('case-text').innerHTML = m.text + (m.links?.length ? ` <a href="${m.links[0]}" target="_blank" rel="noopener">Källa</a>` : '');
+  $('case-res').hidden = !m.res;
+  pressed($('case-res'), 'res', cases.res);
+  caseLayers();
+  const wide = innerWidth >= 700;
+  $('case-more').open = wide;
+  map.fitBounds(m.bounds, wide ? { paddingTopLeft: [500, 70], paddingBottomRight: [20, 20] }
+                               : { paddingTopLeft: [10, 70], paddingBottomRight: [10, $('cases').offsetHeight + 20] });
+  caseScores(m);
+  caseShow(0);
+}
+
+function caseRes(r) {
+  const m = cases.current;
+  const cur = m ? caseFrames(m)[cases.idx] : null;
+  cases.res = r;
+  pressed($('case-res'), 'res', r);
+  if (!m) return;
+  caseClear();
+  caseLayers();
+  caseScores(m);
+  const list = caseFrames(m);
+  caseShow(cur && list.length ? closestIndex(list, new Date(cur.time)) : 0);
+}
+
+function caseShow(i) {
+  const m = cases.current;
+  if (!m) return;
+  const frames = caseFrames(m);
+  if (!frames.length) return;
+  i = Math.max(0, Math.min(i, frames.length - 1));
+  const o = caseOverlay(i);
+  for (let k = 1; k <= 3; k++) caseOverlay(Math.min(i + k, frames.length - 1));
+  if (cases.shown && cases.shown !== o) cases.shown.setOpacity(0);
+  o?.setOpacity(1);
+  cases.shown = o;
+  cases.idx = i;
+  $('case-slider').value = i;
+  const f = frames[i];
+  const end = new Date(f.time);
+  $('case-time').textContent = clock.format(end);
+  const label = LAYERS[cases.res].find(([k]) => k === cases.layer)?.[1] || '';
+  const span = cases.res === '5' ? '' : `, summa ${clock.format(new Date(end - cases.res * MIN))} till ${clock.format(end)}`;
+  $('case-kind').textContent = o ? label + span : `${label}: saknas för den här tiden`;
+  $('case-kind').className = 'kind' + (cases.layer === 'radar' ? '' : ' fc');
+  const unit = m.units?.[cases.res] || 'mm/h';
+  $('case-legend').innerHTML = cases.layer === 'p10' ? legendHtml(m.prob_legend, '%') : legendHtml(m.legends?.[cases.res] || m.legend, unit);
+  const s = m.series?.find(x => x.time === f.time);
+  $('case-status').textContent = s ? `${dayTime.format(end)}. Högst ${num(s.max)} mm/h momentant, ${num(Math.round(s.area5))} km² över 5 mm/h`
+    + (s.saknas > 0.02 ? `, ${Math.round(s.saknas * 100)} procent utan radardata` : '') + '.' : '';
+}
+
+function caseScores(m) {
+  const sc = m.scores?.systems ? m.scores : m.scores?.[cases.res];
+  if (!sc) { $('case-scores').innerHTML = ''; return; }
+  const sys = sc.systems, names = Object.keys(sys), hs = sc.horizons;
+  const rows = ['ETS 1 mm/h', 'ETS 5 mm/h', 'SEDI 10 mm/h', 'Volym'];
+  const fmt = v => v == null ? '' : v.toFixed(2).replace('.', ',');
+  const short = n => ({ 'Ny kedja': 'Kedjan', 'KNEP-proxy': 'Proxyn' }[n] || n);
+  const score = (r, v) => v == null ? -9 : r === 'Volym' ? -Math.abs(Math.log(v)) : v;  // volym: närmast 1 är bäst
+  let html = `<caption>Poäng mot radarn ${hs.join(', ')} min framåt, ${sc.perspective}. Volym är prognosens summa mot radarns. Grönt är bäst.</caption>`
+    + `<tr><th></th><th></th>${hs.map(h => `<th>${h}</th>`).join('')}</tr>`;
+  for (const r of rows) {
+    if (!names.some(n => sys[n][r])) continue;
+    names.forEach((n, j) => {
+      const vals = hs.map(h => sys[n][r]?.[String(h)]);
+      html += `<tr><td>${j === 0 ? r : ''}</td><td>${short(n)}</td>` + vals.map((v, k) => {
+        const best = names.every(o => score(r, sys[o][r]?.[String(hs[k])]) <= score(r, v));
+        return `<td class="${best && v != null ? 'best' : ''}">${fmt(v)}</td>`;
+      }).join('') + '</tr>';
+    });
+  }
+  $('case-scores').innerHTML = html;
+}
+
+/* ---------- uppspelning ---------- */
+function player(btn, step, last, getIdx) {
+  let timer = null;
+  return () => {
+    if (timer) { clearInterval(timer); timer = null; btn.textContent = '▶'; btn.setAttribute('aria-label', 'Spela upp'); return; }
+    btn.textContent = '❚❚'; btn.setAttribute('aria-label', 'Pausa');
+    if (getIdx() >= last()) step(0);
+    let hold = 0;
+    timer = setInterval(() => {
+      if (getIdx() < last()) return step(getIdx() + 1);
+      if (++hold > 3) { hold = 0; step(0); }
+    }, 450);
+  };
+}
+const livePlay = player($('play'), liveShow, () => live.manifest ? listFor(live.manifest, live.res).length - 1 : 0, () => live.idx);
+const casePlay = player($('case-play'), caseShow, () => cases.current ? caseFrames(cases.current).length - 1 : 0, () => cases.idx);
+$('play').addEventListener('click', livePlay);
+$('case-play').addEventListener('click', casePlay);
+$('slider').addEventListener('input', e => liveShow(+e.target.value));
+$('case-slider').addEventListener('input', e => caseShow(+e.target.value));
+$('live-res').querySelectorAll('button').forEach(b => b.addEventListener('click', () => liveRes(b.dataset.res)));
+$('case-res').querySelectorAll('button').forEach(b => b.addEventListener('click', () => caseRes(b.dataset.res)));
+$('live-layers').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  live.layer = b.dataset.layer;
+  pressed($('live-layers'), 'layer', live.layer);
+  liveShow(live.idx);
+}));
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
-  if (e.key === 'ArrowRight') show(idx + 1);
-  if (e.key === 'ArrowLeft') show(idx - 1);
-  if (e.key === ' ') { e.preventDefault(); play(); }
+  const [show, i] = mode === 'live' ? [liveShow, live.idx] : [caseShow, cases.idx];
+  if (e.key === 'ArrowRight') show(i + 1);
+  if (e.key === 'ArrowLeft') show(i - 1);
+  if (e.key === ' ') { e.preventDefault(); (mode === 'live' ? livePlay : casePlay)(); }
 });
+
+/* ---------- flikar ---------- */
+let mode = 'live';
+function setMode(m) {
+  mode = m;
+  $('tab-live').setAttribute('aria-selected', m === 'live');
+  $('tab-cases').setAttribute('aria-selected', m === 'cases');
+  $('live').hidden = m !== 'live';
+  $('cases').hidden = m !== 'cases';
+  $('locate').hidden = m !== 'live';
+  if (m === 'live') {
+    caseClear();
+    cases.current = null;
+    allLive().forEach(o => o.addTo(map));
+    pointMarker?.addTo(map);
+    liveShow(live.idx);
+    if (location.hash) history.replaceState(null, '', location.pathname);
+  } else {
+    allLive().forEach(o => o.remove());
+    pointMarker?.remove();
+    if (!cases.list.length) casesLoad(); else caseOpen(cases.slug || cases.list[0]?.path);
+  }
+}
+$('tab-live').addEventListener('click', () => setMode('live'));
+$('tab-cases').addEventListener('click', () => setMode('cases'));
 
 let me = null;
 $('locate').addEventListener('click', () => map.locate({ setView: true, maxZoom: 9 }));
 map.on('locationfound', e => {
   me?.remove();
   me = L.circleMarker(e.latlng, { radius: 6, weight: 2, color: '#fff', fillColor: '#1f6feb', fillOpacity: 1 }).addTo(map);
+  if (mode === 'live' && !live.point) pointOpen(e.latlng);
 });
 
-load();
-setInterval(load, 60000);
-setInterval(status, 30000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+liveLoad();
+setInterval(() => { if (mode === 'live') liveLoad(); }, 60000);
+setInterval(liveStatus, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && mode === 'live') liveLoad(); });
+if (location.hash.startsWith('#handelser')) setMode('cases');
 </script>
 </body>
 </html>
