@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
 <title>Nederbördsprognos</title>
 <meta name="description" content="Radar och nowcast för nederbörd de kommande två timmarna, och hur modellen klarade kända väderhändelser">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -10,30 +11,71 @@
   :root {
     --bg: #ffffff; --fg: #1b1f24; --muted: #6a737d; --line: #e3e6ea; --accent: #1f6feb; --warn: #b54708;
     --chip: #f2f4f7; --good: #1a7f37; --shadow: 0 2px 16px rgba(0,0,0,.14);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #16191d; --fg: #e8eaed; --muted: #9aa3ad; --line: #2c3238; --accent: #58a6ff; --warn: #f0a35e;
-            --chip: #22272e; --good: #56d364; --shadow: 0 2px 16px rgba(0,0,0,.5); }
+    --canvas: #eef1f4; --card: 0 1px 2px rgba(16,24,40,.06), 0 6px 18px rgba(16,24,40,.08);
   }
   html, body { height: 100%; margin: 0; }
   body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
   #map { position: fixed; inset: 0; }
-  #mosaic { position: fixed; inset: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; background: var(--line); }
-  .pane { position: relative; min-width: 0; }
-  .pmap { position: absolute; inset: 0; background: var(--bg); }
+  /* Prognosfliken: panelen till vänster, mosaiken och tidslisten till höger; på mobil under varandra */
+  #liveview {
+    position: fixed; inset: 0; display: grid; background: var(--canvas);
+    grid-template-columns: 420px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "side mosaic" "side time";
+  }
+  #mosaic { grid-area: mosaic; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 14px 14px 0; min-height: 0; }
+  .pane { position: relative; min-width: 0; border-radius: 16px; overflow: hidden; background: var(--bg); box-shadow: var(--card); }
+  .pmap { position: absolute; inset: 0; background: #e8ebee; }
   .plabel {
-    position: absolute; z-index: 800; left: 8px; bottom: 8px; max-width: calc(100% - 32px); pointer-events: none;
-    background: var(--bg); border-radius: 8px; box-shadow: var(--shadow); padding: 4px 9px; font-size: 12px; line-height: 1.3;
+    position: absolute; z-index: 800; top: 12px; left: 12px; max-width: calc(100% - 24px); box-sizing: border-box; pointer-events: none;
+    background: rgba(255, 255, 255, .94); border-radius: 10px; box-shadow: 0 2px 10px rgba(16, 24, 40, .15);
+    padding: 7px 12px 7px 10px; border-left: 5px solid var(--c); line-height: 1.25;
   }
-  .plabel span { display: block; color: var(--muted); font-size: 11px; }
+  .plabel strong { display: block; font-size: 18px; letter-spacing: -.2px; }
+  .plabel span { display: block; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .plabel.missing span { color: var(--warn); }
-  @media (min-width: 1000px) {
-    #mosaic { left: 484px; }
-    #live { top: calc(64px + env(safe-area-inset-top)); bottom: auto; }
+  #lab-ours { --c: var(--ours); } #lab-met { --c: var(--met); } #lab-snow { --c: var(--snow); }
+
+  #timebar {
+    grid-area: time; justify-self: center; width: min(940px, calc(100% - 28px)); box-sizing: border-box; margin: 14px 0;
+    padding: 12px 18px; background: var(--bg); border-radius: 16px; box-shadow: var(--card);
   }
+  .tb-main { display: flex; align-items: center; gap: 14px; }
+  .tb-main .play { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tb-main .time { min-width: 80px; }
+  .tb-main .kind { min-width: 170px; }
+  .tb-sub { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; margin-top: 4px; }
+  .tb-sub .legend { flex: 1; min-width: 240px; margin-top: 0; }
+  .tb-sub .chips { margin: 0; }
+  #slider { -webkit-appearance: none; appearance: none; background: transparent; }
+  #slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px;
+    background: linear-gradient(to right, var(--past) 0 var(--split, 50%), var(--accent) var(--split, 50%) 100%); }
+  #slider::-moz-range-track { height: 6px; border-radius: 3px;
+    background: linear-gradient(to right, var(--past) 0 var(--split, 50%), var(--accent) var(--split, 50%) 100%); }
+  #slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+  #slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); }
+
+  #live {
+    grid-area: side; position: static; width: auto; max-width: none; max-height: none; border-radius: 0; box-shadow: none;
+    padding: calc(72px + env(safe-area-inset-top)) 22px 18px; overflow: auto; border-right: 1px solid var(--line);
+  }
+  #live h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.3px; }
+  #live .lead { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+
   @media (max-width: 999px) {
-    #mosaic { bottom: 44vh; }
-    #live { max-height: calc(44vh - 24px); }
+    #liveview { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, 32vh);
+                grid-template-areas: "mosaic" "time" "side"; }
+    #mosaic { gap: 6px; padding: calc(62px + env(safe-area-inset-top)) 6px 0; }
+    .pane { border-radius: 12px; }
+    .plabel { top: auto; bottom: 6px; left: 6px; max-width: calc(100% - 12px); padding: 4px 7px 4px 6px; border-left-width: 4px; }
+    .plabel strong { font-size: 14px; }
+    .plabel span { font-size: 10.5px; }
+    #timebar { margin: 6px 0; padding: 8px 12px; width: calc(100% - 12px); }
+    .tb-main { flex-wrap: wrap; gap: 4px 10px; }
+    .tb-main .time { font-size: 22px; min-width: 0; }
+    .tb-main .kind { order: 3; width: 100%; min-width: 0; text-align: left; font-size: 13px; }
+    #live { padding: 10px 14px; border-right: 0; border-top: 1px solid var(--line); }
+    #live h1, #live .lead { display: none; }
   }
   .rain { image-rendering: pixelated; }
   button { font: inherit; color: inherit; }
@@ -109,15 +151,9 @@
   .keys { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin-top: 2px; }
   .keys i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
   :root { --ours: #1f6feb; --past: #9aa3ad; --met: #2da44e; --snow: #d4731c; }
-  @media (prefers-color-scheme: dark) { :root { --ours: #58a6ff; --past: #6e7781; --met: #56d364; --snow: #f0a35e; } }
 </style>
 </head>
 <body>
-<div id="mosaic" aria-label="Min modell, MET Norge och SNOW sida vid sida">
-  <div class="pane"><div class="pmap" id="map-ours"></div><div class="plabel" id="lab-ours"><strong>Min modell</strong><span></span></div></div>
-  <div class="pane"><div class="pmap" id="map-met"></div><div class="plabel" id="lab-met"><strong>MET Norge</strong><span></span></div></div>
-  <div class="pane"><div class="pmap" id="map-snow"></div><div class="plabel" id="lab-snow"><strong>SNOW</strong><span></span></div></div>
-</div>
 <div id="map" hidden></div>
 <nav id="tabs" role="tablist" aria-label="Vy">
   <button role="tab" id="tab-live" aria-selected="true">Prognos</button>
@@ -125,30 +161,10 @@
 </nav>
 <button id="locate" title="Visa min plats" aria-label="Visa min plats">◎</button>
 
+<div id="liveview">
 <section id="live" class="panel" aria-label="Aktuell prognos">
-  <div class="row" style="justify-content: space-between; align-items: baseline;">
-    <div class="time" id="time">--:--</div>
-    <div class="kind" id="kind">Laddar</div>
-  </div>
-  <div class="row" style="margin-top: 6px;">
-    <button class="play" id="play" aria-label="Spela upp">▶</button>
-    <input id="slider" type="range" min="0" max="0" value="0" aria-label="Tid">
-  </div>
-  <div class="row" style="justify-content: space-between; flex-wrap: wrap; gap: 0 8px;">
-    <div class="chips seg" id="live-res" role="group" aria-label="Upplösning">
-      <button aria-pressed="true" data-res="5" title="Momentan intensitet var 5:e minut">5 min</button>
-      <button aria-pressed="false" data-res="15" title="Summa per kvart, som KNEP">15 min</button>
-      <button aria-pressed="false" data-res="60" title="Summa per timme, som SNOW">1 h</button>
-    </div>
-    <div class="chips layers">
-      <button aria-pressed="true" id="bg-toggle" title="Senaste radarbilden svagt under prognoserna">Radar i bakgrunden</button>
-    </div>
-    <div class="chips layers" id="live-layers" hidden>
-      <button aria-pressed="true" data-layer="rain">Intensitet</button>
-      <button aria-pressed="false" data-layer="p10">Risk för minst 10 mm/h</button>
-    </div>
-  </div>
-  <div class="legend" id="legend" aria-label="Färgskala"></div>
+  <h1>Nederbördsprognos</h1>
+  <p class="lead">Min modell bredvid MET Norges nowcast och SMHI:s SNOW, två timmar framåt.</p>
   <div class="status" id="status"></div>
   <div id="point" hidden>
     <div class="row"><strong id="point-title">Punkt</strong><button id="point-close" aria-label="Stäng punkten">×</button></div>
@@ -167,6 +183,35 @@
     <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0). Jämförelse: <a href="https://opendata.smhi.se/">SMHI SNOW</a>,
     <a href="https://api.met.no/">MET Norge</a> (CC BY 4.0).</div>
 </section>
+<div id="mosaic" aria-label="Min modell, MET Norge och SNOW sida vid sida">
+  <div class="pane"><div class="pmap" id="map-ours"></div><div class="plabel" id="lab-ours"><strong>Min modell</strong><span></span></div></div>
+  <div class="pane"><div class="pmap" id="map-met"></div><div class="plabel" id="lab-met"><strong>MET Norge</strong><span></span></div></div>
+  <div class="pane"><div class="pmap" id="map-snow"></div><div class="plabel" id="lab-snow"><strong>SNOW</strong><span></span></div></div>
+</div>
+<div id="timebar" aria-label="Tid">
+  <div class="tb-main">
+    <button class="play" id="play" aria-label="Spela upp">▶</button>
+    <div class="time" id="time">--:--</div>
+    <input id="slider" type="range" min="0" max="0" value="0" aria-label="Tid">
+    <div class="kind" id="kind">Laddar</div>
+  </div>
+  <div class="tb-sub">
+    <div class="chips seg" id="live-res" role="group" aria-label="Upplösning">
+      <button aria-pressed="true" data-res="5" title="Momentan intensitet var 5:e minut">5 min</button>
+      <button aria-pressed="false" data-res="15" title="Summa per kvart, som KNEP">15 min</button>
+      <button aria-pressed="false" data-res="60" title="Summa per timme, som SNOW">1 h</button>
+    </div>
+    <div class="legend" id="legend" aria-label="Färgskala"></div>
+    <div class="chips layers">
+      <button aria-pressed="true" id="bg-toggle" title="Senaste radarbilden svagt under prognoserna">Radar i bakgrunden</button>
+    </div>
+    <div class="chips layers" id="live-layers" hidden>
+      <button aria-pressed="true" data-layer="rain">Intensitet</button>
+      <button aria-pressed="false" data-layer="p10">Risk för minst 10 mm/h</button>
+    </div>
+  </div>
+</div>
+</div>
 
 <section id="cases" class="panel" aria-label="Väderhändelser" hidden>
   <div class="chips" id="case-list" role="list"></div>
@@ -213,9 +258,8 @@ const num = v => v.toLocaleString('sv-SE');
 const mm = v => v == null ? '' : v.toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const MIN = 60000;
 
-const dark = matchMedia('(prefers-color-scheme: dark)').matches;
 // Esris gråa bakgrund kräver ingen nyckel (CARTO:s rutor kräver numera en utanför localhost)
-const basemap = attribution => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_${dark ? 'Dark' : 'Light'}_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
+const basemap = attribution => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
   { maxNativeZoom: 16, maxZoom: 19, attribution });
 
 // Prognosfliken: tre kartor som följer varandra, avgränsade till MEPS-området (där SNOW finns)
@@ -295,6 +339,8 @@ function liveShow(i) {
   live.idx = i;
   $('slider').max = list.length - 1;
   $('slider').value = i;
+  const split = list.map(x => x.kind).lastIndexOf('obs');
+  $('slider').style.setProperty('--split', `${list.length > 1 ? Math.max(0, split) / (list.length - 1) * 100 : 0}%`);
   const f = list[i], t = +new Date(f.time);
   $('time').textContent = clock.format(new Date(f.time));
   if (live.res === '5') {
@@ -441,7 +487,7 @@ async function fetchSnow(ll) {
 async function pointOpen(ll, quiet) {
   if (!live.manifest) return;
   clearMarkers();
-  pointMarkers = paneMaps.map(pm => L.circleMarker(ll, { radius: 5, weight: 2, color: dark ? '#fff' : '#1b1f24', fillOpacity: 0, interactive: false }).addTo(pm));
+  pointMarkers = paneMaps.map(pm => L.circleMarker(ll, { radius: 5, weight: 2, color: '#1b1f24', fillOpacity: 0, interactive: false }).addTo(pm));
   $('point').hidden = false;
   $('point-hint').hidden = true;
   if (!quiet) $('point-status').textContent = 'Hämtar';
@@ -739,10 +785,9 @@ function setMode(m) {
   mode = m;
   $('tab-live').setAttribute('aria-selected', m === 'live');
   $('tab-cases').setAttribute('aria-selected', m === 'cases');
-  $('live').hidden = m !== 'live';
+  $('liveview').hidden = m !== 'live';
   $('cases').hidden = m !== 'cases';
   $('locate').hidden = m !== 'live';
-  $('mosaic').hidden = m !== 'live';
   $('map').hidden = m !== 'cases';
   if (m === 'live') {
     caseClear();
