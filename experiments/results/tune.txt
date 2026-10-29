@@ -1,0 +1,17 @@
+rmi_20210704   A full vikt, utan händelsedrag   | 5: AUC 0.970 BSS +0.150 kvot 1.14 | 10: AUC 0.653 BSS -0.324 kvot 0.88 | 20: AUC 0.410 BSS -0.143 kvot 0.74
+rmi_20210704   B rotvikt, alla drag             | 5: AUC 0.973 BSS +0.248 kvot 1.22 | 10: AUC 0.963 BSS +0.089 kvot 1.06 | 20: AUC 0.817 BSS -0.735 kvot 1.51
+rmi_20210704   C rotvikt, utan händelsedrag     | 5: AUC 0.972 BSS +0.235 kvot 1.47 | 10: AUC 0.955 BSS +0.008 kvot 1.86 | 20: AUC 0.633 BSS -0.688 kvot 2.33
+rmi_20210704   D full vikt, grova löv           | 5: AUC 0.972 BSS +0.084 kvot 1.26 | 10: AUC 0.873 BSS -1.111 kvot 2.21 | 20: AUC 0.870 BSS -2.063 kvot 4.45
+rmi_20210704   E rotvikt, grova löv             | 5: AUC 0.974 BSS +0.246 kvot 1.26 | 10: AUC 0.963 BSS +0.067 kvot 1.04 | 20: AUC 0.934 BSS -0.428 kvot 1.50
+mch_20150515   A full vikt, utan händelsedrag   | 5: AUC 0.963 BSS +0.159 kvot 0.91 | 10: AUC 0.743 BSS -0.360 kvot 1.31 | 20: AUC 0.747 BSS -2.003 kvot 2.96
+mch_20150515   B rotvikt, alla drag             | 5: AUC 0.970 BSS +0.300 kvot 0.80 | 10: AUC 0.958 BSS +0.095 kvot 0.86 | 20: AUC 0.827 BSS -0.250 kvot 0.75
+mch_20150515   C rotvikt, utan händelsedrag     | 5: AUC 0.974 BSS +0.309 kvot 0.93 | 10: AUC 0.957 BSS +0.011 kvot 1.22 | 20: AUC 0.858 BSS -0.464 kvot 1.80
+mch_20150515   D full vikt, grova löv           | 5: AUC 0.957 BSS +0.204 kvot 0.77 | 10: AUC 0.793 BSS -0.267 kvot 1.21 | 20: AUC 0.907 BSS +0.012 kvot 0.15
+mch_20150515   E rotvikt, grova löv             | 5: AUC 0.969 BSS +0.302 kvot 0.81 | 10: AUC 0.959 BSS +0.126 kvot 0.74 | 20: AUC 0.858 BSS +0.010 kvot 0.14
+fmi_20160928   A full vikt, utan händelsedrag   | 5: AUC 0.974 BSS +0.106 kvot 1.14 | 10: AUC 0.769 BSS -0.060 kvot 0.70 | 20: AUC 0.409 BSS -2.420 kvot 3.46
+fmi_20160928   B rotvikt, alla drag             | 5: AUC 0.980 BSS +0.160 kvot 1.77 | 10: AUC 0.962 BSS +0.021 kvot 0.98 | 20: AUC 0.746 BSS -0.039 kvot 0.32
+fmi_20160928   C rotvikt, utan händelsedrag     | 5: AUC 0.977 BSS +0.178 kvot 1.77 | 10: AUC 0.935 BSS +0.013 kvot 2.37 | 20: AUC 0.656 BSS -0.064 kvot 6.48
+fmi_20160928   D full vikt, grova löv           | 5: AUC 0.977 BSS +0.051 kvot 1.45 | 10: AUC 0.902 BSS -0.990 kvot 2.01 | 20: AUC 0.819 BSS -0.210 kvot 1.12
+fmi_20160928   E rotvikt, grova löv             | 5: AUC 0.980 BSS +0.146 kvot 1.76 | 10: AUC 0.961 BSS +0.020 kvot 0.98 | 20: AUC 0.836 BSS +0.002 kvot 0.14
+
+[exited with code 0]
