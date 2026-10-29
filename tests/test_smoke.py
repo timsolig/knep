@@ -65,13 +65,74 @@ def test_motion_is_eastward():
 def test_cli_end_to_end(tmp_path):
     cache, out = tmp_path / "cache", tmp_path / "out"
     cache.mkdir()
-    _write_cache(cache)
-    rc = cli.main(["--time", T0.isoformat(), "--cache", str(cache), "--out", str(out), "--hours", "1", "--keep-cache"])
+    _write_cache(cache, n=7)
+    rc = cli.main(["--time", T0.isoformat(), "--cache", str(cache), "--out", str(out), "--hours", "1", "--keep-cache",
+                   "--history", "7", "--no-bias"])
     assert rc == 0
     manifest = json.loads((out / "manifest.json").read_text())
     kinds = [f["kind"] for f in manifest["frames"]]
-    assert kinds == ["obs"] * 4 + ["fc"] * 12
+    assert kinds == ["obs"] * 7 + ["fc"] * 12
+    assert manifest["missing_radars"] == [] and manifest["sources"]["smhi"] == 1.0
     assert manifest["analysis"] == "2026-10-28T19:25:00Z"
     (s, w), (n, e) = manifest["bounds"]
     assert 53 < s < 54.5 and 69.5 < n < 70.5 and 4.5 < w < 6 and 29 < e < 31
     assert all((out / f["file"]).exists() for f in manifest["frames"])
+
+
+def test_chain_moves_and_keeps_peaks():
+    obs = np.stack([_rain(k) for k in range(-6, 1)])
+    res = model.Chain().run(obs, T0, 12)
+    cx = lambda f: (np.nan_to_num(f) * np.arange(W)).sum() / np.nan_to_num(f).sum()
+    assert abs(cx(res.rain[-1]) - cx(obs[-1]) - 12 * SPEED) < 4
+    # matchningen mot analysens fördelning: toppen smetas inte ut av interpolationen
+    assert np.nanmax(res.rain[-1]) > 0.97 * np.nanmax(obs[-1])
+    assert res.prob is None
+
+
+def test_location_map_learns_a_stationary_bias():
+    """En plats där radarn alltid ser 3 dB mer än prognosen ska få en positiv korrektion."""
+    state = model.State()
+    shape = (60, 80)
+    base = np.full(shape, 2.0, np.float32)
+    obs = base.copy()
+    obs[20:40, 30:50] *= 10 ** 0.3
+    for k in range(12):
+        t = T0 - k * model.STEP
+        state.obs[t.isoformat()] = obs
+        state.fc30[t.isoformat()] = base
+    corr = model.location_map(state, T0, shape)
+    assert corr[30, 40] > 2.0 and abs(corr[5, 5]) < 0.5
+
+
+def test_state_roundtrip(tmp_path):
+    s = model.State()
+    s.obs[T0.isoformat()] = np.ones((4, 5), np.float32)
+    s.fc30[T0.isoformat()] = np.full((4, 5), 2.0, np.float32)
+    s.save(tmp_path / "m.npz")
+    r = model.State.load(tmp_path / "m.npz")
+    assert np.allclose(r.fc30[T0.isoformat()], 2.0) and list(r.obs) == [T0.isoformat()]
+
+
+def test_cli_applies_volume_correction(tmp_path):
+    from nowcast import bias, composite, render
+
+    cache, out = tmp_path / "cache", tmp_path / "out"
+    cache.mkdir()
+    _write_cache(cache, n=7)
+    grid = composite.TargetGrid(WEST + RES / 2 - RES / 2, NORTH, RES, (H, W))
+    coef = np.zeros((12, 3))
+    coef[:, 0] = np.log(1.5)
+    path = tmp_path / "bias.npz"
+    bias.Correction(coef, np.zeros((H, W), np.float32), bias.beam_height(grid)).save(path)
+    rc = cli.main(["--time", T0.isoformat(), "--cache", str(cache), "--out", str(out), "--hours", "1", "--keep-cache",
+                   "--history", "7", "--bias", str(path)])
+    assert rc == 0
+    m = json.loads((out / "manifest.json").read_text())
+    assert abs(m["volume_correction"]["median"] - 1.5) < 0.01
+    import gzip
+
+    codes = np.frombuffer(gzip.decompress((out / m["values"]["file"]).read_bytes()), np.uint8).reshape(m["values"]["shape"])
+    analysis = render.decode_values(codes[6])
+    truth = _rain(0)
+    inside = np.isfinite(analysis) & (truth > 2)
+    assert np.allclose(analysis[inside], 1.5 * truth[inside], rtol=0.12)
