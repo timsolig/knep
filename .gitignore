@@ -9,3 +9,5 @@ web/data/
 # modellerna versioneras i GitHub Releases, se models/models.json
 models/*.pkl
 models/*.npz
+# token för driften, se deploy/compose.yaml
+deploy/.env

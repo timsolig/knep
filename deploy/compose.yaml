@@ -1,0 +1,28 @@
+# Driften på Pi:n. Bilden byggs direkt från main på GitHub, så ingen klon behövs.
+#
+#   docker compose up -d --build     starta, eller uppdatera till senaste main
+#   docker compose logs -f           följ körningarna
+#
+# Lägg GITHUB_TOKEN=... i en fil .env bredvid den här filen. Utan token räknas
+# prognoserna men publiceras inte. KNEP_SOURCE=.. bygger från klonen i stället för main.
+services:
+  knep:
+    build:
+      context: ${KNEP_SOURCE:-https://github.com/timsolig/knep.git#main}
+      dockerfile: deploy/Dockerfile
+    image: knep
+    container_name: knep
+    init: true
+    restart: unless-stopped
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    volumes:
+      - cache:/app/cache   # radarbilder, modelltillstånd och insamlingen mot regnmätarna
+      - out:/app/out       # senaste prognosen, så att en omstart inte räknar om samma bild
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }   # skona SD-kortet
+
+volumes:
+  cache:
+  out:
