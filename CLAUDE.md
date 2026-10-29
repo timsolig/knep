@@ -12,11 +12,17 @@ Nederbördsnowcast 0 till 2 h från SMHI:s radarkomposit. Körs på en Raspberry
 ## Struktur
 
 - `src/nowcast/radar.py` hämtning och avkodning. GeoTIFF 0..255 i EPSG:3006, dBZ = 0,4 · v − 30, 0 = inget eko, 255 = utanför täckning, Z = 200 R^1,5
-- `src/nowcast/model.py` modellen. `nowcast(obs, steps)` är gränssnittet: in (T, H, W) mm/h, ut (steps, H, W) mm/h, NaN där underlag saknas
-- `src/nowcast/render.py` omprojicering till EPSG:3857, PNG per ruta och manifest.json
-- `web/index.html` sidan (Leaflet från cdnjs, ingen byggkedja)
+- `src/nowcast/model.py` modellen. `Chain.run(obs, tid, steg, tillstånd)` är kedjan (rörelse, extrapolering, fördelningsmatchning, platskarta, sannolikheter för kraftig nederbörd); `nowcast(obs, steps)` är referensen. Tillståndet (senaste timmens analyser och 30-minutersprognoser) sparas i `cache/state/`
+- `src/nowcast/extremes.py` särdrag och sannolikheter som delas av drift och träning; modellen ligger i `models/extremes.pkl`
+- `src/nowcast/bias.py` volymkorrektion mot SMHI:s regnmätare (`nowcast-bias`); kartan ligger i `models/bias.npz`, underlaget, veckofaktorn och kandidaten till ny karta i `cache/bias/`
+- `src/nowcast/models.py` modellversioner (`nowcast-models`): filerna ligger i GitHub Releases, `models/models.json` låser tagg och sha256; nya versioner med `deploy/release_model.sh`
+- `src/nowcast/composite.py` och `sources.py` kompositen: SMHI, OPERA och enskilda radarvolymer som reserv, lagrangesk utfyllnad vid bortfall
+- `src/nowcast/cases.py` namngivna händelser (`nowcast-case`), skriver till `web/cases/`
+- `src/nowcast/render.py` omprojicering till EPSG:3857, PNG per ruta i 5 min, kvart och timme, värdefil (`values.bin.gz`) och manifest.json
+- `web/index.html` sidan med flikarna Prognos och Händelser (Leaflet från cdnjs, ingen byggkedja); punktserien hämtar MET Norge och SMHI SNOW direkt från webbläsaren
 - `deploy/` systemd-timer, `run.sh` och `publish.sh` som tvingar grenen `data`
 - `.github/workflows/pages.yml` slår ihop `web/` och grenen `data` och publicerar
+- `experiments/` jämförelsen mot en KNEP-proxy på öppna radarfall, med resultat i `experiments/results/`. Kör om den innan en ändring av modellen tas in
 
 ## Mål
 
@@ -29,5 +35,6 @@ Claude Code körs i containern i `dev/`. Repot ligger i `/work` och radararkivet
 ## Regler
 
 - En ny modell ersätter baslinjen bara om den slår den i verifieringen på ett fryst testset (FSS och CSI per ledtid).
+- Tränade modeller checkas aldrig in; de släpps i GitHub Releases och låses i `models/models.json`.
 - Håll beroendena få och installerbara på arm64.
 - Text i gränssnitt och dokumentation skrivs på svenska, utan tankstreck som skiljetecken.
