@@ -1,0 +1,47 @@
+[
+ {
+  "slug": "test-rmi-2021",
+  "name": "Testfall: skyfall i Belgien",
+  "kind": "regn",
+  "start": "2021-07-04T16:55:00Z",
+  "end": "2021-07-04T17:55:00Z",
+  "text": "Öppet radarfall från pysteps-data, 2021-07-04. Högst 69 mm/h i 2 km-rutorna. Visar hur kedjan och KNEP-proxyn klarar händelsen; sannolikheterna för kraftig nederbörd är tränade utan det här fallet.",
+  "path": "test-rmi-2021"
+ },
+ {
+  "slug": "test-mch-2017",
+  "name": "Testfall: vinternederbörd i Schweiz",
+  "kind": "regn",
+  "start": "2017-01-31T10:50:00Z",
+  "end": "2017-01-31T11:55:00Z",
+  "text": "Öppet radarfall från pysteps-data, 2017-01-31. Högst 25 mm/h i 2 km-rutorna. Visar hur kedjan och KNEP-proxyn klarar händelsen; sannolikheterna för kraftig nederbörd är tränade utan det här fallet.",
+  "path": "test-mch-2017"
+ },
+ {
+  "slug": "test-fmi-2016",
+  "name": "Testfall: åska i Finland",
+  "kind": "regn",
+  "start": "2016-09-28T15:50:00Z",
+  "end": "2016-09-28T16:55:00Z",
+  "text": "Öppet radarfall från pysteps-data, 2016-09-28. Högst 94 mm/h i 2 km-rutorna. Visar hur kedjan och KNEP-proxyn klarar händelsen; sannolikheterna för kraftig nederbörd är tränade utan det här fallet.",
+  "path": "test-fmi-2016"
+ },
+ {
+  "slug": "test-mch-2015",
+  "name": "Testfall: åska över Alperna",
+  "kind": "regn",
+  "start": "2015-05-15T16:50:00Z",
+  "end": "2015-05-15T17:55:00Z",
+  "text": "Öppet radarfall från pysteps-data, 2015-05-15. Högst 111 mm/h i 2 km-rutorna. Visar hur kedjan och KNEP-proxyn klarar händelsen; sannolikheterna för kraftig nederbörd är tränade utan det här fallet.",
+  "path": "test-mch-2015"
+ },
+ {
+  "slug": "test-knmi-2010",
+  "name": "Testfall: ihållande regn i Nederländerna",
+  "kind": "regn",
+  "start": "2010-08-26T01:05:00Z",
+  "end": "2010-08-26T06:30:00Z",
+  "text": "Öppet radarfall från pysteps-data, 2010-08-26. Högst 18 mm/h i 2 km-rutorna. Visar hur kedjan och KNEP-proxyn klarar händelsen; sannolikheterna för kraftig nederbörd är tränade utan det här fallet.",
+  "path": "test-knmi-2010"
+ }
+]
