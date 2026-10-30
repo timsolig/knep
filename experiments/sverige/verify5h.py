@@ -28,7 +28,7 @@ import cv2
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
-from data import DATA, load_days, meps_path, radar_path  # noqa: E402
+from data import CYCLE, DATA, load_days, meps_path, radar_path  # noqa: E402
 from knep import nwp, radar, render  # noqa: E402
 
 Q = timedelta(minutes=15)
@@ -105,7 +105,7 @@ def meps_quarters(meps: Meps, t: datetime, grid, interpolate: bool = False, lag:
     kvarten, interpolerad mellan timmarnas mitt (seamless.meps_at)."""
     from knep import seamless
 
-    got = meps.on(nwp.available(t) - lag * timedelta(hours=3), grid)
+    got = meps.on(nwp.available(t, CYCLE) - lag * timedelta(hours=CYCLE), grid)
     if got is None:
         return None
     run, on = got
@@ -212,6 +212,8 @@ def run(part: str, names: list[str], limit: int | None = None, chain_dir: Path =
     started, issues = time.monotonic(), 0
     for d in load_days(part):
         day = datetime.fromisoformat(d["day"]).replace(tzinfo=UTC)
+        if not (chain_dir / d["day"] / "klar").exists():  # bara dagar där kedjan är klar
+            continue
         state = {}  # för system som minns mellan utfärdandetiderna (assimilering)
         for h in range(0, 24, every):
             t = day + timedelta(hours=h)
@@ -229,7 +231,7 @@ def run(part: str, names: list[str], limit: int | None = None, chain_dir: Path =
             ctx = {"t": t, "chain": chain, "motion": motion, "meps": mq, "analysis": analysis, "grid": obs.grid,
                    "meps_i": meps_quarters(meps, t, obs.grid, interpolate=True),
                    "meps_prev": meps_quarters(meps, t, obs.grid, interpolate=True, lag=1),
-                   "obs": obs, "state": state, "meps_run": meps.on(nwp.available(t), obs.grid)}
+                   "obs": obs, "state": state, "meps_run": meps.on(nwp.available(t, CYCLE), obs.grid)}
             fcs = {n: fn(ctx) for n, fn in systems.items()}
             mask_base = np.isfinite(chain[0])
             hour_f = {n: np.zeros(analysis.shape, np.float32) for n in names}

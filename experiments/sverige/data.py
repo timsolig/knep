@@ -171,10 +171,14 @@ def meps_path(run: datetime) -> Path:
     return DATA / "meps" / f"meps_{run:%Y%m%dT%H}.npz"
 
 
+CYCLE = 6         # arkivet har körningar var 6:e timme alla år (2023 även var 3:e); verifieringen tar bara dem
+MEPS_LEADS = 14   # en körning är upp till 8,5 h gammal när den används och ska räcka 5 h framåt
+
+
 def meps_runs_for(day: datetime) -> list[datetime]:
     """Körningarna som behövs för prognoser utfärdade under dygnet, med 2,5 h fördröjning och 5 h framåt."""
-    first = nwp.available(day)
-    return [first + timedelta(hours=3 * k) for k in range(9)]
+    first = nwp.available(day, CYCLE)
+    return [first + timedelta(hours=CYCLE * k) for k in range(24 // CYCLE + 1)]
 
 
 def meps_days(a) -> None:
@@ -189,7 +193,7 @@ def meps_days(a) -> None:
             if path.exists():
                 continue
             try:
-                r = nwp.fetch(s, run, rows, cols, archive=True)
+                r = nwp.fetch(s, run, rows, cols, archive=True, leads=MEPS_LEADS)
             except requests.RequestException as e:
                 print(run, e, file=sys.stderr, flush=True)
                 continue

@@ -69,10 +69,15 @@ def blended(p: seamless.Params, key: str, source: str = "meps_i"):
 
 
 def variant(name: str):
-    """Ett system ur namnet "s:t50_small:t50_large:shape[:sigma_km]", med den fulla rättningen."""
-    parts = [float(x) for x in name.split(":")[1:]]
+    """Ett system ur namnet "s:t50_small:t50_large:shape[:sigma_km]" (fasta vikter) eller
+    "a:t50_small:t50_large:shape:sigma_km:gamma" (anpassade vikter), med den fulla rättningen."""
+    kind, *rest = name.split(":")
+    parts = [float(x) for x in rest]
     keys = ["t50_small", "t50_large", "shape", "sigma_km"]
-    return blended(replace(P, **dict(zip(keys, parts))), "rättad")
+    p = replace(P, **dict(zip(keys, parts)))
+    if kind == "a":
+        return adaptive(p, parts[4] if len(parts) > 4 else 1.0, tag=name)
+    return blended(p, "rättad")
 
 
 P = seamless.Params()
@@ -87,10 +92,10 @@ SYSTEMS = {
 }
 
 
-def adaptive(p: seamless.Params, gamma: float = 1.0, source: str = "meps_i"):
+def adaptive(p: seamless.Params, gamma: float = 1.0, source: str = "meps_i", tag: str = ""):
     """Som blended, men viktkurvan flyttas efter hur kedjan och den rättade MEPS-prognosen från
     förra utfärdandetiden (1 h sedan) träffade radarn nu (seamless.adapted)."""
-    key = f"adaptiv_{gamma}"
+    key = f"adaptiv_{gamma}_{tag}"
 
     def fn(ctx):
         st = _state(ctx, "rättad", p)

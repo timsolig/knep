@@ -27,7 +27,10 @@ from .radar import Grid
 log = logging.getLogger("knep")
 
 LATEST = "https://thredds.met.no/thredds/dodsC/mepslatest/meps_det_2_5km_{t:%Y%m%dT%H}Z.ncml"
-ARCHIVE = "https://thredds.met.no/thredds/dodsC/meps25epsarchive/{t:%Y/%m/%d}/meps_det_2_5km_{t:%Y%m%dT%H}Z.nc"
+# arkivet har bytt namn: meps_det_2_5km till 2023, meps_det_sfc från 2024 (2019 och tidigare
+# ligger på ett annat, mindre rutnät och används inte)
+ARCHIVE = ["https://thredds.met.no/thredds/dodsC/meps25epsarchive/{t:%Y/%m/%d}/meps_det_2_5km_{t:%Y%m%dT%H}Z.nc",
+           "https://thredds.met.no/thredds/dodsC/meps25epsarchive/{t:%Y/%m/%d}/meps_det_sfc_{t:%Y%m%dT%H}Z.ncml"]
 CATALOG = "https://thredds.met.no/thredds/catalog/mepslatest/catalog.xml"
 LAG = timedelta(hours=2, minutes=30)   # från körtid till att körningen finns, med marginal
 LEADS = 11                              # timmar som hämtas per körning
@@ -95,9 +98,11 @@ def box(grid: Grid, margin: int = 3) -> tuple[tuple[int, int], tuple[int, int]]:
 
 
 def fetch(session: requests.Session, run: datetime, rows, cols, archive: bool = False, leads: int = LEADS) -> Run:
-    url = (ARCHIVE if archive else LATEST).format(t=run)
     q = f"precipitation_amount_acc[0:1:{leads}][0:1:0][{rows[0]}:1:{rows[1] - 1}][{cols[0]}:1:{cols[1] - 1}]"
-    r = session.get(url + ".dods?" + q, timeout=300)
+    for url in ([u.format(t=run) for u in ARCHIVE] if archive else [LATEST.format(t=run)]):
+        r = session.get(url + ".dods?" + q, timeout=300)
+        if r.status_code != 404:
+            break
     r.raise_for_status()
     (acc,) = compare.dods_arrays(r.content, [">f4"])
     acc = acc.reshape(leads + 1, rows[1] - rows[0], cols[1] - cols[0])
@@ -114,7 +119,8 @@ def latest_run(session: requests.Session) -> datetime:
     return datetime.strptime(max(stamps), "%Y%m%dT%H").replace(tzinfo=UTC)
 
 
-def available(now: datetime) -> datetime:
-    """Senaste körningen som rimligen finns vid now (för verifieringen på arkivet)."""
+def available(now: datetime, cycle: int = 3) -> datetime:
+    """Senaste körningen som rimligen finns vid now (för verifieringen på arkivet), med en
+    körning var cycle:e timme."""
     t = now - LAG
-    return t.replace(hour=t.hour - t.hour % 3, minute=0, second=0, microsecond=0)
+    return t.replace(hour=t.hour - t.hour % cycle, minute=0, second=0, microsecond=0)

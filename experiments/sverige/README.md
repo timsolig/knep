@@ -5,7 +5,7 @@ Syftet är att förlänga prognosen till 5 h och mäta det mot radarn på svensk
 ## Data
 
 - **Radar**: SMHI:s komposit var 5:e minut ur det öppna arkivet, i `/data/radar/ÅÅÅÅ/MM/DD/`, cirka 19 MB per dygn.
-- **MEPS**: MetCoOps deterministiska körningar var 3:e timme ur MET Norges arkiv (`meps25epsarchive`, från 2016), ett utsnitt över radarns rutnät med timsummor 0 till 11 h, i `/data/meps/`, cirka 2,3 MB per körning. En körning räknas som tillgänglig 2,5 h efter körtiden (i realtid kom 18Z-körningen 20:20).
+- **MEPS**: MetCoOps deterministiska körningar ur MET Norges arkiv (`meps25epsarchive`), ett utsnitt över radarns rutnät med timsummor 0 till 14 h, i `/data/meps/`, cirka 2 MB per körning. Arkivet har körningarna 00, 06, 12 och 18 alla år (2023 även var 3:e timme), med filnamnet `meps_det_2_5km` till 2023 och `meps_det_sfc` från 2024. Verifieringen använder bara körningarna var 6:e timme, så att alla år behandlas lika; i drift finns de var 3:e timme, så MEPS är där i medel 1,5 h färskare än här. En körning räknas som tillgänglig 2,5 h efter körtiden (i realtid kom 18Z-körningen 20:20). 2019 ligger MEPS på ett äldre, mindre rutnät; de två dagarna därifrån har bara kedjans prognoser och räknas inte i jämförelserna med MEPS.
 
 MNWC, som uppdateras varje timme, finns inte som öppen data hos MET Norge, FMI eller SMHI. MET Nordic (`met_forecast_1_0km_nordic`) uppdateras varje timme, men arkivet har bara fyra körningar per dygn, och den är redan efterbearbetad med MET:s egen nowcast.
 

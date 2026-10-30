@@ -166,10 +166,11 @@ def blend(chain_f: np.ndarray, meps_f: np.ndarray, lead_min: float, p: Params) -
     out = wl * cl + (1 - wl) * ml + ws * (np.nan_to_num(c) - cl) + (1 - ws) * (m - ml)
     out = np.maximum(out, 0)
     if p.match:
-        # fördelningen mellan kedjans och MEPS:s, med kedjans vikt för de små skalorna
+        # inom radarns täckning: fördelningen mellan kedjans och MEPS:s där, med kedjans vikt för
+        # de små skalorna; utanför täckningen finns bara MEPS och den behåller sin
         n = 2001
-        target = ws * _quantiles(c, n) + (1 - ws) * _quantiles(m, n)
-        ok = np.isfinite(out)
+        ok = has_chain & np.isfinite(meps_f)
+        target = ws * _quantiles(np.where(ok, chain_f, np.nan), n) + (1 - ws) * _quantiles(np.where(ok, meps_f, np.nan), n)
         order = np.argsort(out[ok] + 1e-3 * gaussian_filter(out, 2.0)[ok], kind="stable")
         vals = np.empty(order.size, np.float32)
         vals[order] = target[np.minimum((np.arange(order.size) + 0.5) / order.size * n, n - 1).astype(int)]
