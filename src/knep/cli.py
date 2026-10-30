@@ -131,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--reference", action="store_true", help="kör referensmodellen i stället för kedjan")
     p.add_argument("--keep-cache", action="store_true", help="rensa inte gamla radarbilder")
     p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")
+    p.add_argument("--seamless", action="store_true", help="blanda kedjan med MEPS rättad mot radarn (seamless.py); använd med --hours 5")
     args = p.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -183,6 +184,13 @@ def main(argv: list[str] | None = None) -> int:
         state.save(state_dir / "model.npz")
         np.save(state_dir / "motion.npy", res.motion.astype(np.float32))
         fc, prob = res.rain, res.prob
+        if args.seamless and not args.time:
+            from . import seamless
+            try:
+                fc, extra["seamless"] = seamless.run_operational(args.cache / "meps", state_dir / "seamless.npz", session,
+                                                                 grid, t0, obs, fc)
+            except (requests.RequestException, ValueError, KeyError, OSError) as e:  # utan MEPS: bara kedjan
+                log.warning("MEPS: %s", e)
     log.info("prognos %s, %d steg på %.1f s", t0, steps, time.monotonic() - started)
 
     frames = [(t, "obs", f) for t, f in zip(times[-len(fields):], obs)]
@@ -196,7 +204,7 @@ def main(argv: list[str] | None = None) -> int:
             share[name] = round(float((sources == code).sum() / max(valid.sum(), 1)), 4)
     if not args.time and not args.no_compare:  # källorna har bara senaste loppet
         started = time.monotonic()
-        extra["compare"] = compare.update(args.out, session, t0)
+        extra["compare"] = compare.update(args.out, session, t0, args.hours)
         log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
     extra["models"] = models.versions()  # vilka släppta versioner som räknade den här prognosen
     render.Renderer(grid).write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)
