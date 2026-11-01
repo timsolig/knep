@@ -150,11 +150,6 @@ def corrected(meps_f: np.ndarray, lead_min: float, state: State, p: Params) -> n
     return f
 
 
-def _quantiles(f: np.ndarray, n: int) -> np.ndarray:
-    v = f[np.isfinite(f)]
-    return np.quantile(v, np.linspace(0, 1, n)) if v.size else np.zeros(n)
-
-
 def blend(chain_f: np.ndarray, meps_f: np.ndarray, lead_min: float, p: Params) -> np.ndarray:
     """En ledtids blandning av kedjan och den rättade MEPS-prognosen."""
     ws, wl = weight(lead_min, p.t50_small, p.shape), weight(lead_min, p.t50_large, p.shape)
@@ -168,12 +163,14 @@ def blend(chain_f: np.ndarray, meps_f: np.ndarray, lead_min: float, p: Params) -
     if p.match:
         # inom radarns täckning: fördelningen mellan kedjans och MEPS:s där, med kedjans vikt för
         # de små skalorna; utanför täckningen finns bara MEPS och den behåller sin
-        n = 2001
+        # Målet är de sorterade värdena själva (samma pixlar i båda fälten), inte ett fåtal
+        # kvantiler: med 2001 kvantiler fick den översta 1/2001 av pixlarna maxvärdet, vilket gav
+        # 25 % för mycket volym redan när kedjans vikt var nära 1.
         ok = has_chain & np.isfinite(meps_f)
-        target = ws * _quantiles(np.where(ok, chain_f, np.nan), n) + (1 - ws) * _quantiles(np.where(ok, meps_f, np.nan), n)
+        target = ws * np.sort(chain_f[ok]) + (1 - ws) * np.sort(meps_f[ok])
         order = np.argsort(out[ok] + 1e-3 * gaussian_filter(out, 2.0)[ok], kind="stable")
         vals = np.empty(order.size, np.float32)
-        vals[order] = target[np.minimum((np.arange(order.size) + 0.5) / order.size * n, n - 1).astype(int)]
+        vals[order] = target
         out = out.astype(np.float32)
         out[ok] = vals
     out[~has_chain & ~np.isfinite(meps_f)] = np.nan
