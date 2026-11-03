@@ -37,6 +37,11 @@
   .plabel em { display: block; font-style: normal; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .plabel em:empty { display: none; }
   .plabel.missing span { color: var(--warn); }
+  .plabel.loading span::after { content: ' · laddar'; color: var(--muted); }
+  @media (min-width: 1100px) { #liveview.side-collapsed #timebar { left: 230px; } }
+  .nowbtn { font-weight: 600; }
+  #side-head button { border: 0; background: var(--chip); border-radius: 8px; height: 28px; cursor: pointer; font-size: 12.5px; padding: 0 9px; }
+  #side-head #side-toggle { width: 30px; padding: 0; font-size: 15px; }
 
   .float { position: absolute; z-index: 1000; background: var(--glass); border-radius: 12px; box-shadow: var(--shadow); box-sizing: border-box; }
 
@@ -58,7 +63,6 @@
   #side { top: calc(60px + env(safe-area-inset-top)); left: 12px; width: 360px; max-height: calc(100% - 60px - 56px); display: flex; flex-direction: column; }
   #side-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px 14px; }
   #side-head h1 { font-size: 15px; margin: 0; flex: 1; letter-spacing: -.2px; }
-  #side-toggle { border: 0; background: var(--chip); border-radius: 8px; width: 30px; height: 28px; cursor: pointer; font-size: 15px; }
   #side-body { overflow: auto; padding: 0 14px 12px; }
   #side.collapsed #side-body { display: none; }
   #side h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; }
@@ -191,6 +195,7 @@
     <div class="kind" id="kind">Laddar</div>
   </div>
   <div class="tb-sub">
+    <div class="chips layers"><button class="nowbtn" id="now-btn" title="Senaste radarbilden (N)">Nu</button></div>
     <div class="chips seg" id="live-res" role="group" aria-label="Upplösning">
       <button aria-pressed="true" data-res="5" title="Momentan intensitet var 5:e minut">5 min</button>
       <button aria-pressed="false" data-res="15" title="Summa per kvart, som KNEP">15 min</button>
@@ -211,6 +216,7 @@
 <aside id="side" class="float" aria-label="Prognos och jämförelse">
   <div id="side-head">
     <h1>Nederbördsprognos</h1>
+    <button id="share" title="Kopiera en länk till den här vyn: kartutsnitt, tid, upplösning och punkt">Länk</button>
     <button id="side-toggle" aria-expanded="true" aria-controls="side-body" title="Fäll ihop panelen">‹</button>
   </div>
   <div id="side-body">
@@ -226,7 +232,8 @@
       <table id="point-table"></table>
       <div class="status" id="point-status"></div>
     </div>
-    <div class="hint" id="point-hint">Klicka i en karta för staplar i punkten. Under markören visar varje karta sin klass. Piltangenterna stegar i tiden.</div>
+    <div class="hint" id="point-hint">Klicka i en karta eller på en mätare för staplar i punkten. Under markören visar varje karta sin klass.
+      Tangenter: pilarna stegar, mellanslag spelar, N går till nu, 1, 2 och 3 byter upplösning, M visar mätarna, B tolv timmar bakåt, Esc stänger punkten.</div>
 
     <details id="area">
       <summary>Regnyta i kartutsnittet</summary>
@@ -392,10 +399,10 @@ function makePane(key) {
   const p = { key, el, map: pm, label: el.querySelector('.plabel'), overlays: new Map(), shown: null, bg: null, src: null,
               gauges: L.layerGroup().addTo(pm), cross: L.circleMarker([0, 0], { radius: 7, weight: 1.5, color: '#1b1f24', fill: false, interactive: false }) };
   pm.on('move zoom', () => syncFrom(p));
-  pm.on('moveend', () => { if (!syncing) { areaSoon(); } });
+  pm.on('moveend', () => { if (!syncing) { areaSoon(); saveHash(); } });
   pm.on('click', e => pointOpen(e.latlng));
   pm.on('mousemove', e => hoverAt(e.latlng, p));
-  pm.on('mouseout', () => hoverAt(null));
+  pm.on('mouseout', () => hoverAt(live.point ? live.point.ll : null, 'point'));
   live.panes.set(key, p);
   if (live.view) pm.setView(live.view.center, live.view.zoom, { animate: false }); else pm.setView([62.5, 16], 4);
   return p;
@@ -440,7 +447,8 @@ function fitMosaic(initial) {
   if (!first) return;
   const z = first.map.getBoundsZoom(L.latLngBounds(NORDEN));
   visiblePanes().forEach(p => p.map.setMinZoom(Math.max(2, first.map.getBoundsZoom(L.latLngBounds(MEPS).pad(-0.15)) - 1)));
-  if (initial) first.map.setView(L.latLngBounds(NORDEN).getCenter(), z, { animate: false });
+  if (initial && want.view) first.map.setView(want.view.center, want.view.zoom, { animate: false });
+  else if (initial) first.map.setView(L.latLngBounds(NORDEN).getCenter(), z, { animate: false });
   syncFrom(first);
 }
 
@@ -469,6 +477,37 @@ function modelChips() {
   }
 }
 
+/* ---------- länken: kartutsnitt, tid, upplösning och punkt i adressen ---------- */
+function parseHash() {
+  const h = location.hash.slice(1), out = {};
+  if (!h || h.startsWith('handelser')) return out;
+  const q = new URLSearchParams(h);
+  const ll = s => { const v = (s || '').split(',').map(Number); return v.length >= 2 && v.every(Number.isFinite) ? v : null; };
+  const k = ll(q.get('karta')); if (k) out.view = { center: L.latLng(k[0], k[1]), zoom: k[2] ?? 6 };
+  const pt = ll(q.get('punkt')); if (pt) out.point = L.latLng(pt[0], pt[1]);
+  if (['5', '15', '60'].includes(q.get('upp'))) out.res = q.get('upp');
+  if (q.get('tid')) out.time = q.get('tid');
+  return out;
+}
+const want = parseHash();
+if (want.res) live.res = want.res;
+let hashTimer = 0;
+function saveHash(now) {
+  clearTimeout(hashTimer);
+  const write = () => {
+    if (mode !== 'live' || !live.view) return;
+    const q = new URLSearchParams();
+    const c = live.view.center;
+    q.set('karta', `${c.lat.toFixed(3)},${c.lng.toFixed(3)},${live.view.zoom}`);
+    q.set('upp', live.res);
+    const f = live.manifest && framesFor(live.manifest, live.res)[live.idx];
+    if (f) q.set('tid', f.time);
+    if (live.point) q.set('punkt', `${live.point.ll.lat.toFixed(3)},${live.point.ll.lng.toFixed(3)}`);
+    history.replaceState(null, '', '#' + q.toString().replace(/%2C/g, ',').replace(/%3A/g, ':'));
+  };
+  if (now) write(); else hashTimer = setTimeout(write, 400);
+}
+
 /* ---------- rutorna ---------- */
 // vilken bild en karta visar för en tid i tidslisten (f ur framesFor)
 function srcFor(p, f, layer = live.layer) {
@@ -488,10 +527,11 @@ function srcFor(p, f, layer = live.layer) {
   }
   if (!x) return { missing: 'saknas för tiden' };
   const info = modelInfo(p.key);
-  const run = e.reference ? `körning ${clock.format(new Date(e.reference))}` : '';
+  const age = e.reference ? Math.round((new Date(m.analysis) - new Date(e.reference)) / MIN) : 0;
+  const run = e.reference ? `körning ${clock.format(new Date(e.reference))}${age > 60 ? `, ${ago(age)} gammal` : ''}` : '';
   const text = hourly || r === '60' ? `${info.what ? info.what + ' ' : ''}${clock.format(new Date(x.start || t - 3600000))} till ${clock.format(new Date(x.time))}`
     : [run, e.resolution_km ? `${num(e.resolution_km)} km` : ''].filter(Boolean).join(', ');
-  return { file: x.file, bounds: e.bounds, text: text || run, hourly };
+  return { file: x.file, bounds: e.bounds, text: age > 60 && !text.includes('gammal') ? `${text}, ${ago(age)} gammal` : text || run, hourly, stale: age > 60 };
 }
 const urlFor = src => `${DATA}${src.file}${src.hist ? '' : `?v=${encodeURIComponent(live.manifest.analysis)}`}`;
 
@@ -500,6 +540,8 @@ function overlay(p, src) {
   let o = p.overlays.get(url);
   if (!o) {
     o = L.imageOverlay(url, src.bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(p.map);
+    const done = () => { o._ok = true; if (p.shown === o) p.label.classList.remove('loading'); };
+    o.on('load', done).on('error', done);
     p.overlays.set(url, o);
   }
   return o;
@@ -554,7 +596,8 @@ function liveShow(i) {
     p.shown = o;
     p.src = s.file ? s : null;
     p.bg?.setOpacity(live.bg && future ? 0.55 : 0);
-    paneLabel(p, s.missing || s.text, !!s.missing);
+    paneLabel(p, s.missing || s.text, !!s.missing || s.stale);
+    p.label.classList.toggle('loading', !!o && !o._ok);
   }
   if (list.some(x => x.hist)) preload(i);
   gaugesDraw(f);
@@ -564,6 +607,7 @@ function liveShow(i) {
   if (live.point) pointDraw();
   areaDraw();
   hoverAt(live.hover?.ll, live.hover?.from);
+  saveHash();
 }
 
 function legendDraw(f, future) {
@@ -607,6 +651,7 @@ function liveStatus() {
   const gaps = m.missing_radars?.length ? ` Radar saknas: ${m.missing_radars.join(', ')}, området fylls med flyttad analys och grannländernas radar.` : '';
   const vc = m.volume_correction ? ` Volymkorrigerad mot regnmätarna, medianfaktor ${num(m.volume_correction.median)}.` : '';
   el.className = 'status' + (age > STALE_MIN || gaps ? ' warn' : '');
+  document.title = `Nederbörd ${clock.format(new Date(m.analysis))}`;
   el.textContent = age > STALE_MIN
     ? `Ingen ny radarbild på ${age} min. Prognosen kan vara inaktuell.`
     : `Analys ${clock.format(new Date(m.analysis))}, uppdateras var femte minut.${gaps}${vc}`;
@@ -636,6 +681,8 @@ async function liveLoad() {
   const keep = oldList[live.idx] || null;
   live.manifest = m;
   live.values = null;
+  const ver = `?v=${encodeURIComponent(m.analysis)}`;
+  for (const u of [...decoded.keys()]) if (u.includes('?v=') && !u.endsWith(ver)) decoded.delete(u);  // förra cykelns bilder
   let added = false;
   for (const k of modelKeys(m)) if (!live.panes.has(k)) { makePane(k); added = true; }
   // gamla bilder bort, utom de bakåt som fortfarande finns (de byter aldrig namn)
@@ -657,12 +704,14 @@ async function liveLoad() {
   const lastOf = l => l.map(f => f.kind).lastIndexOf('obs');
   let i = live.res === '5' ? lastOf(list) + (old && keep ? live.idx - lastOf(oldList) : 0) : list.findIndex(f => f.kind !== 'obs');
   if (live.res !== '5' && keep && old) i = closestIndex(list, new Date(keep.time));
+  if (!old && want.time) { const j = list.findIndex(f => f.time === want.time); if (j >= 0) i = j; }  // tiden ur länken, om den finns kvar
   preload(Math.max(0, i));
   liveShow(Math.max(0, i));
   liveStatus();
   if (innerWidth < 700) { placeFloats(); layoutMosaic(); }
-  if (live.obs) gaugesLoad();
+  if (live.obs || live.point) gaugesLoad();
   if (live.point) pointOpen(live.point.ll, true);
+  else if (!old && want.point) pointOpen(want.point);
   areaSoon();
 }
 
@@ -738,9 +787,10 @@ function gaugesDraw(f) {
     if (!st) continue;
     const c = colorFor(v, items);
     for (const p of visiblePanes()) {
-      L.circleMarker([st[0], st[1]], c ? { radius: 5.5, weight: 1.5, color: '#1b1f24', fillColor: c, fillOpacity: 1 }
-                                       : { radius: 3, weight: 1.2, color: '#57606a', fillColor: '#fff', fillOpacity: 1 })
+      L.circleMarker([st[0], st[1]], c ? { radius: 5.5, weight: 1.5, color: '#1b1f24', fillColor: c, fillOpacity: 1, bubblingMouseEvents: false }
+                                       : { radius: 3, weight: 1.2, color: '#57606a', fillColor: '#fff', fillOpacity: 1, bubblingMouseEvents: false })
         .bindTooltip(`<div class="gauge-tip"><b>${st[2]}</b><br>${mm(v)} ${unit}</div>`, { direction: 'top', offset: [0, -4] })
+        .on('click', () => pointOpen(L.latLng(st[0], st[1])))
         .addTo(p.gauges);
     }
   }
@@ -791,7 +841,7 @@ function decode(url, bounds) {
       img.onerror = reject;
       img.src = url;
     }));
-    if (decoded.size > 500) decoded.delete(decoded.keys().next().value);
+    if (decoded.size > 200) decoded.delete(decoded.keys().next().value);
   }
   return decoded.get(url);
 }
@@ -829,7 +879,7 @@ function hoverAt(ll, from) {
     for (const p of live.panes.values()) {
       const em = p.label.querySelector('em');
       if (!ll || p.el.hidden) { p.cross.remove(); em.textContent = ''; continue; }
-      if (p !== from) p.cross.setLatLng(ll).addTo(p.map); else p.cross.remove();
+      if (p !== from && from !== 'point') p.cross.setLatLng(ll).addTo(p.map); else p.cross.remove();
       if (!p.src || (live.res === '5' && live.layer === 'p10' && p.key === 'ours')) { em.textContent = ''; continue; }
       const src = p.src;
       try {
@@ -886,6 +936,7 @@ function areaDraw() {
   for (let t = Math.ceil(x0 / (step * MIN)) * step * MIN; t <= x1; t += step * MIN) g += `<text x="${X(t)}" y="${Hd - 4}" text-anchor="middle">${clock.format(new Date(t))}</text>`;
   const cur = ts[live.idx];
   if (cur != null) g += `<line class="now" x1="${X(cur)}" x2="${X(cur)}" y1="${T0}" y2="${Hd - B0}"/>`;
+  if (A.hover != null) g += `<line x1="${X(ts[A.hover])}" x2="${X(ts[A.hover])}" y1="${T0}" y2="${Hd - B0}" stroke="var(--fg)" opacity=".35"/>`;
   const read = [];
   for (const s of A.series) {
     const info = modelInfo(s.key);
@@ -896,12 +947,13 @@ function areaDraw() {
       g += `<path d="${seg(ob)}" fill="none" stroke="var(--past)" stroke-width="2"/>`;
       g += `<path d="${seg(ob.slice(-1).concat(fc))}" fill="none" stroke="${info.color}" stroke-width="2"/>`;
     } else g += `<path d="${seg(ok)}" fill="none" stroke="${info.color}" stroke-width="2"/>`;
-    const here = s.pts[live.idx];
+    const here = s.pts[A.hover ?? live.idx];
     if (here?.a != null) read.push(`<b style="color:${s.key === 'ours' && here.obs ? 'var(--past)' : info.color}">${s.key === 'ours' && here.obs ? 'Radar' : info.name}</b> ${num(Math.round(here.a / 100) * 100)} km²`);
   }
   svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
   svg.innerHTML = g;
-  $('area-readout').innerHTML = read.join(' · ');
+  A.geom = { X, ts };
+  $('area-readout').innerHTML = (A.hover != null ? `${clock.format(new Date(ts[A.hover]))}: ` : '') + read.join(' · ');
 }
 
 /* ---------- punkten: staplar för alla källor per tidssteg ---------- */
@@ -962,6 +1014,8 @@ async function pointOpen(ll, quiet) {
   live.point = { ll, ours: ours.value || null, met: met.value || null, snow: snow.value || null, gauge: nearestGauge(ll), hover: null,
                  errors: { ours: ours.status === 'rejected', met: met.status === 'rejected', snow: snow.status === 'rejected' } };
   pointDraw();
+  if (!live.hover || live.hover.from === 'point') hoverAt(ll, 'point');
+  saveHash();
 }
 
 // medel av 5-minutersvärden per period (värdet vid t gäller de fem minuterna före t); null om något saknas
@@ -1106,10 +1160,29 @@ $('point-chart').addEventListener('click', ev => {
   const list = framesFor(live.manifest, live.res), j = list.findIndex(f => f.time === P.periods[i].time);
   if (j >= 0) liveShow(j);
 });
+function areaIndexAt(ev) {
+  const A = live.area, svg = $('area-chart');
+  if (!A?.geom) return null;
+  const box = svg.getBoundingClientRect(), x = (ev.clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
+  let best = null, d = Infinity;
+  A.geom.ts.forEach((t, i) => { const e = Math.abs(A.geom.X(t) - x); if (e < d) { d = e; best = i; } });
+  return best;
+}
+$('area-chart').addEventListener('mousemove', ev => { if (live.area) { live.area.hover = areaIndexAt(ev); areaDraw(); } });
+$('area-chart').addEventListener('mouseleave', () => { if (live.area) { live.area.hover = null; areaDraw(); } });
+$('area-chart').addEventListener('click', ev => {  // bara om diagrammet räknades på samma tidslista som visas
+  const i = areaIndexAt(ev), A = live.area;
+  if (i != null && A.r === live.res && A.list.length === framesFor(live.manifest, live.res).length) liveShow(i);
+});
 $('point-close').addEventListener('click', () => {
+  pointClose();
+});
+function pointClose() {
   live.point = null; clearMarkers();
   $('point').hidden = true; $('point-hint').hidden = false;
-});
+  if (live.hover?.from === 'point') hoverAt(null);
+  saveHash();
+}
 
 /* ---------- händelser ---------- */
 const LAYERS = {
@@ -1319,6 +1392,7 @@ function sideToggle(collapse) {
   $('side-toggle').title = collapse ? 'Visa panelen' : 'Fäll ihop panelen';
   $('side-toggle').setAttribute('aria-expanded', !collapse);
   store.set('collapsed', collapse);
+  $('liveview').classList.toggle('side-collapsed', collapse);
   if (innerWidth < 700) $('side-toggle').textContent = collapse ? '⌃' : '⌄';
 }
 $('side-toggle').addEventListener('click', () => sideToggle(!$('side').classList.contains('collapsed')));
@@ -1328,6 +1402,27 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') show(i + 1);
   if (e.key === 'ArrowLeft') show(i - 1);
   if (e.key === ' ') { e.preventDefault(); (mode === 'live' ? livePlay : casePlay)(); }
+  if (mode !== 'live' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (['1', '2', '3'].includes(k) && !$('live-res').hidden) liveRes({ 1: '5', 2: '15', 3: '60' }[k]);
+  if (k === 'n') liveNow();
+  if (k === 'm') $('obs-toggle').click();
+  if (k === 'b' && !$('back-toggle').hidden) $('back-toggle').click();
+  if (k === 'escape' && live.point) pointClose();
+});
+function liveNow() {
+  const m = live.manifest;
+  if (!m) return;
+  const list = framesFor(m, live.res);
+  const i = live.res === '5' ? list.map(f => f.kind).lastIndexOf('obs') : list.findIndex(f => f.kind !== 'obs');
+  liveShow(Math.max(0, i));
+}
+$('now-btn').addEventListener('click', liveNow);
+$('share').addEventListener('click', async () => {
+  saveHash(true);
+  try { await navigator.clipboard.writeText(location.href); $('share').textContent = 'Kopierad'; }
+  catch (e) { $('share').textContent = 'Se adressfältet'; }
+  setTimeout(() => { $('share').textContent = 'Länk'; }, 1800);
 });
 
 /* ---------- flikar ---------- */
@@ -1345,7 +1440,7 @@ function setMode(m) {
     cases.current = null;
     layoutMosaic();
     liveShow(live.idx);
-    if (location.hash) history.replaceState(null, '', location.pathname);
+    saveHash(true);
   } else {
     map.invalidateSize();
     if (!cases.list.length) casesLoad(); else caseOpen(cases.slug || cases.list[0]?.path);

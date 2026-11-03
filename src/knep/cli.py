@@ -210,7 +210,11 @@ def main(argv: list[str] | None = None) -> int:
         extra["compare"] = compare.update(args.out, session, t0, args.hours)
         log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
     if not args.time and not args.no_gauges:  # SMHI ger alla stationer bara för senaste timmen
-        g = gauges.update(args.out, session, datetime.now(UTC), max(args.back, 1.0))
+        try:
+            g = gauges.update(args.out, session, datetime.now(UTC), max(args.back, 1.0))
+        except Exception as e:  # noqa: BLE001  mätarna får aldrig stoppa prognosen
+            log.warning("mätare: %s", e)
+            g = None
         if g:
             extra["gauges"] = g
     extra["models"] = models.versions()  # vilka släppta versioner som räknade den här prognosen
