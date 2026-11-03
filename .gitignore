@@ -11,3 +11,6 @@ models/*.pkl
 models/*.npz
 # token för driften, se deploy/compose.yaml
 deploy/.env
+# nattkörningen, se experiments/natt/README.md
+natt.log
+STOPP

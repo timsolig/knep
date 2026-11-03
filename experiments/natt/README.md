@@ -15,7 +15,7 @@ I containern, en gång per natt:
 
 ```sh
 cd /work
-git switch main && git pull   # eller den gren som har experiments/natt
+git switch natt-forberedelse   # tills experiments/natt är mergad; sedan main
 experiments/natt/kor.sh --prov          # valfritt: en minut, provar behörigheterna
 tmux new -d -s natt 'experiments/natt/kor.sh --till 07:00'
 ```
