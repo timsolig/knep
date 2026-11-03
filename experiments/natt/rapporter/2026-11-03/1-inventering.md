@@ -79,9 +79,15 @@ Tre dagar från 2025 har grannländernas volymer i arkivet, så ett litet volyme
 
 ## Hämtningen
 
-HAMTNING_STATUS
+Läget när rapporten skrevs (22:40), enligt `hamta.py kontroll`:
 
-`hamta.py` hoppar över det som finns och kan köras om. Den avbryts om `/data` har mindre än 2 GB ledigt eller om processen skrivit mer än `--max-gb` (0,75 GB för radar och mätare, 0,35 GB för MEPS, alltså högst 1,1 GB av nattens 2 GB). Radarn hämtas med fyra samtidiga anrop men högst 2 anrop/s totalt (`sverige/data.Throttled`), och svarstiden ger ungefär 1 bild/s, så alla 28 dygn tar runt 2,5 h.
+- **Radarn: klar.** Alla 28 dygn, 367 bilder per dygn (90 min före till 5 h efter). Sammanlagt 6 bilder gick inte att hämta (troligen saknas de i SMHI:s arkiv; skriptet loggar inte felkoden; en omkörning av `hamta.py radar` provar dem igen): en vardera 2020-02-10, 2020-05-01, 2023-07-12 och 2024-11-25, och två 2025-10-24. Uppgift 2 ska hoppa över fall som skulle behöva en saknad bild som facit, eller behandla bilden som saknad.
+- **MEPS: klar.** Alla 5 körningar för alla 28 dygn (140 körningar). Filerna blev cirka 2,8 MB, mer än de 2,5 MB jag räknat med, så första körningen stannade på sitt tak på 0,35 GB med tre dygn kvar. Jag körde klart dem med ett extra tak på 0,08 GB.
+- **Timsummorna från mätarna (p7): klara.** 200 stationer, 189 451 värden i `/data/bortfall/matare/p7.npz`. Fem stationer fick avbrutna anslutningar från SMHI och saknas.
+- **Kvartssummorna (p14): pågår.** Arkivfilerna hämtas med cirka 2,5 stationer per minut, och vid 22:40 var 51 av 187 klara. Filen skrivs först när alla stationer är hämtade. Den här sessionen slutar innan dess, och då kan bakgrundsprocessen avbrytas. **Uppgift 2: kör `hamta.py kontroll`. Står det `mätare p14: saknas`, starta `hamta.py matare --logg /data/bortfall/hamta_radar.log` i bakgrunden** (p7 hoppas över eftersom den finns). Kvartssummorna behövs först i uppgift 3, och då bara som kontroll.
+- Ny data i natt hittills: ungefär 0,95 GB (ledigt på `/data` gick från 5,28 till 4,33 GB; andra sessioner på värden kan också ha skrivit). Kvar av nattens tak är alltså cirka 1 GB.
+
+`hamta.py` hoppar över det som finns och kan köras om. Den avbryts om `/data` har mindre än 2 GB ledigt eller om processen skrivit mer än `--max-gb` (0,75 GB för radar och mätare, 0,35 + 0,08 GB för MEPS). Radarn hämtas med fyra samtidiga anrop men högst 2 anrop/s totalt (`sverige/data.Throttled`). Med två anrop gav svarstiden bara 1 bild/s, så jag startade om med fyra; då gick det cirka 2,75 min per dygn och alla 28 dygn tog ungefär 80 min.
 
 ```sh
 uv run python experiments/bortfall/hamta.py kontroll                      # vad som finns
@@ -93,7 +99,7 @@ Loggar: `/data/bortfall/hamta_radar.log`, `/data/bortfall/hamta_meps.log`. Mäta
 
 ## Plan för resten av natten
 
-Datatak: kvar efter den här uppgiften är ungefär 0,9 GB av nattens 2 GB. **Uppgift 2 ska därför inte spara radarbilderna igen** utan bara fallens beskrivning (dag, starttid, längd, släckta radarer, hålets mask komprimerad, MEPS-körning) och läsa facit ur `/data/radar/` vid behov. Annars spräcks taket.
+Datatak: kvar efter den här uppgiften är ungefär 1 GB av nattens 2 GB. **Uppgift 2 ska därför inte spara radarbilderna igen** utan bara fallens beskrivning (dag, starttid, längd, släckta radarer, hålets mask komprimerad, MEPS-körning) och läsa facit ur `/data/radar/` vid behov. Annars spräcks taket.
 
 2. **Bortfallsfall.** Hålet: pixlar inom 240 km från de släckta radarerna och utanför 240 km från alla andra radarer i `composite.RADARS` (bara de som faktiskt bidrar till SMHI:s komposit vore riktigare, men de grannländska är med i RADARS och ger ett mindre, försiktigare hål). Start när minst ett par procent av hålet är vått, längd dragen ur {30 min, 1, 2, 3, 6 h}, 30 till 60 min av riktig radar före som uppvärmning. Fallen dras med fast frö, ett antal per dag, med typ ett fall per dag och radarkombination för att undvika att samma regn räknas många gånger. Kontrollera först att alla träningsdagar har radarn hämtad (`hamta.py kontroll`), och kör om hämtningen om den inte blev klar. Valideringsdagarna har redan radar och MEPS lokalt.
 3. **Domaren.** Måtten per ålderklass (0 till 30, 30 till 90, 90 till 360 min). Bootstrap över dagar, inte fall, eftersom fall samma dag är beroende. Sömmen som skillnaden i gradientens storlek i ett band på några pixlar längs kanten. Baslinjerna hål, fylld och utjämnad. Obs: `fill_gaps` släpper pixlarna efter 90 min (`max_age`), så för åldern 90 till 360 min är fylld lika med hål; det är så driften fungerar och ska inte ändras i domaren, men det ska stå i tabellen.
@@ -113,4 +119,9 @@ Regnmätarna: oberoende kontroll av volymen i hålet i uppgift 3 och 6 (timsummo
 
 Inga ändringar i `src/knep/`. `uv run pytest`: 56 passerade.
 
-Status: STATUS_RAD
+## Vad som fungerade och inte
+
+- Fungerade: urvalet, hämtningen av radar och MEPS, timsummorna från mätarna, och provningen av arkiven.
+- Fungerade inte direkt: omdirigering med `>` i skalet är inte tillåten i natt, så `hamta.py` fick en egen `--logg`. Kvartssummorna från mätarna är långsamma och var inte klara när sessionen slutade (se ovan).
+
+Status: klar
