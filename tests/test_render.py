@@ -39,3 +39,27 @@ def test_write_aggregates_whole_periods(tmp_path):
     assert codes.shape == (36, 40, 50)
     assert np.allclose(render.decode_values(codes[0]), 6.0, rtol=0.04)
     assert all((tmp_path / f["file"]).exists() for f in q + h)
+
+
+def test_warp_lookup_matches_reproject_and_png_colors(tmp_path):
+    """Uppslaget ger samma bild som rasterio med närmaste granne, och palett-PNG:n samma färger
+    som klasserna i COLORS (genomskinlig under den lägsta nivån)."""
+    from PIL import Image
+    from rasterio.warp import Resampling, reproject
+
+    grid = radar.Grid(CRS.from_epsg(3006), from_origin(400000, 7000000, 2000, 2000), (90, 70))
+    rng = np.random.default_rng(1)
+    field = (rng.lognormal(0, 1.5, grid.shape) * (rng.random(grid.shape) < 0.4)).astype(np.float32)
+    field[:5] = np.nan
+    rend = render.Renderer(grid)
+    ref = np.full(rend.shape, np.nan, np.float32)
+    reproject(field, ref, src_transform=grid.transform, src_crs=grid.crs, src_nodata=np.nan,
+              dst_transform=rend.transform, dst_crs=render.WEB, dst_nodata=np.nan, resampling=Resampling.nearest)
+    w = rend.warp(field)
+    assert np.array_equal(w, ref, equal_nan=True)
+
+    rend.png(field, tmp_path / "a.png")
+    rgba = np.asarray(Image.open(tmp_path / "a.png").convert("RGBA"))
+    idx = np.digitize(np.nan_to_num(w), render.LEVELS)
+    assert (rgba[idx == 0, 3] == 0).all()
+    assert np.array_equal(rgba[idx > 0], render.COLORS[idx[idx > 0] - 1])

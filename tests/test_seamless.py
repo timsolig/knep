@@ -116,3 +116,16 @@ def test_skill_and_adapted_weights():
     assert seamless.adapted(p, 0.8, 0.2).t50_small == 2 * p.t50_small    # kedjan bättre: längre
     assert seamless.adapted(p, 0.1, 0.6).t50_large == 0.5 * p.t50_large  # MEPS bättre: kortare
     assert seamless.adapted(p, None, 0.5) is p
+
+
+def test_blend_keeps_chain_volume_at_short_lead():
+    """Fördelningsmatchningen får inte lägga till volym när kedjans vikt är nära 1, inte heller
+    med enstaka mycket höga värden (klotter, hagel)."""
+    rng = np.random.default_rng(0)
+    chain = np.zeros((H, W), np.float32)
+    wet = rng.random((H, W)) < 0.08
+    chain[wet] = rng.lognormal(0, 1.2, wet.sum())
+    chain[rng.random((H, W)) < 0.001] = 150
+    meps = seamless.gaussian_filter(chain, 5) * 1.1
+    out = seamless.blend(chain, meps, 7.5, seamless.Params())
+    assert abs(out.sum() / chain.sum() - 1) < 0.01

@@ -112,35 +112,41 @@ class Renderer:
         self.shape = (dh, dw)
         w_, s_, e_, n_ = transform_bounds(WEB, "EPSG:4326", *array_bounds(dh, dw, self.transform))
         self.bounds = [[round(s_, 5), round(w_, 5)], [round(n_, 5), round(e_, 5)]]
+        self._map = None
+
+    def _lookup(self) -> tuple[np.ndarray, np.ndarray]:
+        """Närmaste granne mellan två fasta rutnät: vilken källpixel varje målpixel tar räknas en
+        gång, genom att omprojicera pixlarnas nummer, och sedan är varje bild ett uppslag."""
+        if self._map is None:
+            h, w = self.grid.shape
+            src = np.arange(h * w, dtype=np.float64).reshape(h, w)
+            dst = np.full(self.shape, np.nan, np.float64)
+            reproject(src, dst, src_transform=self.grid.transform, src_crs=self.grid.crs, src_nodata=np.nan,
+                      dst_transform=self.transform, dst_crs=WEB, dst_nodata=np.nan,
+                      resampling=Resampling.nearest)
+            valid = np.isfinite(dst)
+            self._map = valid, dst[valid].astype(np.int64)
+        return self._map
 
     def warp(self, field: np.ndarray) -> np.ndarray:
+        valid, src = self._lookup()
         out = np.full(self.shape, np.nan, np.float32)
-        reproject(
-            field.astype(np.float32),
-            out,
-            src_transform=self.grid.transform,
-            src_crs=self.grid.crs,
-            src_nodata=np.nan,
-            dst_transform=self.transform,
-            dst_crs=WEB,
-            dst_nodata=np.nan,
-            resampling=Resampling.nearest,
-        )
+        out[valid] = np.asarray(field, np.float32).ravel()[src]
         return out
 
+    def _png(self, value: np.ndarray, levels, colors, path: Path) -> None:
+        """PNG med palett: klass 0 genomskinlig, klass i färgen colors[i - 1] med dess alfa."""
+        idx = np.digitize(np.nan_to_num(self.warp(value), nan=0.0), levels).astype(np.uint8)
+        pal = np.vstack([np.zeros((1, 4), np.uint8), colors])
+        img = Image.fromarray(idx, "P")
+        img.putpalette(pal[:, :3].ravel().tolist())
+        img.save(path, transparency=bytes(pal[:, 3].tolist()), compress_level=6)
+
     def png(self, field: np.ndarray, path: Path) -> None:
-        idx = np.digitize(np.nan_to_num(self.warp(field), nan=0.0), LEVELS)
-        rgba = np.zeros(idx.shape + (4,), np.uint8)
-        rain = idx > 0
-        rgba[rain] = COLORS[idx[rain] - 1]
-        Image.fromarray(rgba, "RGBA").save(path, optimize=True)
+        self._png(field, LEVELS, COLORS, path)
 
     def png_prob(self, p: np.ndarray, path: Path) -> None:
-        idx = np.digitize(np.nan_to_num(self.warp(p), nan=0.0), PROB_LEVELS)
-        rgba = np.zeros(idx.shape + (4,), np.uint8)
-        on = idx > 0
-        rgba[on] = PROB_COLORS[idx[on] - 1]
-        Image.fromarray(rgba, "RGBA").save(path, optimize=True)
+        self._png(p, PROB_LEVELS, PROB_COLORS, path)
 
     def write(self, out: Path, analysis: datetime, frames: list[tuple], extra: dict | None = None) -> None:
         """Skriv PNG per ruta och upplösning, värdefilen och sist manifest.json, så att sidan aldrig
