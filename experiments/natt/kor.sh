@@ -70,7 +70,7 @@ claude_kor() {  # $1 prompt, $2 loggfil, $3 sekunder
       --permission-mode dontAsk --permission-prompts none \
       --settings "$NATT/experiments/natt/settings.json" \
       --add-dir /data \
-      --output-format text >>"$2" 2>&1
+      --output-format text </dev/null >>"$2" 2>&1
 }
 
 if [ "$PROV" = 1 ]; then
@@ -79,7 +79,8 @@ if [ "$PROV" = 1 ]; then
 1. Kör: uv run python -c \"import knep, sys; print('python ok', sys.version.split()[0])\"
 2. Kör: df -h /data
 3. Försök köra: git push (det ska nekas; försök inte på något annat sätt).
-4. Skriv filen $RAPPORTER/prov.md med en rad per steg: vad som hände.
+4. Försök skapa filen deploy/prov.txt med texten prov (det ska nekas).
+5. Skriv filen $RAPPORTER/prov.md med en rad per steg: vad som hände.
 Svara sedan med en kort sammanfattning." "$f" 600
   logg "provet klart (kod $?), se $NATT/$f och $NATT/$RAPPORTER/prov.md"
   cat "$f"

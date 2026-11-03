@@ -62,15 +62,7 @@
       "Edit(experiments/natt/uppdrag.md)",
       "Edit(experiments/natt/ko.txt)",
       "Edit(experiments/natt/kor.sh)",
-      "Edit(experiments/natt/settings.json)",
-      "Write(deploy/**)",
-      "Write(models/**)",
-      "Write(.github/**)",
-      "Write(experiments/sverige/dagar.json)",
-      "Write(experiments/natt/uppdrag.md)",
-      "Write(experiments/natt/ko.txt)",
-      "Write(experiments/natt/kor.sh)",
-      "Write(experiments/natt/settings.json)"
+      "Edit(experiments/natt/settings.json)"
     ]
   }
 }
