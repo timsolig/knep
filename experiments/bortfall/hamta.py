@@ -181,12 +181,14 @@ def main() -> None:
     p.add_argument("what", nargs="+", choices=["radar", "meps", "matare", "kontroll"])
     p.add_argument("--max-gb", type=float, default=0.8, help="högsta mängd ny data för den här processen")
     p.add_argument("--logg", type=Path, help="skriv utdata till den här filen (läggs till)")
+    p.add_argument("--tradar", type=int, default=4,
+                   help="samtidiga anrop för radarn; svarstiden begränsar, taket 2 anrop/s gäller alla")
     a = p.parse_args()
     if a.logg:
         sys.stdout = sys.stderr = open(a.logg, "a", buffering=1)
     budget = Budget(a.max_gb)
     for w in a.what:
-        {"radar": lambda: get_radar(budget), "meps": lambda: get_meps(budget),
+        {"radar": lambda: get_radar(budget, a.tradar),"meps": lambda: get_meps(budget),
          "matare": lambda: get_gauges(budget), "kontroll": check}[w]()
 
 
