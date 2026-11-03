@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>Nederbördsprognos</title>
-<meta name="description" content="Radar och nowcast för nederbörd de kommande två timmarna, jämförd med MET Norge, SMHI SNOW och regnmätarna">
+<meta name="description" content="Radar och nowcast för nederbörd de kommande fem timmarna, jämförd med MET Norge, SMHI SNOW och regnmätarna">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
@@ -525,7 +525,10 @@ function srcFor(p, f, layer = live.layer) {
     x = (e.frames60 || []).find(y => t > +new Date(y.start) && t <= +new Date(y.time));
     hourly = !!x;
   }
-  if (!x) return { missing: 'saknas för tiden' };
+  if (!x) {
+    const last = [...own, ...(e.frames60 || [])].map(y => +new Date(y.time)).reduce((a, b) => Math.max(a, b), 0);
+    return { missing: last && t > last ? `prognosen slutar ${clock.format(new Date(last))}` : 'saknas för tiden' };
+  }
   const info = modelInfo(p.key);
   const age = e.reference ? Math.round((new Date(m.analysis) - new Date(e.reference)) / MIN) : 0;
   const run = e.reference ? `körning ${clock.format(new Date(e.reference))}${age > 60 ? `, ${ago(age)} gammal` : ''}` : '';
@@ -650,11 +653,12 @@ function liveStatus() {
   const el = $('status');
   const gaps = m.missing_radars?.length ? ` Radar saknas: ${m.missing_radars.join(', ')}, området fylls med flyttad analys och grannländernas radar.` : '';
   const vc = m.volume_correction ? ` Volymkorrigerad mot regnmätarna, medianfaktor ${num(m.volume_correction.median)}.` : '';
+  const sl = m.seamless?.meps_run ? ` Längre fram blandas MEPS in (körning ${clock.format(new Date(m.seamless.meps_run))}), rättad mot radarn.` : '';
   el.className = 'status' + (age > STALE_MIN || gaps ? ' warn' : '');
   document.title = `Nederbörd ${clock.format(new Date(m.analysis))}`;
   el.textContent = age > STALE_MIN
     ? `Ingen ny radarbild på ${age} min. Prognosen kan vara inaktuell.`
-    : `Analys ${clock.format(new Date(m.analysis))}, uppdateras var femte minut.${gaps}${vc}`;
+    : `Analys ${clock.format(new Date(m.analysis))}, ${ago(Math.round((new Date(m.frames.at(-1).time) - new Date(m.analysis)) / MIN))} framåt, uppdateras var femte minut.${sl}${gaps}${vc}`;
   const c = m.compare || {};
   $('sources').textContent = [...live.panes.keys()].filter(k => k !== 'ours').map(k => {
     const e = c[k], info = modelInfo(k);
@@ -932,7 +936,7 @@ function areaDraw() {
   const fmt = v => v >= 10000 ? `${num(Math.round(v / 1000))}k` : num(Math.round(v / 100) * 100);
   let g = '';
   for (const v of [0, ymax / 2 / 1.08, ymax / 1.08]) g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 4}" y="${Y(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
-  const step = (x1 - x0) > 4 * 3600000 ? 120 : 30;
+  const step = (x1 - x0) > 7 * 3600000 ? 120 : (x1 - x0) > 3 * 3600000 ? 60 : 30;
   for (let t = Math.ceil(x0 / (step * MIN)) * step * MIN; t <= x1; t += step * MIN) g += `<text x="${X(t)}" y="${Hd - 4}" text-anchor="middle">${clock.format(new Date(t))}</text>`;
   const cur = ts[live.idx];
   if (cur != null) g += `<line class="now" x1="${X(cur)}" x2="${X(cur)}" y1="${T0}" y2="${Hd - B0}"/>`;
@@ -1071,7 +1075,7 @@ function pointDraw() {
   for (const v of [0, ymax / 2, ymax / 1.1]) {
     g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 4}" y="${Y(v) + 3}" text-anchor="end">${num(+v.toPrecision(2))}</text>`;
   }
-  const step = res === 60 ? 60 : 30;
+  const step = res === 60 || x1 - x0 > 3 * 3600000 ? 60 : 30;
   for (let t = Math.ceil(x0 / (step * MIN)) * step * MIN; t <= x1; t += step * MIN) {
     g += `<text x="${X(t)}" y="${Hd - 4}" text-anchor="middle">${clock.format(new Date(t))}</text>`;
   }

@@ -1,6 +1,6 @@
 # knep
 
-Nederbördsnowcast 0 till 2 h från SMHI:s radarkomposit. Körs på en Raspberry Pi (arm64, ingen GPU) var femte minut, och en cykel ska bli klar på under två minuter. Resultatet publiceras som statiska filer på GitHub Pages.
+Nederbördsnowcast 0 till 5 h från SMHI:s radarkomposit. Körs på en Raspberry Pi (arm64, ingen GPU) var femte minut, och en cykel ska bli klar på under två minuter. Resultatet publiceras som statiska filer på GitHub Pages.
 
 ## Kommandon
 
@@ -13,6 +13,7 @@ Nederbördsnowcast 0 till 2 h från SMHI:s radarkomposit. Körs på en Raspberry
 
 - `src/knep/radar.py` hämtning och avkodning. GeoTIFF 0..255 i EPSG:3006, dBZ = 0,4 · v − 30, 0 = inget eko, 255 = utanför täckning, Z = 200 R^1,5
 - `src/knep/model.py` modellen. `Chain.run(obs, tid, steg, tillstånd)` är kedjan (rörelse, extrapolering, fördelningsmatchning, platskarta, sannolikheter för kraftig nederbörd); `nowcast(obs, steps)` är referensen. Tillståndet (senaste timmens analyser och 30-minutersprognoser) sparas i `cache/state/`
+- `src/knep/seamless.py` och `nwp.py` MEPS rättad mot radarn och blandad med kedjan, så att prognosen räcker 5 h (standard; `--no-seamless` stänger av). Bara i realtid, eftersom MEPS bara finns för senaste körningen. Sannolikheterna för kraftig nederbörd gäller de första 2 h (`--prob-hours`), som extremmodellen är kalibrerad för
 - `src/knep/extremes.py` särdrag och sannolikheter som delas av drift och träning; modellen ligger i `models/extremes.pkl`
 - `src/knep/bias.py` volymkorrektion mot SMHI:s regnmätare (`knep-bias`); kartan ligger i `models/bias.npz`, underlaget, veckofaktorn och kandidaten till ny karta i `cache/bias/`
 - `src/knep/models.py` modellversioner (`knep-models`): filerna ligger i GitHub Releases, `models/models.json` låser tagg och sha256; nya versioner med `deploy/release_model.sh`
