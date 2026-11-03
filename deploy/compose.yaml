@@ -1,28 +1,35 @@
-# Driften på Pi:n. Bilden byggs direkt från main på GitHub, så ingen klon behövs.
+# Driften på Pi:n. Containern följer main på GitHub och tar en sammanslagning i drift av
+# sig själv inom fem minuter, så den behöver bara byggas en gång (och igen om
+# deploy/Dockerfile eller deploy/drift.sh ändras).
 #
-#   docker compose up -d --build     starta, eller uppdatera till senaste main
-#   docker compose logs -f           följ körningarna
+#   docker compose up -d --build     bygg och starta
+#   docker compose logs -f           följ körningarna och versionsbytena
 #
 # Lägg GITHUB_TOKEN=... i en fil .env bredvid den här filen. Utan token räknas
-# prognoserna men publiceras inte. KNEP_SOURCE=.. bygger från klonen i stället för main.
+# prognoserna men publiceras inte. KNEP_BRANCH=gren i .env kör en annan gren.
 services:
   knep:
     build:
-      context: ${KNEP_SOURCE:-https://github.com/timsolig/knep.git#main}
+      context: https://github.com/timsolig/knep.git#main
       dockerfile: deploy/Dockerfile
-    image: knep
+    image: knep-drift
     container_name: knep
     init: true
     restart: unless-stopped
     environment:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      KNEP_BRANCH: ${KNEP_BRANCH:-main}
     volumes:
-      - cache:/app/cache   # radarbilder, modelltillstånd och insamlingen mot regnmätarna
-      - out:/app/out       # senaste prognosen, så att en omstart inte räknar om samma bild
+      - releases:/srv/knep/releases   # en utcheckning med miljö per commit, de tre senaste
+      - uv-cache:/srv/knep/uv-cache   # paketcachen, så att en ny commit installeras på sekunder
+      - cache:/srv/knep/cache         # radarbilder, modelltillstånd och insamlingen mot regnmätarna
+      - out:/srv/knep/out             # senaste prognosen
     logging:
       driver: json-file
       options: { max-size: 10m, max-file: "3" }   # skona SD-kortet
 
 volumes:
+  releases:
+  uv-cache:
   cache:
   out:

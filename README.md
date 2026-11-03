@@ -25,7 +25,7 @@ KNEP är inte fri öppen data hos SMHI (realtidsfilerna levereras mot avgift), s
 
 ## Raspberry Pi
 
-Driften är en enda container som innehåller allt: beroendena (pysteps kompileras när bilden byggs), de låsta modellerna ur `models/models.json` och en slinga som räknar och publicerar en prognos var femte minut. Bilden byggs direkt från `main` på GitHub, så Pi:n behöver bara Docker, `deploy/compose.yaml` och token.
+Driften är en container som följer `main` på GitHub. Bilden innehåller bara verktygen (Python, uv, git och kompilatorn för pysteps) och `deploy/drift.sh`; själva koden checkas ut per commit i en Docker-volym. Pi:n behöver Docker, `deploy/compose.yaml` och token.
 
 ```sh
 mkdir -p ~/knep-drift && cd ~/knep-drift
@@ -35,13 +35,11 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
-Första bygget tar en stund eftersom pysteps kompileras. Sedan körs en cykel direkt och därefter två minuter efter varje femminutersbild. Utan token i `.env` räknas prognoserna men publiceras inte, vilket går bra för att prova. Radarbilderna, modelltillståndet och insamlingen mot regnmätarna ligger i Docker-volymen `cache` och överlever omstarter och uppdateringar. Containern startar om av sig själv efter strömavbrott.
+Var femte minut, före cykeln, frågar driften GitHub vilken commit `main` pekar på. En ny commit checkas ut, installeras med `uv sync` (någon minut ur paketcachen, längre när `uv.lock` ändras och pysteps kompileras om), hämtar sina låsta modeller ur `models/models.json` och provas med `knep --help`. Sedan kör driften den. En sammanslagning till `main` är alltså i drift inom fem minuter, utan att något görs på Pi:n.
 
-En uppdatering till senaste `main`, med nya modellversioner, är samma kommando:
+Misslyckas den nya versionens första cykel går driften tillbaka till den förra och provar den nya igen efter en timme, eller direkt om `main` ändras. Det syns i loggen som `drift: första cykeln med ... misslyckades`. De tre senaste versionerna ligger kvar i volymen `releases`.
 
-```sh
-cd ~/knep-drift && docker compose up -d --build
-```
+Bilden behöver bara byggas om när `deploy/Dockerfile` eller `deploy/drift.sh` ändras, med samma `docker compose up -d --build`. Radarbilderna, modelltillståndet och insamlingen mot regnmätarna ligger i volymen `cache` och överlever både versionsbyten och ombyggen. Utan token i `.env` räknas prognoserna men publiceras inte. `KNEP_BRANCH=gren` i `.env` låter driften följa en annan gren, för att prova något innan det slås ihop.
 
 ## Händelser
 
@@ -109,15 +107,15 @@ deploy/release_model.sh extremes extremes-v2 models/extremes.pkl models/release-
 
 1. Skapa repot på GitHub (publikt), skjut upp historiken (se nedan) och slå på Pages med källan GitHub Actions. Workflowet `test` kör testerna på varje pull request.
 2. Ange repot i `models/models.json` (`"repo": "ägare/knep"`) och släpp den första modellen: `deploy/release_model.sh extremes extremes-v1 models/extremes.pkl models/release-notes/extremes-v1.md`.
-3. På Pi:n: hämta `deploy/compose.yaml`, lägg token i `.env` och starta med `docker compose up -d --build` (avsnittet Raspberry Pi ovan).
+3. På Pi:n: hämta `deploy/compose.yaml`, lägg token i `.env` och starta med `docker compose up -d --build` (avsnittet Raspberry Pi ovan). Därefter följer driften `main` av sig själv.
 4. Skatta volymkartan ur arkivet och släpp den som `bias-v1`, eller låt driften samla och släpp kandidaten efter 60 dygn.
 5. Bygg händelserna (avsnittet Händelser) på en gren och slå ihop dem via pull request.
 
-En uppdatering av driften är `docker compose up -d --build` i `~/knep-drift`. Workflowet `test` bygger också driftens bild på arm64 för varje pull request, så ett trasigt bygge syns innan det når Pi:n.
+Workflowet `test` bygger driftens bild på arm64 för varje pull request och installerar grenen i den som driften gör, så ett trasigt bygge syns innan det når `main`.
 
 ## Utvecklingsmiljö med Claude Code
 
-`dev/` innehåller en container med Claude Code, GitHub CLI och uv. Den monterar `~/knep` som `/work` och `~/radar-arkiv` som `/data`. Driften ovan är en egen container byggd från `main`; `KNEP_SOURCE=.. docker compose up -d --build` i `deploy/` bygger den i stället från en klon, för att prova en gren.
+`dev/` innehåller en container med Claude Code, GitHub CLI och uv. Den monterar `~/knep` som `/work` och `~/radar-arkiv` som `/data`. Driften ovan är en egen container som följer `main`; `KNEP_BRANCH` i dess `.env` låter den följa en gren i stället.
 
 ```sh
 cd ~/knep/dev && docker compose up -d --build
