@@ -164,13 +164,13 @@
 <div id="liveview">
 <section id="live" class="panel" aria-label="Aktuell prognos">
   <h1>Nederbördsprognos</h1>
-  <p class="lead">Min modell bredvid MET Norges nowcast och SMHI:s SNOW, två timmar framåt.</p>
+  <p class="lead">Tim-KNEP bredvid MET Norges nowcast och SMHI:s SNOW, två timmar framåt, och radaranalysen tolv timmar bakåt.</p>
   <div class="status" id="status"></div>
   <div id="point" hidden>
     <div class="row"><strong id="point-title">Punkt</strong><button id="point-close" aria-label="Stäng punkten">×</button></div>
     <svg id="point-chart" role="img" aria-label="Tidsserie i punkten"></svg>
     <div class="keys">
-      <span><i style="background:var(--past)"></i>Radar</span><span><i style="background:var(--ours)"></i>Min modell</span>
+      <span><i style="background:var(--past)"></i>Radar</span><span><i style="background:var(--ours)"></i>Tim-KNEP</span>
       <span><i style="background:var(--met)"></i>MET Norge nowcast</span><span><i style="background:var(--snow)"></i>SNOW median, min till max</span>
     </div>
     <table id="point-table"></table>
@@ -183,8 +183,8 @@
     <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0). Jämförelse: <a href="https://opendata.smhi.se/">SMHI SNOW</a>,
     <a href="https://api.met.no/">MET Norge</a> (CC BY 4.0).</div>
 </section>
-<div id="mosaic" aria-label="Min modell, MET Norge och SNOW sida vid sida">
-  <div class="pane"><div class="pmap" id="map-ours"></div><div class="plabel" id="lab-ours"><strong>Min modell</strong><span></span></div></div>
+<div id="mosaic" aria-label="Tim-KNEP, MET Norge och SNOW sida vid sida">
+  <div class="pane"><div class="pmap" id="map-ours"></div><div class="plabel" id="lab-ours"><strong>Tim-KNEP</strong><span></span></div></div>
   <div class="pane"><div class="pmap" id="map-met"></div><div class="plabel" id="lab-met"><strong>MET Norge</strong><span></span></div></div>
   <div class="pane"><div class="pmap" id="map-snow"></div><div class="plabel" id="lab-snow"><strong>SNOW</strong><span></span></div></div>
 </div>
@@ -204,6 +204,7 @@
     <div class="legend" id="legend" aria-label="Färgskala"></div>
     <div class="chips layers">
       <button aria-pressed="true" id="bg-toggle" title="Senaste radarbilden svagt under prognoserna">Radar i bakgrunden</button>
+      <button aria-pressed="false" id="back-toggle" title="Radaranalysen de senaste tolv timmarna" hidden>12 h bakåt</button>
     </div>
     <div class="chips layers" id="live-layers" hidden>
       <button aria-pressed="true" data-layer="rain">Intensitet</button>
@@ -313,14 +314,39 @@ function sweref99tm(lat, lon) {
   return [E0 + k0 * A * y, k0 * A * x];
 }
 
-/* ---------- aktuell prognos: min modell, MET Norge och SNOW ---------- */
+/* ---------- aktuell prognos: Tim-KNEP, MET Norge och SNOW ---------- */
 const live = { manifest: null, overlays: { 5: [], 15: [], 60: [] }, prob: [], ext: { met: { 5: [], 15: [], 60: [] }, snow: [] },
-               res: '5', idx: 0, layer: 'rain', bg: true, values: null, point: null };
+               res: '5', idx: 0, layer: 'rain', bg: true, back: false, hist: new Map(), values: null, point: null };
 const listFor = (m, r) => (r === '5' ? m.frames : r === '15' ? m.frames15 : m.frames60) || [];
+// analysen bakåt (hist/): bara det som ligger före manifestets egna rutor
+const histFor = (m, r) => {
+  const h = m.history; if (!h) return [];
+  const l = (r === '5' ? h.frames : r === '15' ? h.frames15 : h.frames60) || [], first = listFor(m, r)[0];
+  return first ? l.filter(f => +new Date(f.time) < +new Date(first.time)) : l;
+};
+const framesFor = (m, r) => live.back ? [...histFor(m, r).map(f => ({ ...f, hist: true })), ...listFor(m, r)] : listFor(m, r);
+// bilderna bakåt byter aldrig namn, så de läggs till först när de visas och behålls mellan uppdateringarna
+function histOverlay(file) {
+  let o = live.hist.get(file);
+  if (!o) {
+    o = L.imageOverlay(`${DATA}${file}`, live.manifest.bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(panes.ours.map);
+    live.hist.set(file, o);
+  }
+  return o;
+}
+function overlayAt(r, i) {
+  const off = framesFor(live.manifest, r).length - listFor(live.manifest, r).length;
+  return i < off ? histOverlay(framesFor(live.manifest, r)[i].file) : live.overlays[r][i - off];
+}
+function probAt(i) {
+  const off = framesFor(live.manifest, '5').length - live.manifest.frames.length;
+  return i < off ? null : live.prob[i - off];
+}
+const ago = minutes => { const h = Math.floor(minutes / 60), r = minutes % 60; return h ? `${h} h${r ? ` ${r} min` : ''}` : `${r} min`; };
 const metFor = (m, r) => { const e = m.compare?.met; return e ? (r === '5' ? e.frames : r === '15' ? e.frames15 : e.frames60) || [] : []; };
 const lastObs = m => m.frames.map(f => f.kind).lastIndexOf('obs');
 const allLive = () => [...Object.values(live.overlays).flat(), ...live.prob, ...Object.values(live.ext.met).flat(), ...live.ext.snow,
-                       ...Object.values(panes).map(p => p.bg)].filter(Boolean);
+                       ...Object.values(panes).map(p => p.bg), ...live.hist.values()].filter(Boolean);
 
 function paneLabel(k, text, missing) {
   panes[k].label.querySelector('span').textContent = text;
@@ -330,22 +356,22 @@ function paneLabel(k, text, missing) {
 function liveShow(i) {
   const m = live.manifest;
   if (!m) return;
-  const list = listFor(m, live.res), ov = live.overlays[live.res];
+  const list = framesFor(m, live.res);
   if (!list.length) return;
   i = Math.max(0, Math.min(i, list.length - 1));
   allLive().forEach(o => o.setOpacity(0));
-  const p = live.res === '5' && live.layer === 'p10' ? live.prob[i] : null;
-  (p || ov[i])?.setOpacity(1);
+  const p = live.res === '5' && live.layer === 'p10' ? probAt(i) : null;
+  (p || overlayAt(live.res, i))?.setOpacity(1);
   live.idx = i;
   $('slider').max = list.length - 1;
   $('slider').value = i;
   const split = list.map(x => x.kind).lastIndexOf('obs');
   $('slider').style.setProperty('--split', `${list.length > 1 ? Math.max(0, split) / (list.length - 1) * 100 : 0}%`);
   const f = list[i], t = +new Date(f.time);
-  $('time').textContent = clock.format(new Date(f.time));
+  $('time').textContent = (day.format(new Date(f.time)) !== day.format(new Date()) ? dayTime : clock).format(new Date(f.time));
   if (live.res === '5') {
     const lead = Math.round((new Date(f.time) - new Date(m.analysis)) / MIN);
-    $('kind').textContent = f.kind === 'fc' ? `Prognos +${lead} min` : lead === 0 ? 'Senaste radarbild' : `Radar ${lead} min`;
+    $('kind').textContent = f.kind === 'fc' ? `Prognos +${lead} min` : lead === 0 ? 'Senaste radarbild' : `Radar ${ago(-lead)} före analysen`;
   } else {
     const what = { obs: 'Radar', fc: 'Prognos', mix: 'Radar och prognos' }[f.kind];
     $('kind').textContent = `${what}, summa ${clock.format(new Date(f.start))} till ${clock.format(new Date(f.time))}`;
@@ -357,11 +383,11 @@ function liveShow(i) {
   const mi = metFor(m, live.res).findIndex(x => +new Date(x.time) === t);
   live.ext.met[live.res][mi]?.setOpacity(1);
   const met = m.compare?.met;
-  paneLabel('met', !met ? 'inte hämtad' : mi < 0 ? 'saknas för tiden' : `lopp ${clock.format(new Date(met.reference))}, ${num(met.resolution_km)} km`, !met || mi < 0);
+  paneLabel('met', !met ? 'inte hämtad' : f.hist ? 'bara prognos, ingen analys bakåt' : mi < 0 ? 'saknas för tiden' : `lopp ${clock.format(new Date(met.reference))}, ${num(met.resolution_km)} km`, !met || mi < 0);
   const sf = m.compare?.snow?.frames60 || [];
   const si = sf.findIndex(x => t > +new Date(x.start) && t <= +new Date(x.time));
   live.ext.snow[si]?.setOpacity(1);
-  paneLabel('snow', !m.compare?.snow ? 'inte hämtad' : si < 0 ? 'saknas för tiden'
+  paneLabel('snow', !m.compare?.snow ? 'inte hämtad' : f.hist ? 'bara prognos, ingen analys bakåt' : si < 0 ? 'saknas för tiden'
     : `median ${clock.format(new Date(sf[si].start))} till ${clock.format(new Date(sf[si].time))}`, !m.compare?.snow || si < 0);
 
   // senaste radarbilden svagt under prognoserna
@@ -371,15 +397,16 @@ function liveShow(i) {
   $('legend').innerHTML = p ? legendHtml(m.prob_legend, '%')
     : legendHtml(m.legends?.[live.res] || m.legend, m.units?.[live.res] || 'mm/h');
   $('live-layers').hidden = live.res !== '5' || !live.prob.some(Boolean);
+  $('back-toggle').hidden = !m.history?.frames?.length;
 }
 
 function liveRes(r) {
   const m = live.manifest;
-  const cur = m ? listFor(m, live.res)[live.idx] : null;
+  const cur = m ? framesFor(m, live.res)[live.idx] : null;
   live.res = r;
   pressed($('live-res'), 'res', r);
   if (!m) return;
-  const list = listFor(m, r);
+  const list = framesFor(m, r);
   if (!list.length) return;
   let i = cur ? closestIndex(list, new Date(cur.time)) : 0;
   if (r !== '5' && cur && list[i].kind === 'obs' && cur.kind !== 'obs') i = Math.min(i + 1, list.length - 1);
@@ -417,10 +444,13 @@ async function liveLoad() {
   }
   if (live.manifest && m.analysis === live.manifest.analysis) { liveStatus(); return; }
   const old = live.manifest;
-  const keep = old ? listFor(old, live.res)[live.idx] : null;
+  const oldList = old ? framesFor(old, live.res) : [];
+  const keep = oldList[live.idx] || null;
   const v = encodeURIComponent(m.analysis);
   const add = (pane, file, bounds) => L.imageOverlay(`${DATA}${file}?v=${v}`, bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(panes[pane].map);
-  allLive().forEach(o => o.remove());
+  allLive().filter(o => ![...live.hist.values()].includes(o)).forEach(o => o.remove());
+  const histFiles = new Set(['frames', 'frames15', 'frames60'].flatMap(k => (m.history?.[k] || []).map(f => f.file)));
+  for (const [file, o] of live.hist) if (!histFiles.has(file)) { o.remove(); live.hist.delete(file); }
   // bakgrunden läggs först, så att den hamnar under prognoserna
   const obs = m.frames[lastObs(m)];
   for (const k in panes) panes[k].bg = obs ? add(k, obs.file, m.bounds) : null;
@@ -433,15 +463,16 @@ async function liveLoad() {
   Object.assign(live, { overlays: fresh, prob, ext, manifest: m, values: null });
   $('live-res').hidden = !m.frames15;  // äldre manifest har bara 5 min
   if (!m.frames15) live.res = '5';
-  const list = listFor(m, live.res);
-  let i = live.res === '5' ? lastObs(m) + (old && keep ? live.idx - lastObs(old) : 0) : list.findIndex(f => f.kind !== 'obs');
+  const list = framesFor(m, live.res);
+  const lastOf = l => l.map(f => f.kind).lastIndexOf('obs');
+  let i = live.res === '5' ? lastOf(list) + (old && keep ? live.idx - lastOf(oldList) : 0) : list.findIndex(f => f.kind !== 'obs');
   if (live.res !== '5' && keep && old) i = closestIndex(list, new Date(keep.time));
   liveShow(Math.max(0, i));
   liveStatus();
   if (live.point) pointOpen(live.point.ll, true);
 }
 
-/* ---------- punkt: min modell mot SNOW och MET Norge ---------- */
+/* ---------- punkt: Tim-KNEP mot SNOW och MET Norge ---------- */
 let pointMarkers = [];
 const clearMarkers = () => { pointMarkers.forEach(mk => mk.remove()); pointMarkers = []; };
 
@@ -564,9 +595,9 @@ function pointDraw() {
   svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
   svg.innerHTML = g;
 
-  // hela kommande timmar: min modell, MET Norge och SNOW i mm
+  // hela kommande timmar: Tim-KNEP, MET Norge och SNOW i mm
   const hours = (m.frames60 || []).filter(h => h.kind !== 'obs').map(h => ({ end: +new Date(h.time), start: +new Date(h.start) }));
-  let t = '<caption>Summa per timme, mm</caption><tr><th>Timme</th><th>Min modell</th><th>MET Norge</th><th>SNOW median</th></tr>';
+  let t = '<caption>Summa per timme, mm</caption><tr><th>Timme</th><th>Tim-KNEP</th><th>MET Norge</th><th>SNOW median</th></tr>';
   for (const h of hours) {
     const o = P.ours ? periodMean(P.ours, h.end, 60) : null, mt = P.met ? periodMean(P.met.series, h.end, 60) : null;
     const sn = (P.snow || []).find(x => x.end === h.end);
@@ -576,7 +607,7 @@ function pointDraw() {
   $('point-table').innerHTML = hours.length ? t : '';
 
   const notes = [];
-  if (P.errors.ours || !P.ours) notes.push('Min modell saknar värden här (utanför radarns rutnät).');
+  if (P.errors.ours || !P.ours) notes.push('Tim-KNEP saknar värden här (utanför radarns rutnät).');
   if (P.errors.met) notes.push('MET Norge svarade inte.');
   else if (P.met && P.met.coverage !== 'ok') notes.push('MET Norge har ingen radartäckning här.');
   if (P.errors.snow) notes.push('SNOW svarade inte (punkten kan ligga utanför SMHI:s område).');
@@ -753,7 +784,17 @@ function player(btn, step, last, getIdx) {
     }, 450);
   };
 }
-const livePlay = player($('play'), liveShow, () => live.manifest ? listFor(live.manifest, live.res).length - 1 : 0, () => live.idx);
+const livePlay = player($('play'), liveShow, () => live.manifest ? framesFor(live.manifest, live.res).length - 1 : 0, () => live.idx);
+$('back-toggle').addEventListener('click', () => {
+  const m = live.manifest;
+  if (!m) return;
+  const cur = framesFor(m, live.res)[live.idx];
+  live.back = !live.back;
+  $('back-toggle').setAttribute('aria-pressed', live.back);
+  const list = framesFor(m, live.res);
+  liveShow(live.back ? 0 : cur ? closestIndex(list, new Date(cur.time)) : 0);
+  if (live.point) pointDraw();
+});
 const casePlay = player($('case-play'), caseShow, () => cases.current ? caseFrames(cases.current).length - 1 : 0, () => cases.idx);
 $('play').addEventListener('click', livePlay);
 $('case-play').addEventListener('click', casePlay);

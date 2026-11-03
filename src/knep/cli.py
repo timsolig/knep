@@ -131,6 +131,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--reference", action="store_true", help="kör referensmodellen i stället för kedjan")
     p.add_argument("--keep-cache", action="store_true", help="rensa inte gamla radarbilder")
     p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")
+    p.add_argument("--back", type=float, default=render.HISTORY_HOURS,
+                   help="timmar radaranalys bakåt på sidan (hist/), 0 stänger av")
     p.add_argument("--seamless", action="store_true", help="blanda kedjan med MEPS rättad mot radarn (seamless.py); använd med --hours 5")
     args = p.parse_args(argv)
 
@@ -207,7 +209,12 @@ def main(argv: list[str] | None = None) -> int:
         extra["compare"] = compare.update(args.out, session, t0, args.hours)
         log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
     extra["models"] = models.versions()  # vilka släppta versioner som räknade den här prognosen
-    render.Renderer(grid).write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)
+    rend = render.Renderer(grid)
+    if args.back > 0:
+        started = time.monotonic()
+        extra["history"] = rend.history(args.out, [(t, f) for t, kind, f, *_ in frames if kind == "obs"], t0, args.back)
+        log.info("analys bakåt: %d bilder på %.1f s", len(extra["history"]["frames"]), time.monotonic() - started)
+    rend.write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)
     log.info("skrev %d rutor till %s", len(frames), args.out)
 
     if not args.keep_cache:
