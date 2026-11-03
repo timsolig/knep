@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from . import bias, compare, composite, model, models, radar, render
+from . import bias, compare, composite, gauges, model, models, radar, render
 
 NO_NEW_DATA = 75
 log = logging.getLogger("knep")
@@ -133,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")
     p.add_argument("--back", type=float, default=render.HISTORY_HOURS,
                    help="timmar radaranalys bakåt på sidan (hist/), 0 stänger av")
+    p.add_argument("--no-gauges", action="store_true", help="hämta inte regnmätarna till sidan (gauges.json)")
     p.add_argument("--seamless", action="store_true", help="blanda kedjan med MEPS rättad mot radarn (seamless.py); använd med --hours 5")
     args = p.parse_args(argv)
 
@@ -208,6 +209,14 @@ def main(argv: list[str] | None = None) -> int:
         started = time.monotonic()
         extra["compare"] = compare.update(args.out, session, t0, args.hours)
         log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
+    if not args.time and not args.no_gauges:  # SMHI ger alla stationer bara för senaste timmen
+        try:
+            g = gauges.update(args.out, session, datetime.now(UTC), max(args.back, 1.0))
+        except Exception as e:  # noqa: BLE001  mätarna får aldrig stoppa prognosen
+            log.warning("mätare: %s", e)
+            g = None
+        if g:
+            extra["gauges"] = g
     extra["models"] = models.versions()  # vilka släppta versioner som räknade den här prognosen
     rend = render.Renderer(grid)
     if args.back > 0:

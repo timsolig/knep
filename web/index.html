@@ -5,106 +5,129 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>Nederbördsprognos</title>
-<meta name="description" content="Radar och nowcast för nederbörd de kommande två timmarna, och hur modellen klarade kända väderhändelser">
+<meta name="description" content="Radar och nowcast för nederbörd de kommande två timmarna, jämförd med MET Norge, SMHI SNOW och regnmätarna">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
     --bg: #ffffff; --fg: #1b1f24; --muted: #6a737d; --line: #e3e6ea; --accent: #1f6feb; --warn: #b54708;
-    --chip: #f2f4f7; --good: #1a7f37; --shadow: 0 2px 16px rgba(0,0,0,.14);
-    --canvas: #eef1f4; --card: 0 1px 2px rgba(16,24,40,.06), 0 6px 18px rgba(16,24,40,.08);
+    --chip: #f2f4f7; --good: #1a7f37; --shadow: 0 2px 16px rgba(0,0,0,.16);
+    --canvas: #eef1f4; --glass: rgba(255,255,255,.95);
+    --ours: #1f6feb; --past: #8b949e; --met: #2da44e; --snow: #d4731c; --gauge: #1b1f24;
   }
   html, body { height: 100%; margin: 0; }
-  body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
-  #map { position: fixed; inset: 0; }
-  /* Prognosfliken: panelen till vänster, mosaiken och tidslisten till höger; på mobil under varandra */
-  #liveview {
-    position: fixed; inset: 0; display: grid; background: var(--canvas);
-    grid-template-columns: 420px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas: "side mosaic" "side time";
-  }
-  #mosaic { grid-area: mosaic; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 14px 14px 0; min-height: 0; }
-  .pane { position: relative; min-width: 0; border-radius: 16px; overflow: hidden; background: var(--bg); box-shadow: var(--card); }
+  body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--canvas); }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  .rain { image-rendering: pixelated; }
+  /* senaste radarbilden under prognoserna: grå, så att den inte ser ut som en del av modellen */
+  .radar-bg { filter: grayscale(1) brightness(.55) contrast(1.2); mix-blend-mode: multiply; }
+
+  /* ---------- prognosfliken: kartorna fyller skärmen, panelerna flyter ovanpå ---------- */
+  #liveview { position: fixed; inset: 0; }
+  #mosaic { position: absolute; inset: var(--m-top, 0) 0 var(--m-bottom, 0) 0; display: grid; gap: 3px; background: #c9d0d7; }
+  .pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #e8ebee; }
   .pmap { position: absolute; inset: 0; background: #e8ebee; }
   .plabel {
-    position: absolute; z-index: 800; top: 12px; left: 12px; max-width: calc(100% - 24px); box-sizing: border-box; pointer-events: none;
-    background: rgba(255, 255, 255, .94); border-radius: 10px; box-shadow: 0 2px 10px rgba(16, 24, 40, .15);
-    padding: 7px 12px 7px 10px; border-left: 5px solid var(--c); line-height: 1.25;
+    position: absolute; z-index: 800; left: 8px; bottom: 8px; max-width: calc(100% - 16px); box-sizing: border-box; pointer-events: none;
+    background: var(--glass); border-radius: 8px; box-shadow: 0 1px 6px rgba(16,24,40,.18);
+    padding: 4px 9px 4px 7px; border-left: 4px solid var(--c); line-height: 1.25;
   }
-  .plabel strong { display: block; font-size: 18px; letter-spacing: -.2px; }
-  .plabel span { display: block; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .plabel strong { font-size: 14px; letter-spacing: -.1px; }
+  .plabel span { display: block; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .plabel em { display: block; font-style: normal; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .plabel em:empty { display: none; }
   .plabel.missing span { color: var(--warn); }
-  #lab-ours { --c: var(--ours); } #lab-met { --c: var(--met); } #lab-snow { --c: var(--snow); }
+  .plabel.loading span::after { content: ' · laddar'; color: var(--muted); }
+  @media (min-width: 1100px) { #liveview.side-collapsed #timebar { left: 230px; } }
+  .nowbtn { font-weight: 600; }
+  #side-head button { border: 0; background: var(--chip); border-radius: 8px; height: 28px; cursor: pointer; font-size: 12.5px; padding: 0 9px; }
+  #side-head #side-toggle { width: 30px; padding: 0; font-size: 15px; }
 
-  #timebar {
-    grid-area: time; justify-self: center; width: min(940px, calc(100% - 28px)); box-sizing: border-box; margin: 14px 0;
-    padding: 12px 18px; background: var(--bg); border-radius: 16px; box-shadow: var(--card);
-  }
-  .tb-main { display: flex; align-items: center; gap: 14px; }
-  .tb-main .play { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .tb-main .time { min-width: 80px; }
-  .tb-main .kind { min-width: 170px; }
-  .tb-sub { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; margin-top: 4px; }
-  .tb-sub .legend { flex: 1; min-width: 240px; margin-top: 0; }
+  .float { position: absolute; z-index: 1000; background: var(--glass); border-radius: 12px; box-shadow: var(--shadow); box-sizing: border-box; }
+
+  #timebar { top: calc(10px + env(safe-area-inset-top)); left: 384px; right: 64px; max-width: 980px; margin: 0 auto; padding: 6px 12px 7px; }
+  .tb-main { display: flex; align-items: center; gap: 10px; }
+  .tb-main .time { font-size: 22px; min-width: 64px; }
+  .tb-main .kind { min-width: 150px; font-size: 13px; }
+  .tb-sub { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; margin-top: 3px; }
   .tb-sub .chips { margin: 0; }
   #slider { -webkit-appearance: none; appearance: none; background: transparent; }
   #slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px;
     background: linear-gradient(to right, var(--past) 0 var(--split, 50%), var(--accent) var(--split, 50%) 100%); }
   #slider::-moz-range-track { height: 6px; border-radius: 3px;
     background: linear-gradient(to right, var(--past) 0 var(--split, 50%), var(--accent) var(--split, 50%) 100%); }
-  #slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%;
+  #slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%;
     background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
-  #slider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); }
+  #slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); }
 
-  #live {
-    grid-area: side; position: static; width: auto; max-width: none; max-height: none; border-radius: 0; box-shadow: none;
-    padding: calc(72px + env(safe-area-inset-top)) 22px 18px; overflow: auto; border-right: 1px solid var(--line);
+  #side { top: calc(60px + env(safe-area-inset-top)); left: 12px; width: 360px; max-height: calc(100% - 60px - 56px); display: flex; flex-direction: column; }
+  #side-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px 14px; }
+  #side-head h1 { font-size: 15px; margin: 0; flex: 1; letter-spacing: -.2px; }
+  #side-body { overflow: auto; padding: 0 14px 12px; }
+  #side.collapsed #side-body { display: none; }
+  #side h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; }
+
+  #legendbox { right: 12px; top: var(--legend-top, 98px); width: 340px; padding: 7px 10px 8px; font-size: 11.5px; }
+  #legendbox .legend { font-size: 10.5px; }
+  #legendbox .lt { display: flex; justify-content: space-between; color: var(--muted); margin-bottom: 3px; }
+  #legendbox .keys { margin-top: 5px; }
+
+  @media (max-width: 1099px) {
+    #timebar { left: 12px; right: 12px; top: calc(56px + env(safe-area-inset-top)); max-width: none; }
+    #side { top: var(--side-top, 150px); max-height: calc(100% - var(--side-top, 150px) - 56px); }
   }
-  #live h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -.3px; }
-  #live .lead { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
-
-  @media (max-width: 999px) {
-    #liveview { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, 32vh);
-                grid-template-areas: "mosaic" "time" "side"; }
-    #mosaic { gap: 6px; padding: calc(62px + env(safe-area-inset-top)) 6px 0; }
-    .pane { border-radius: 12px; }
-    .plabel { top: auto; bottom: 6px; left: 6px; max-width: calc(100% - 12px); padding: 4px 7px 4px 6px; border-left-width: 4px; }
-    .plabel strong { font-size: 14px; }
-    .plabel span { font-size: 10.5px; }
-    #timebar { margin: 6px 0; padding: 8px 12px; width: calc(100% - 12px); }
-    .tb-main { flex-wrap: wrap; gap: 4px 10px; }
-    .tb-main .time { font-size: 22px; min-width: 0; }
-    .tb-main .kind { order: 3; width: 100%; min-width: 0; text-align: left; font-size: 13px; }
-    #live { padding: 10px 14px; border-right: 0; border-top: 1px solid var(--line); }
-    #live h1, #live .lead { display: none; }
+  @media (max-width: 699px) {
+    #timebar { left: 6px; right: 6px; padding: 4px 8px 5px; border-radius: 10px; }
+    .tb-main { flex-wrap: wrap; gap: 2px 8px; }
+    .tb-main .time { font-size: 18px; min-width: 0; }
+    .tb-main .kind { order: 3; width: 100%; min-width: 0; text-align: left; font-size: 12px; }
+    .tb-main input[type=range] { order: 2; flex-basis: 50%; }
+    #side { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 60%; border-radius: 12px 12px 0 0; padding-bottom: env(safe-area-inset-bottom); background: var(--bg); }
+    .tb-sub { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 8px; }
+    .tb-sub::-webkit-scrollbar { display: none; }
+    .tb-sub .chips { flex-wrap: nowrap; flex: none; }
+    #legendbox { right: 6px; left: 6px; width: auto; padding: 4px 8px 5px; border-radius: 10px; }
+    #legendbox .keys { display: none; }
+    .plabel { left: 5px; bottom: 5px; padding: 3px 6px 3px 5px; }
+    .plabel strong { font-size: 12.5px; }
+    .plabel span, .plabel em { font-size: 10.5px; }
   }
-  .rain { image-rendering: pixelated; }
-  button { font: inherit; color: inherit; }
 
-  #tabs {
-    position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 12px; z-index: 1001; display: flex;
-    background: var(--bg); border-radius: 10px; box-shadow: var(--shadow); padding: 3px;
-  }
-  #tabs button { border: 0; background: none; padding: 7px 14px; border-radius: 8px; cursor: pointer; color: var(--muted); }
-  #tabs button[aria-selected="true"] { background: var(--chip); color: var(--fg); font-weight: 600; }
-
+  /* ---------- händelsefliken ---------- */
+  #map { position: fixed; inset: 0; }
   .panel {
     position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
     max-width: 460px; z-index: 1000; background: var(--bg); border-radius: 14px; box-shadow: var(--shadow);
     padding: 14px 16px 12px; box-sizing: border-box; max-height: calc(100% - 90px); overflow: auto;
   }
+  @media (min-width: 700px) { .panel { right: auto; width: 460px; } }
+
+  #tabs {
+    position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 12px; z-index: 1001; display: flex;
+    background: var(--bg); border-radius: 10px; box-shadow: var(--shadow); padding: 3px;
+  }
+  #tabs button { border: 0; background: none; padding: 6px 13px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+  #tabs button[aria-selected="true"] { background: var(--chip); color: var(--fg); font-weight: 600; }
+  #locate {
+    position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 1001;
+    width: 40px; height: 40px; border-radius: 10px; border: 0; background: var(--bg);
+    box-shadow: var(--shadow); font-size: 18px; cursor: pointer;
+  }
+
   .row { display: flex; align-items: center; gap: 12px; }
   .time { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .kind { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
   .kind.fc { color: var(--accent); }
-
   .play {
-    flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
-    background: var(--bg); font-size: 15px; cursor: pointer; display: grid; place-items: center;
+    flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--bg); font-size: 14px; cursor: pointer; display: grid; place-items: center;
   }
-  .play:focus-visible, input[type=range]:focus-visible, .chips button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  input[type=range] { flex: 1; accent-color: var(--accent); height: 32px; margin: 0; }
+  .tb-main .play { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .play:focus-visible, input[type=range]:focus-visible, .chips button:focus-visible, #side-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); height: 28px; margin: 0; min-width: 0; }
 
   .legend { display: flex; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  #legendbox .legend { margin-top: 0; }
   .legend div { flex: 1; }
   .legend span { display: block; height: 6px; }
   .legend div:first-child span { border-radius: 3px 0 0 3px; }
@@ -112,45 +135,45 @@
 
   .status { margin-top: 6px; font-size: 12px; color: var(--muted); }
   .status.warn { color: var(--warn); }
+  .status a { color: inherit; }
+  .hint { margin-top: 4px; font-size: 12px; color: var(--muted); }
 
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
-  .chips button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 4px 11px; cursor: pointer; font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 8px; }
+  .chips button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 10px; cursor: pointer; font-size: 12.5px; }
   .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .chips.layers button { border-radius: 8px; font-size: 12px; padding: 4px 9px; }
+  .chips.layers button, .seg button { border-radius: 7px; font-size: 12px; padding: 3px 9px; }
+  .chips.models button { border-left: 4px solid var(--c); border-radius: 7px; font-size: 12px; padding: 3px 9px; }
+  .chips.models button[aria-pressed="true"] { background: var(--chip); border-color: var(--line); border-left-color: var(--c); color: var(--fg); font-weight: 600; }
   h2 { font-size: 17px; margin: 2px 0 2px; }
   .meta { color: var(--muted); font-size: 12px; }
   .text { font-size: 13px; margin: 6px 0 8px; }
   .text a { color: var(--accent); }
-  .status a { color: inherit; }
   table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 8px; }
   th, td { padding: 3px 4px; text-align: right; border-bottom: 1px solid var(--line); }
   th:first-child, td:first-child { text-align: left; }
   td.best { color: var(--good); font-weight: 600; }
+  td.obs { color: var(--muted); }
+  #point-table td, #point-table th { white-space: nowrap; }
   caption { text-align: left; color: var(--muted); font-size: 11px; padding-bottom: 2px; }
-  [hidden] { display: none !important; }
   details { margin-top: 8px; }
   summary { cursor: pointer; font-size: 13px; color: var(--accent); }
-
-  #locate {
-    position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 1000;
-    width: 40px; height: 40px; border-radius: 10px; border: 0; background: var(--bg);
-    box-shadow: var(--shadow); font-size: 18px; cursor: pointer;
-  }
   .leaflet-control-attribution { font-size: 10px; }
-  @media (min-width: 700px) { .panel { right: auto; width: 460px; } }
-  .seg button { border-radius: 8px; font-size: 12px; padding: 4px 10px; }
-  .hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
-  #point { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+
   #point .row { justify-content: space-between; }
   #point-close { border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted); padding: 0 4px; }
-  #point-chart { display: block; width: 100%; height: 160px; margin-top: 4px; }
-  @media (max-width: 500px) { #point-chart { height: 120px; } }
-  #point-chart text { font-size: 10px; fill: var(--muted); font-variant-numeric: tabular-nums; }
-  #point-chart .grid { stroke: var(--line); stroke-width: 1; }
-  #point-chart .now { stroke: var(--muted); stroke-dasharray: 2 3; }
-  .keys { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .chart { display: block; width: 100%; height: 150px; margin-top: 4px; cursor: crosshair; }
+  .chart text { font-size: 10px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .chart .grid { stroke: var(--line); stroke-width: 1; }
+  .chart .now { stroke: var(--muted); stroke-dasharray: 2 3; }
+  .chart .cur { fill: var(--accent); opacity: .09; }
+  .chart .hov { fill: var(--fg); opacity: .07; }
+  .readout { font-size: 12px; font-variant-numeric: tabular-nums; min-height: 17px; }
+  .readout b { font-weight: 600; }
+  .keys { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
   .keys i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
-  :root { --ours: #1f6feb; --past: #9aa3ad; --met: #2da44e; --snow: #d4731c; }
+  .keys i.ring { border-radius: 50%; border: 2px solid var(--gauge); width: 7px; height: 7px; }
+  .keys i.grey { background: #8b949e; opacity: .7; }
+  .gauge-tip { font-size: 12px; }
 </style>
 </head>
 <body>
@@ -162,33 +185,9 @@
 <button id="locate" title="Visa min plats" aria-label="Visa min plats">◎</button>
 
 <div id="liveview">
-<section id="live" class="panel" aria-label="Aktuell prognos">
-  <h1>Nederbördsprognos</h1>
-  <p class="lead">Tim-KNEP bredvid MET Norges nowcast och SMHI:s SNOW, två timmar framåt, och radaranalysen tolv timmar bakåt.</p>
-  <div class="status" id="status"></div>
-  <div id="point" hidden>
-    <div class="row"><strong id="point-title">Punkt</strong><button id="point-close" aria-label="Stäng punkten">×</button></div>
-    <svg id="point-chart" role="img" aria-label="Tidsserie i punkten"></svg>
-    <div class="keys">
-      <span><i style="background:var(--past)"></i>Radar</span><span><i style="background:var(--ours)"></i>Tim-KNEP</span>
-      <span><i style="background:var(--met)"></i>MET Norge nowcast</span><span><i style="background:var(--snow)"></i>SNOW median, min till max</span>
-    </div>
-    <table id="point-table"></table>
-    <div class="status" id="point-status"></div>
-  </div>
-  <div class="hint" id="point-hint">Dra eller zooma i en karta så följer de andra med. Klicka för en tidsserie i punkten.</div>
-  <div class="status" id="sources"></div>
-  <div class="status">Samma färg är samma medelintensitet i alla tre. SNOW finns per timme och visas som timmens medel även i 5 och 15 min.
-    Karta &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, &copy; OpenStreetMap. Radar: <a href="https://www.smhi.se/data">SMHI</a>,
-    <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0). Jämförelse: <a href="https://opendata.smhi.se/">SMHI SNOW</a>,
-    <a href="https://api.met.no/">MET Norge</a> (CC BY 4.0).</div>
-</section>
-<div id="mosaic" aria-label="Tim-KNEP, MET Norge och SNOW sida vid sida">
-  <div class="pane"><div class="pmap" id="map-ours"></div><div class="plabel" id="lab-ours"><strong>Tim-KNEP</strong><span></span></div></div>
-  <div class="pane"><div class="pmap" id="map-met"></div><div class="plabel" id="lab-met"><strong>MET Norge</strong><span></span></div></div>
-  <div class="pane"><div class="pmap" id="map-snow"></div><div class="plabel" id="lab-snow"><strong>SNOW</strong><span></span></div></div>
-</div>
-<div id="timebar" aria-label="Tid">
+<div id="mosaic" aria-label="Modellerna sida vid sida"></div>
+
+<div id="timebar" class="float" aria-label="Tid">
   <div class="tb-main">
     <button class="play" id="play" aria-label="Spela upp">▶</button>
     <div class="time" id="time">--:--</div>
@@ -196,21 +195,73 @@
     <div class="kind" id="kind">Laddar</div>
   </div>
   <div class="tb-sub">
+    <div class="chips layers"><button class="nowbtn" id="now-btn" title="Senaste radarbilden (N)">Nu</button></div>
     <div class="chips seg" id="live-res" role="group" aria-label="Upplösning">
       <button aria-pressed="true" data-res="5" title="Momentan intensitet var 5:e minut">5 min</button>
       <button aria-pressed="false" data-res="15" title="Summa per kvart, som KNEP">15 min</button>
       <button aria-pressed="false" data-res="60" title="Summa per timme, som SNOW">1 h</button>
     </div>
-    <div class="legend" id="legend" aria-label="Färgskala"></div>
     <div class="chips layers">
-      <button aria-pressed="true" id="bg-toggle" title="Senaste radarbilden svagt under prognoserna">Radar i bakgrunden</button>
+      <button aria-pressed="false" id="obs-toggle" title="SMHI:s regnmätare med samma färgskala: kvartssumma, timsumma eller kvartens medelintensitet i 5 min">Mätare</button>
+      <button aria-pressed="true" id="bg-toggle" title="Senaste radarbilden i grått under prognoserna">Radar i bakgrunden</button>
       <button aria-pressed="false" id="back-toggle" title="Radaranalysen de senaste tolv timmarna" hidden>12 h bakåt</button>
     </div>
     <div class="chips layers" id="live-layers" hidden>
       <button aria-pressed="true" data-layer="rain">Intensitet</button>
-      <button aria-pressed="false" data-layer="p10">Risk för minst 10 mm/h</button>
+      <button aria-pressed="false" data-layer="p10">Risk ≥ 10 mm/h</button>
     </div>
   </div>
+</div>
+
+<aside id="side" class="float" aria-label="Prognos och jämförelse">
+  <div id="side-head">
+    <h1>Nederbördsprognos</h1>
+    <button id="share" title="Kopiera en länk till den här vyn: kartutsnitt, tid, upplösning och punkt">Länk</button>
+    <button id="side-toggle" aria-expanded="true" aria-controls="side-body" title="Fäll ihop panelen">‹</button>
+  </div>
+  <div id="side-body">
+    <div class="status" id="status" style="margin-top:0"></div>
+    <h3>Kartor</h3>
+    <div class="chips models" id="model-chips" role="group" aria-label="Modeller som visas"></div>
+
+    <div id="point" hidden>
+      <div class="row"><h3 id="point-title" style="margin:8px 0 0">Punkt</h3><button id="point-close" aria-label="Stäng punkten">×</button></div>
+      <svg id="point-chart" class="chart" role="img" aria-label="Tidsserie i punkten"></svg>
+      <div class="readout" id="point-readout"></div>
+      <div class="keys" id="point-keys"></div>
+      <table id="point-table"></table>
+      <div class="status" id="point-status"></div>
+    </div>
+    <div class="hint" id="point-hint">Klicka i en karta eller på en mätare för staplar i punkten. Under markören visar varje karta sin klass.
+      Tangenter: pilarna stegar, mellanslag spelar, N går till nu, 1, 2 och 3 byter upplösning, M visar mätarna, B tolv timmar bakåt, Esc stänger punkten.</div>
+
+    <details id="area">
+      <summary>Regnyta i kartutsnittet</summary>
+      <div class="chips seg" id="area-thr" role="group" aria-label="Tröskel" style="margin-top:6px">
+        <button aria-pressed="false" data-thr="2">≥ 0,5 mm/h</button>
+        <button aria-pressed="true" data-thr="3">≥ 1 mm/h</button>
+        <button aria-pressed="false" data-thr="5">≥ 4 mm/h</button>
+      </div>
+      <svg id="area-chart" class="chart" role="img" aria-label="Regnyta över tid per modell"></svg>
+      <div class="readout" id="area-readout"></div>
+      <div class="status" id="area-status">Ytan räknas ur kartbilderna inom det som syns. Utanför en modells område räknas det som torrt.</div>
+    </details>
+
+    <details id="about">
+      <summary>Källor</summary>
+      <div class="status" id="sources"></div>
+      <div class="status">Samma färg är samma medelintensitet i alla kartor. SNOW finns per timme och visas som timmens medel även i 5 och 15 min.
+        Karta &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, &copy; OpenStreetMap. Radar och mätare: <a href="https://www.smhi.se/data">SMHI</a>,
+        <a href="https://eumetnet.github.io/openradardata-documentation/">EUMETNET OPERA</a> (CC BY 4.0). Jämförelse: <a href="https://opendata.smhi.se/">SMHI SNOW</a>,
+        <a href="https://api.met.no/">MET Norge</a> (CC BY 4.0).</div>
+    </details>
+  </div>
+</aside>
+
+<div id="legendbox" class="float" aria-label="Färgskala">
+  <div class="lt"><span id="legend-title">Intensitet</span><span id="legend-unit"></span></div>
+  <div class="legend" id="legend"></div>
+  <div class="keys" id="legend-keys"></div>
 </div>
 </div>
 
@@ -258,34 +309,14 @@ const dayTime = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'short
 const num = v => v.toLocaleString('sv-SE');
 const mm = v => v == null ? '' : v.toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const MIN = 60000;
+const store = {  // egna inställningar i webbläsaren; sidan fungerar utan
+  get(k, d) { try { const v = localStorage.getItem('knep.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('knep.' + k, JSON.stringify(v)); } catch (e) { /* privat läge */ } },
+};
 
 // Esris gråa bakgrund kräver ingen nyckel (CARTO:s rutor kräver numera en utanför localhost)
 const basemap = attribution => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
   { maxNativeZoom: 16, maxZoom: 19, attribution });
-
-// Prognosfliken: tre kartor som följer varandra, avgränsade till MEPS-området (där SNOW finns)
-const MEPS = [[49.75632, -18.17334], [75.23955, 54.29416]];
-const panes = Object.fromEntries(['ours', 'met', 'snow'].map(k => {
-  const pm = L.map(`map-${k}`, { zoomControl: false, attributionControl: false, maxZoom: 11,
-                                 maxBounds: MEPS, maxBoundsViscosity: 1 }).setView([62.5, 16], 4);
-  basemap().addTo(pm);
-  return [k, { map: pm, label: $(`lab-${k}`), bg: null }];
-}));
-const paneMaps = Object.values(panes).map(p => p.map);
-let syncing = false;
-paneMaps.forEach(pm => pm.on('move zoom', () => {
-  if (syncing) return;
-  syncing = true;
-  paneMaps.forEach(o => { if (o !== pm) o.setView(pm.getCenter(), pm.getZoom(), { animate: false }); });
-  syncing = false;
-}));
-function fitMosaic() {
-  paneMaps.forEach(pm => pm.invalidateSize());
-  const z = panes.ours.map.getBoundsZoom(L.latLngBounds(MEPS).pad(-0.15));
-  paneMaps.forEach(pm => pm.setMinZoom(Math.max(2, z - 1)));
-  panes.ours.map.setView([62.5, 16], z);
-}
-fitMosaic();
 
 // Händelsefliken: en karta
 const map = L.map('map', { zoomControl: false, minZoom: 3, maxZoom: 11 }).setView([62.5, 16], 5);
@@ -293,7 +324,7 @@ basemap('Karta &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, &c
 
 function legendHtml(items, unit) {
   return items.map(l => `<div><span style="background:${l.color}"></span>${unit === '%' ? Math.round(l.min * 100) : num(l.min)}</div>`).join('')
-    + `<div style="flex:none;padding-left:6px;align-self:flex-end">${unit}</div>`;
+    + (unit === undefined ? '' : `<div style="flex:none;padding-left:6px;align-self:flex-end">${unit}</div>`);
 }
 function pressed(group, attr, value) {
   group.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset[attr] === value));
@@ -314,10 +345,27 @@ function sweref99tm(lat, lon) {
   return [E0 + k0 * A * y, k0 * A * x];
 }
 
-/* ---------- aktuell prognos: Tim-KNEP, MET Norge och SNOW ---------- */
-const live = { manifest: null, overlays: { 5: [], 15: [], 60: [] }, prob: [], ext: { met: { 5: [], 15: [], 60: [] }, snow: [] },
-               res: '5', idx: 0, layer: 'rain', bg: true, back: false, hist: new Map(), values: null, point: null };
+/* ---------- modellerna ----------
+   Varje karta är en modell. Tim-KNEP kommer ur manifestet, de andra ur compare i manifestet.
+   En ny källa under compare med bounds och frames, frames15 eller frames60 (och gärna name
+   och reference) får en egen karta utan ändringar här; bara frames60 betyder timvärden. */
+const KNOWN = {
+  ours: { name: 'Tim-KNEP', color: 'var(--ours)' },
+  met: { name: 'MET Norge', color: 'var(--met)', what: 'nowcast' },
+  snow: { name: 'SNOW', color: 'var(--snow)', what: 'median' },
+};
+const EXTRA_COLORS = ['#8250df', '#bf3989', '#0a7d8c', '#7d4e00'];
+const MEPS = [[49.75632, -18.17334], [75.23955, 54.29416]];  // kartorna avgränsas till MEPS-området, där SNOW finns
+const NORDEN = [[55.0, 6.0], [69.5, 30.0]];  // det som ska synas från början
+const LEVELS = [0.1, 0.5, 1, 2, 4, 8, 16, 32];  // som render.LEVELS: klass k är minst LEVELS[k - 1] mm/h
+const ALPHAS = [170, 200, 215, 225, 235, 240, 245, 250];  // klassernas alfa i PNG-paletten, en per klass
+
+const live = { manifest: null, res: store.get('res', '5'), idx: 0, layer: 'rain', bg: store.get('bg', true), back: store.get('back', false),
+               obs: store.get('obs', false), hidden: new Set(store.get('hidden', [])), panes: new Map(), gauges: null,
+               values: null, point: null, view: null, area: null, areaThr: 3, hover: null };
+
 const listFor = (m, r) => (r === '5' ? m.frames : r === '15' ? m.frames15 : m.frames60) || [];
+const listOf = (e, r) => (r === '5' ? e.frames : r === '15' ? e.frames15 : e.frames60) || [];
 // analysen bakåt (hist/): bara det som ligger före manifestets egna rutor
 const histFor = (m, r) => {
   const h = m.history; if (!h) return [];
@@ -325,32 +373,196 @@ const histFor = (m, r) => {
   return first ? l.filter(f => +new Date(f.time) < +new Date(first.time)) : l;
 };
 const framesFor = (m, r) => live.back ? [...histFor(m, r).map(f => ({ ...f, hist: true })), ...listFor(m, r)] : listFor(m, r);
-// bilderna bakåt byter aldrig namn, så de läggs till först när de visas och behålls mellan uppdateringarna
-function histOverlay(file) {
-  let o = live.hist.get(file);
+const ago = minutes => { const h = Math.floor(minutes / 60), r = minutes % 60; return h ? `${h} h${r ? ` ${r} min` : ''}` : `${r} min`; };
+const unitFor = r => live.manifest?.units?.[r] || { 5: 'mm/h', 15: 'mm per 15 min', 60: 'mm per timme' }[r];
+const factor = r => r === '5' ? 1 : +r / 60;  // klassgränserna i mm/h gånger periodens längd
+
+function modelKeys(m) {
+  const extra = Object.keys(m?.compare || {}).filter(k => k !== 'bounds' && typeof m.compare[k] === 'object' && m.compare[k].bounds);
+  return ['ours', ...new Set(['met', 'snow', ...extra])];
+}
+function modelInfo(key) {
+  const e = live.manifest?.compare?.[key];
+  const k = KNOWN[key] || {};
+  const i = [...live.panes.keys()].indexOf(key);
+  return { name: e?.name || k.name || key, color: e?.color || k.color || EXTRA_COLORS[Math.max(0, i - 3) % EXTRA_COLORS.length], what: k.what || e?.what || '' };
+}
+const visiblePanes = () => [...live.panes.values()].filter(p => !live.hidden.has(p.key));
+
+function makePane(key) {
+  const el = document.createElement('div');
+  el.className = 'pane';
+  el.innerHTML = `<div class="pmap"></div><div class="plabel"><strong></strong><span></span><em></em></div>`;
+  $('mosaic').append(el);
+  const pm = L.map(el.firstChild, { zoomControl: false, attributionControl: false, maxZoom: 11, maxBounds: MEPS, maxBoundsViscosity: 1, preferCanvas: true });
+  basemap().addTo(pm);
+  const p = { key, el, map: pm, label: el.querySelector('.plabel'), overlays: new Map(), shown: null, bg: null, src: null,
+              gauges: L.layerGroup().addTo(pm), cross: L.circleMarker([0, 0], { radius: 7, weight: 1.5, color: '#1b1f24', fill: false, interactive: false }) };
+  pm.on('move zoom', () => syncFrom(p));
+  pm.on('moveend', () => { if (!syncing) { areaSoon(); saveHash(); } });
+  pm.on('click', e => pointOpen(e.latlng));
+  pm.on('mousemove', e => hoverAt(e.latlng, p));
+  pm.on('mouseout', () => hoverAt(live.point ? live.point.ll : null, 'point'));
+  live.panes.set(key, p);
+  if (live.view) pm.setView(live.view.center, live.view.zoom, { animate: false }); else pm.setView([62.5, 16], 4);
+  return p;
+}
+
+let syncing = false;
+function syncFrom(p) {
+  if (syncing) return;
+  syncing = true;
+  live.view = { center: p.map.getCenter(), zoom: p.map.getZoom() };
+  visiblePanes().forEach(o => { if (o !== p) o.map.setView(live.view.center, live.view.zoom, { animate: false }); });
+  syncing = false;
+}
+
+// kolumner och rader: den indelning som ger störst kvadrat per karta
+function layoutMosaic() {
+  const vis = visiblePanes(), box = $('mosaic').getBoundingClientRect(), n = Math.max(1, vis.length);
+  let best = 1, side = 0;
+  for (let c = 1; c <= n; c++) {
+    const r = Math.ceil(n / c), s = Math.min(box.width / c, box.height / r);
+    if (s > side + 1) { side = s; best = c; }
+  }
+  $('mosaic').style.gridTemplateColumns = `repeat(${best}, minmax(0, 1fr))`;
+  for (const p of live.panes.values()) p.el.hidden = live.hidden.has(p.key);
+  vis.forEach(p => p.map.invalidateSize());
+}
+
+function placeFloats() {  // mobil och smal skärm: kartorna mellan tidslisten och panelen
+  const narrow = innerWidth < 700, tb = $('timebar').getBoundingClientRect(), head = $('side-head').offsetHeight;
+  const lv = $('liveview').style;
+  lv.setProperty('--side-top', `${Math.round(tb.bottom + 8)}px`);
+  lv.setProperty('--legend-top', `${Math.round(tb.bottom + (narrow ? 4 : 8))}px`);
+  const lg = narrow ? tb.bottom + 4 + $('legendbox').offsetHeight : 0;
+  lv.setProperty('--m-top', narrow ? `${Math.round(lg + 4)}px` : '0px');
+  lv.setProperty('--m-bottom', narrow ? `${head + 2}px` : '0px');  // den utfällda panelen ligger ovanpå kartorna
+}
+
+function fitMosaic(initial) {
+  placeFloats();
+  layoutMosaic();
+  const first = visiblePanes()[0];
+  if (!first) return;
+  const z = first.map.getBoundsZoom(L.latLngBounds(NORDEN));
+  visiblePanes().forEach(p => p.map.setMinZoom(Math.max(2, first.map.getBoundsZoom(L.latLngBounds(MEPS).pad(-0.15)) - 1)));
+  if (initial && want.view) first.map.setView(want.view.center, want.view.zoom, { animate: false });
+  else if (initial) first.map.setView(L.latLngBounds(NORDEN).getCenter(), z, { animate: false });
+  syncFrom(first);
+}
+
+function modelChips() {
+  $('model-chips').innerHTML = [...live.panes.keys()].map(k => {
+    const info = modelInfo(k);
+    return `<button data-key="${k}" style="--c:${info.color}" aria-pressed="${!live.hidden.has(k)}">${info.name}</button>`;
+  }).join('');
+  $('model-chips').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.key;
+    if (live.hidden.has(k)) live.hidden.delete(k);
+    else if (visiblePanes().length > 1) live.hidden.add(k);
+    store.set('hidden', [...live.hidden]);
+    modelChips();
+    layoutMosaic();
+    const v = live.view;
+    if (v) visiblePanes().forEach(p => p.map.setView(v.center, v.zoom, { animate: false }));
+    preload();
+    liveShow(live.idx);
+    areaSoon();
+  }));
+  for (const [k, p] of live.panes) {
+    const info = modelInfo(k);
+    p.label.style.setProperty('--c', info.color);
+    p.label.querySelector('strong').textContent = info.name;
+  }
+}
+
+/* ---------- länken: kartutsnitt, tid, upplösning och punkt i adressen ---------- */
+function parseHash() {
+  const h = location.hash.slice(1), out = {};
+  if (!h || h.startsWith('handelser')) return out;
+  const q = new URLSearchParams(h);
+  const ll = s => { const v = (s || '').split(',').map(Number); return v.length >= 2 && v.every(Number.isFinite) ? v : null; };
+  const k = ll(q.get('karta')); if (k) out.view = { center: L.latLng(k[0], k[1]), zoom: k[2] ?? 6 };
+  const pt = ll(q.get('punkt')); if (pt) out.point = L.latLng(pt[0], pt[1]);
+  if (['5', '15', '60'].includes(q.get('upp'))) out.res = q.get('upp');
+  if (q.get('tid')) out.time = q.get('tid');
+  return out;
+}
+const want = parseHash();
+if (want.res) live.res = want.res;
+let hashTimer = 0;
+function saveHash(now) {
+  clearTimeout(hashTimer);
+  const write = () => {
+    if (mode !== 'live' || !live.view) return;
+    const q = new URLSearchParams();
+    const c = live.view.center;
+    q.set('karta', `${c.lat.toFixed(3)},${c.lng.toFixed(3)},${live.view.zoom}`);
+    q.set('upp', live.res);
+    const f = live.manifest && framesFor(live.manifest, live.res)[live.idx];
+    if (f) q.set('tid', f.time);
+    if (live.point) q.set('punkt', `${live.point.ll.lat.toFixed(3)},${live.point.ll.lng.toFixed(3)}`);
+    history.replaceState(null, '', '#' + q.toString().replace(/%2C/g, ',').replace(/%3A/g, ':'));
+  };
+  if (now) write(); else hashTimer = setTimeout(write, 400);
+}
+
+/* ---------- rutorna ---------- */
+// vilken bild en karta visar för en tid i tidslisten (f ur framesFor)
+function srcFor(p, f, layer = live.layer) {
+  const m = live.manifest, r = live.res;
+  if (p.key === 'ours') {
+    const file = r === '5' && layer === 'p10' && f.p10 ? f.p10 : f.file;
+    return { file, bounds: m.bounds, hist: f.hist, text: f.kind === 'obs' ? (f.hist ? 'radaranalys' : 'radar') : `prognos från ${clock.format(new Date(m.analysis))}` };
+  }
+  const e = m.compare?.[p.key];
+  if (!e) return { missing: 'inte hämtad' };
+  if (f.hist) return { missing: 'bara prognos, ingen analys bakåt' };
+  const t = +new Date(f.time), own = listOf(e, r);
+  let x = own.find(y => +new Date(y.time) === t), hourly = false;
+  if (!x && !own.length && r !== '60') {  // bara timvärden: timmen som innehåller tiden
+    x = (e.frames60 || []).find(y => t > +new Date(y.start) && t <= +new Date(y.time));
+    hourly = !!x;
+  }
+  if (!x) return { missing: 'saknas för tiden' };
+  const info = modelInfo(p.key);
+  const age = e.reference ? Math.round((new Date(m.analysis) - new Date(e.reference)) / MIN) : 0;
+  const run = e.reference ? `körning ${clock.format(new Date(e.reference))}${age > 60 ? `, ${ago(age)} gammal` : ''}` : '';
+  const text = hourly || r === '60' ? `${info.what ? info.what + ' ' : ''}${clock.format(new Date(x.start || t - 3600000))} till ${clock.format(new Date(x.time))}`
+    : [run, e.resolution_km ? `${num(e.resolution_km)} km` : ''].filter(Boolean).join(', ');
+  return { file: x.file, bounds: e.bounds, text: age > 60 && !text.includes('gammal') ? `${text}, ${ago(age)} gammal` : text || run, hourly, stale: age > 60 };
+}
+const urlFor = src => `${DATA}${src.file}${src.hist ? '' : `?v=${encodeURIComponent(live.manifest.analysis)}`}`;
+
+function overlay(p, src) {
+  const url = urlFor(src);
+  let o = p.overlays.get(url);
   if (!o) {
-    o = L.imageOverlay(`${DATA}${file}`, live.manifest.bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(panes.ours.map);
-    live.hist.set(file, o);
+    o = L.imageOverlay(url, src.bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(p.map);
+    const done = () => { o._ok = true; if (p.shown === o) p.label.classList.remove('loading'); };
+    o.on('load', done).on('error', done);
+    p.overlays.set(url, o);
   }
   return o;
 }
-function overlayAt(r, i) {
-  const off = framesFor(live.manifest, r).length - listFor(live.manifest, r).length;
-  return i < off ? histOverlay(framesFor(live.manifest, r)[i].file) : live.overlays[r][i - off];
-}
-function probAt(i) {
-  const off = framesFor(live.manifest, '5').length - live.manifest.frames.length;
-  return i < off ? null : live.prob[i - off];
-}
-const ago = minutes => { const h = Math.floor(minutes / 60), r = minutes % 60; return h ? `${h} h${r ? ` ${r} min` : ''}` : `${r} min`; };
-const metFor = (m, r) => { const e = m.compare?.met; return e ? (r === '5' ? e.frames : r === '15' ? e.frames15 : e.frames60) || [] : []; };
-const lastObs = m => m.frames.map(f => f.kind).lastIndexOf('obs');
-const allLive = () => [...Object.values(live.overlays).flat(), ...live.prob, ...Object.values(live.ext.met).flat(), ...live.ext.snow,
-                       ...Object.values(panes).map(p => p.bg), ...live.hist.values()].filter(Boolean);
 
-function paneLabel(k, text, missing) {
-  panes[k].label.querySelector('span').textContent = text;
-  panes[k].label.classList.toggle('missing', !!missing);
+function preload(around) {  // hela listan utom bilderna bakåt, som laddas kring den tid som visas
+  const m = live.manifest;
+  if (!m) return;
+  const list = framesFor(m, live.res);
+  for (const p of visiblePanes()) {
+    list.forEach((f, i) => {
+      if (f.hist && (around == null || i < around - 2 || i > around + 4)) return;
+      const s = srcFor(p, f);
+      if (s.file) overlay(p, s);
+    });
+  }
+}
+
+function paneLabel(p, text, missing) {
+  p.label.querySelector('span').textContent = text;
+  p.label.classList.toggle('missing', !!missing);
 }
 
 function liveShow(i) {
@@ -359,59 +571,76 @@ function liveShow(i) {
   const list = framesFor(m, live.res);
   if (!list.length) return;
   i = Math.max(0, Math.min(i, list.length - 1));
-  allLive().forEach(o => o.setOpacity(0));
-  const p = live.res === '5' && live.layer === 'p10' ? probAt(i) : null;
-  (p || overlayAt(live.res, i))?.setOpacity(1);
   live.idx = i;
+  const f = list[i], t = +new Date(f.time);
   $('slider').max = list.length - 1;
   $('slider').value = i;
   const split = list.map(x => x.kind).lastIndexOf('obs');
   $('slider').style.setProperty('--split', `${list.length > 1 ? Math.max(0, split) / (list.length - 1) * 100 : 0}%`);
-  const f = list[i], t = +new Date(f.time);
   $('time').textContent = (day.format(new Date(f.time)) !== day.format(new Date()) ? dayTime : clock).format(new Date(f.time));
   if (live.res === '5') {
-    const lead = Math.round((new Date(f.time) - new Date(m.analysis)) / MIN);
+    const lead = Math.round((t - new Date(m.analysis)) / MIN);
     $('kind').textContent = f.kind === 'fc' ? `Prognos +${lead} min` : lead === 0 ? 'Senaste radarbild' : `Radar ${ago(-lead)} före analysen`;
   } else {
     const what = { obs: 'Radar', fc: 'Prognos', mix: 'Radar och prognos' }[f.kind];
     $('kind').textContent = `${what}, summa ${clock.format(new Date(f.start))} till ${clock.format(new Date(f.time))}`;
   }
   $('kind').className = 'kind ' + (f.kind === 'obs' ? 'obs' : 'fc');
-  paneLabel('ours', f.kind === 'obs' ? 'radar' : `analys ${clock.format(new Date(m.analysis))}`);
 
-  // MET Norge: samma tid; SNOW: timmen som innehåller tiden (eller slutar då, för timsummor)
-  const mi = metFor(m, live.res).findIndex(x => +new Date(x.time) === t);
-  live.ext.met[live.res][mi]?.setOpacity(1);
-  const met = m.compare?.met;
-  paneLabel('met', !met ? 'inte hämtad' : f.hist ? 'bara prognos, ingen analys bakåt' : mi < 0 ? 'saknas för tiden' : `lopp ${clock.format(new Date(met.reference))}, ${num(met.resolution_km)} km`, !met || mi < 0);
-  const sf = m.compare?.snow?.frames60 || [];
-  const si = sf.findIndex(x => t > +new Date(x.start) && t <= +new Date(x.time));
-  live.ext.snow[si]?.setOpacity(1);
-  paneLabel('snow', !m.compare?.snow ? 'inte hämtad' : f.hist ? 'bara prognos, ingen analys bakåt' : si < 0 ? 'saknas för tiden'
-    : `median ${clock.format(new Date(sf[si].start))} till ${clock.format(new Date(sf[si].time))}`, !m.compare?.snow || si < 0);
-
-  // senaste radarbilden svagt under prognoserna
   const future = t > +new Date(m.analysis);
-  Object.values(panes).forEach(pn => pn.bg?.setOpacity(live.bg && future ? 0.3 : 0));
-
-  $('legend').innerHTML = p ? legendHtml(m.prob_legend, '%')
-    : legendHtml(m.legends?.[live.res] || m.legend, m.units?.[live.res] || 'mm/h');
-  $('live-layers').hidden = live.res !== '5' || !live.prob.some(Boolean);
+  for (const p of visiblePanes()) {
+    const s = srcFor(p, f);
+    const o = s.file ? overlay(p, s) : null;
+    if (p.shown && p.shown !== o) p.shown.setOpacity(0);
+    o?.setOpacity(1);
+    p.shown = o;
+    p.src = s.file ? s : null;
+    p.bg?.setOpacity(live.bg && future ? 0.55 : 0);
+    paneLabel(p, s.missing || s.text, !!s.missing || s.stale);
+    p.label.classList.toggle('loading', !!o && !o._ok);
+  }
+  if (list.some(x => x.hist)) preload(i);
+  gaugesDraw(f);
+  legendDraw(f, future);
+  $('live-layers').hidden = live.res !== '5' || !m.frames.some(x => x.p10);
   $('back-toggle').hidden = !m.history?.frames?.length;
+  if (live.point) pointDraw();
+  areaDraw();
+  hoverAt(live.hover?.ll, live.hover?.from);
+  saveHash();
+}
+
+function legendDraw(f, future) {
+  const m = live.manifest, p10 = live.res === '5' && live.layer === 'p10';
+  $('legend-title').textContent = p10 ? 'Risk för minst 10 mm/h' : live.res === '5' ? 'Intensitet' : `Summa per ${live.res === '15' ? 'kvart' : 'timme'}`;
+  $('legend-unit').textContent = p10 ? '%' : unitFor(live.res);
+  $('legend').innerHTML = p10 ? legendHtml(m.prob_legend, undefined) : legendHtml(m.legends?.[live.res] || m.legend, undefined);
+  const keys = [];
+  if (live.bg && future) keys.push('<span><i class="grey"></i>Senaste radarbilden, grå</span>');
+  if (live.obs) {
+    const g = gaugeValues(f);
+    keys.push(`<span><i class="ring"></i>Mätare${live.res === '5' ? ', kvartens medel i mm/h' : ''}</span>`);
+    const last = live.gauges && Object.keys(live.gauges[15] || {}).sort().at(-1);
+    if (!g) keys.push(`<span>${!live.gauges ? 'mätarna hämtas' : !last ? 'inga mätarvärden' : `inga mätarvärden för tiden, senaste ${clock.format(new Date(last))}`
+      + (!live.back && m.history?.frames?.length && +new Date(f.time) > +new Date(last) ? '. SMHI lägger ut dem ungefär en timme efter radarn, se 12 h bakåt' : '')}</span>`);
+  }
+  $('legend-keys').innerHTML = keys.join('');
 }
 
 function liveRes(r) {
   const m = live.manifest;
   const cur = m ? framesFor(m, live.res)[live.idx] : null;
   live.res = r;
+  store.set('res', r);
   pressed($('live-res'), 'res', r);
   if (!m) return;
   const list = framesFor(m, r);
   if (!list.length) return;
   let i = cur ? closestIndex(list, new Date(cur.time)) : 0;
   if (r !== '5' && cur && list[i].kind === 'obs' && cur.kind !== 'obs') i = Math.min(i + 1, list.length - 1);
+  preload(i);
   liveShow(i);
-  if (live.point) pointDraw();
+  areaSoon();
 }
 
 function liveStatus() {
@@ -422,14 +651,18 @@ function liveStatus() {
   const gaps = m.missing_radars?.length ? ` Radar saknas: ${m.missing_radars.join(', ')}, området fylls med flyttad analys och grannländernas radar.` : '';
   const vc = m.volume_correction ? ` Volymkorrigerad mot regnmätarna, medianfaktor ${num(m.volume_correction.median)}.` : '';
   el.className = 'status' + (age > STALE_MIN || gaps ? ' warn' : '');
+  document.title = `Nederbörd ${clock.format(new Date(m.analysis))}`;
   el.textContent = age > STALE_MIN
     ? `Ingen ny radarbild på ${age} min. Prognosen kan vara inaktuell.`
     : `Analys ${clock.format(new Date(m.analysis))}, uppdateras var femte minut.${gaps}${vc}`;
-  const c = m.compare;
-  $('sources').textContent = !c ? '' : [
-    c.met ? `MET Norge: lopp ${clock.format(new Date(c.met.reference))} i ${num(c.met.resolution_km)} km, var femte minut två timmar framåt.` : 'MET Norge kunde inte hämtas.',
-    c.snow ? `SNOW: körning ${clock.format(new Date(c.snow.reference))}, ensemblens median per timme.` : 'SNOW kunde inte hämtas.',
-  ].join(' ');
+  const c = m.compare || {};
+  $('sources').textContent = [...live.panes.keys()].filter(k => k !== 'ours').map(k => {
+    const e = c[k], info = modelInfo(k);
+    if (!e) return `${info.name} kunde inte hämtas.`;
+    if (k === 'met') return `MET Norge: lopp ${clock.format(new Date(e.reference))} i ${num(e.resolution_km)} km, var femte minut två timmar framåt.`;
+    if (k === 'snow') return `SNOW: körning ${clock.format(new Date(e.reference))}, ensemblens median per timme.`;
+    return `${info.name}${e.reference ? `: körning ${clock.format(new Date(e.reference))}` : ''}.`;
+  }).join(' ') + (live.gauges ? ` Mätare: ${Object.keys(live.gauges.stations).length} stationer från SMHI${live.gauges.direct ? ', senaste timmen hämtad direkt' : ''}.` : '');
 }
 
 async function liveLoad() {
@@ -446,33 +679,284 @@ async function liveLoad() {
   const old = live.manifest;
   const oldList = old ? framesFor(old, live.res) : [];
   const keep = oldList[live.idx] || null;
-  const v = encodeURIComponent(m.analysis);
-  const add = (pane, file, bounds) => L.imageOverlay(`${DATA}${file}?v=${v}`, bounds, { opacity: 0, interactive: false, className: 'rain' }).addTo(panes[pane].map);
-  allLive().filter(o => ![...live.hist.values()].includes(o)).forEach(o => o.remove());
-  const histFiles = new Set(['frames', 'frames15', 'frames60'].flatMap(k => (m.history?.[k] || []).map(f => f.file)));
-  for (const [file, o] of live.hist) if (!histFiles.has(file)) { o.remove(); live.hist.delete(file); }
-  // bakgrunden läggs först, så att den hamnar under prognoserna
-  const obs = m.frames[lastObs(m)];
-  for (const k in panes) panes[k].bg = obs ? add(k, obs.file, m.bounds) : null;
-  const ours = (f, file) => add('ours', file, m.bounds);
-  const fresh = { 5: m.frames.map(f => ours(f, f.file)), 15: (m.frames15 || []).map(f => ours(f, f.file)), 60: (m.frames60 || []).map(f => ours(f, f.file)) };
-  const prob = m.frames.map(f => f.p10 ? ours(f, f.p10) : null);
-  const met = m.compare?.met, snow = m.compare?.snow;
-  const ext = { met: Object.fromEntries(['5', '15', '60'].map(r => [r, metFor(m, r).map(f => add('met', f.file, met.bounds))])),
-                snow: (snow?.frames60 || []).map(f => add('snow', f.file, snow.bounds)) };
-  Object.assign(live, { overlays: fresh, prob, ext, manifest: m, values: null });
+  live.manifest = m;
+  live.values = null;
+  const ver = `?v=${encodeURIComponent(m.analysis)}`;
+  for (const u of [...decoded.keys()]) if (u.includes('?v=') && !u.endsWith(ver)) decoded.delete(u);  // förra cykelns bilder
+  let added = false;
+  for (const k of modelKeys(m)) if (!live.panes.has(k)) { makePane(k); added = true; }
+  // gamla bilder bort, utom de bakåt som fortfarande finns (de byter aldrig namn)
+  const histFiles = new Set(['frames', 'frames15', 'frames60'].flatMap(k => (m.history?.[k] || []).map(f => urlFor({ file: f.file, hist: true }))));
+  for (const p of live.panes.values()) {
+    for (const [url, o] of p.overlays) if (!histFiles.has(url)) { o.remove(); p.overlays.delete(url); }
+    p.shown = null;
+    p.bg?.remove();
+    const obs = m.frames[m.frames.map(f => f.kind).lastIndexOf('obs')];
+    p.bg = obs ? L.imageOverlay(urlFor({ file: obs.file }), m.bounds, { opacity: 0, interactive: false, className: 'rain radar-bg' }).addTo(p.map) : null;
+    p.bg?.bringToBack();
+  }
+  modelChips();
+  if (added) fitMosaic();
   $('live-res').hidden = !m.frames15;  // äldre manifest har bara 5 min
   if (!m.frames15) live.res = '5';
+  pressed($('live-res'), 'res', live.res);
   const list = framesFor(m, live.res);
   const lastOf = l => l.map(f => f.kind).lastIndexOf('obs');
   let i = live.res === '5' ? lastOf(list) + (old && keep ? live.idx - lastOf(oldList) : 0) : list.findIndex(f => f.kind !== 'obs');
   if (live.res !== '5' && keep && old) i = closestIndex(list, new Date(keep.time));
+  if (!old && want.time) { const j = list.findIndex(f => f.time === want.time); if (j >= 0) i = j; }  // tiden ur länken, om den finns kvar
+  preload(Math.max(0, i));
   liveShow(Math.max(0, i));
   liveStatus();
+  if (innerWidth < 700) { placeFloats(); layoutMosaic(); }
+  if (live.obs || live.point) gaugesLoad();
   if (live.point) pointOpen(live.point.ll, true);
+  else if (!old && want.point) pointOpen(want.point);
+  areaSoon();
 }
 
-/* ---------- punkt: Tim-KNEP mot SNOW och MET Norge ---------- */
+/* ---------- regnmätarna ---------- */
+// Pi:n sparar SMHI:s kvarts- och timsummor i tolv timmar (gauges.json); finns filen inte hämtas
+// senaste timmen direkt från SMHI. Ett värde vid tiden t är summan för perioden som slutar t.
+function parseMetobs(doc) {
+  const stations = {}, values = {};
+  for (const s of doc.station || []) {
+    let got = false;
+    for (const v of s.value || []) {
+      if (v.value == null || v.value === '' || !['G', 'Y'].includes(v.quality)) continue;
+      const t = new Date(v.date).toISOString().replace('.000', '');
+      (values[t] ||= {})[s.key] = +v.value;
+      got = true;
+    }
+    if (got) stations[s.key] = [s.latitude, s.longitude, s.name];
+  }
+  return { stations, values };
+}
+async function gaugesLoad() {
+  const m = live.manifest;
+  if (!m) return;
+  if (live.gauges?.analysis === m.analysis) return;
+  try {
+    const r = await fetch(`${DATA}gauges.json?v=${encodeURIComponent(m.analysis)}`);
+    if (!r.ok) throw new Error(r.status);
+    live.gauges = { ...(await r.json()), analysis: m.analysis };
+  } catch (e) {
+    const base = 'https://opendata-download-metobs.smhi.se/api/version/1.0/parameter';
+    try {
+      const [q, h] = await Promise.all([14, 7].map(p => fetch(`${base}/${p}/station-set/all/period/latest-hour/data.json`).then(r => r.json()).then(parseMetobs)));
+      live.gauges = { stations: { ...q.stations, ...h.stations }, 15: q.values, 60: h.values, analysis: m.analysis, direct: true };
+    } catch (e2) {
+      live.gauges = { stations: {}, 15: {}, 60: {}, analysis: m.analysis, failed: true };
+    }
+  }
+  liveShow(live.idx);
+  liveStatus();
+  if (live.point) { live.point.gauge = nearestGauge(live.point.ll); pointDraw(); }
+}
+// värdena för tiden i kartans enhet: mm per period, eller kvartens medel i mm/h för 5 min
+function gaugeValues(f, res = live.res) {
+  const g = live.gauges;
+  if (!g || !f) return null;
+  const iso = d => new Date(d).toISOString().replace('.000', '');
+  if (res === '15') return g[15]?.[f.time] || null;
+  if (res === '60') {
+    if (g[60]?.[f.time]) return g[60][f.time];
+    const qs = [0, 15, 30, 45].map(k => g[15]?.[iso(+new Date(f.time) - k * MIN)]);
+    if (!qs.every(Boolean)) return null;
+    const out = {};
+    for (const sid in qs[0]) if (qs.every(q => q[sid] != null)) out[sid] = qs.reduce((s, q) => s + q[sid], 0);
+    return out;
+  }
+  const end = Math.ceil(+new Date(f.time) / (15 * MIN)) * 15 * MIN, q = g[15]?.[iso(end)];
+  if (!q) return null;
+  return Object.fromEntries(Object.entries(q).map(([k, v]) => [k, v * 4]));
+}
+function colorFor(v, items) {
+  let c = null;
+  for (const l of items) if (v >= l.min) c = l.color;
+  return c && c.replace(/,[\d.]+\)$/, ',1)');
+}
+function gaugesDraw(f) {
+  for (const p of live.panes.values()) p.gauges.clearLayers();
+  if (!live.obs) return;
+  const vals = gaugeValues(f), m = live.manifest;
+  if (!vals) return;
+  const items = m.legends?.[live.res] || m.legend, unit = unitFor(live.res);
+  for (const [sid, v] of Object.entries(vals)) {
+    const st = live.gauges.stations[sid];
+    if (!st) continue;
+    const c = colorFor(v, items);
+    for (const p of visiblePanes()) {
+      L.circleMarker([st[0], st[1]], c ? { radius: 5.5, weight: 1.5, color: '#1b1f24', fillColor: c, fillOpacity: 1, bubblingMouseEvents: false }
+                                       : { radius: 3, weight: 1.2, color: '#57606a', fillColor: '#fff', fillOpacity: 1, bubblingMouseEvents: false })
+        .bindTooltip(`<div class="gauge-tip"><b>${st[2]}</b><br>${mm(v)} ${unit}</div>`, { direction: 'top', offset: [0, -4] })
+        .on('click', () => pointOpen(L.latLng(st[0], st[1])))
+        .addTo(p.gauges);
+    }
+  }
+}
+function nearestGauge(ll) {
+  const g = live.gauges;
+  if (!g) return null;
+  let best = null, dist = 15;  // km
+  for (const [sid, [lat, lon, name]] of Object.entries(g.stations)) {
+    const dx = (lon - ll.lng) * 111.32 * Math.cos(ll.lat * Math.PI / 180), dy = (lat - ll.lat) * 110.57, d = Math.hypot(dx, dy);
+    if (d < dist) { dist = d; best = { sid, name, km: d }; }
+  }
+  return best;
+}
+
+/* ---------- klasserna i kartbilderna: värdet under markören och regnytan ---------- */
+const R_EARTH = 6378137, STRIDE = 2;
+const mercX = lon => R_EARTH * lon * Math.PI / 180;
+const mercY = lat => R_EARTH * Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+const decoded = new Map();
+function decode(url, bounds) {
+  if (!decoded.has(url)) {
+    decoded.set(url, new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const w = Math.ceil(img.naturalWidth / STRIDE), h = Math.ceil(img.naturalHeight / STRIDE);
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0, w, h);
+        const d = ctx.getImageData(0, 0, w, h).data, cls = new Uint8Array(w * h);
+        for (let i = 0; i < w * h; i++) {
+          const a = d[i * 4 + 3];
+          if (a < 85) continue;
+          let k = 0;
+          for (let j = 1; j < ALPHAS.length; j++) if (Math.abs(ALPHAS[j] - a) < Math.abs(ALPHAS[k] - a)) k = j;
+          cls[i] = k + 1;
+        }
+        const [[s, wst], [n, e]] = bounds, xW = mercX(wst), xE = mercX(e), yN = mercY(n), yS = mercY(s);
+        const dx = (xE - xW) / w, dy = (yN - yS) / h, km2 = new Float32Array(h);
+        for (let r = 0; r < h; r++) {  // ytan per pixel krymper med cos² av latituden
+          const lat = 2 * Math.atan(Math.exp((yN - (r + 0.5) * dy) / R_EARTH)) - Math.PI / 2;
+          km2[r] = dx * dy * Math.cos(lat) ** 2 / 1e6;
+        }
+        resolve({ w, h, cls, xW, xE, yN, yS, km2 });
+      };
+      img.onerror = reject;
+      img.src = url;
+    }));
+    if (decoded.size > 200) decoded.delete(decoded.keys().next().value);
+  }
+  return decoded.get(url);
+}
+function classAt(im, ll) {
+  const c = Math.floor((mercX(ll.lng) - im.xW) / (im.xE - im.xW) * im.w), r = Math.floor((im.yN - mercY(ll.lat)) / (im.yN - im.yS) * im.h);
+  return c < 0 || r < 0 || c >= im.w || r >= im.h ? null : im.cls[r * im.w + c];
+}
+function areaOf(im, vb, thr) {
+  const c0 = Math.max(0, Math.floor((mercX(vb.getWest()) - im.xW) / (im.xE - im.xW) * im.w));
+  const c1 = Math.min(im.w, Math.ceil((mercX(vb.getEast()) - im.xW) / (im.xE - im.xW) * im.w));
+  const r0 = Math.max(0, Math.floor((im.yN - mercY(vb.getNorth())) / (im.yN - im.yS) * im.h));
+  const r1 = Math.min(im.h, Math.ceil((im.yN - mercY(vb.getSouth())) / (im.yN - im.yS) * im.h));
+  let a = 0;
+  for (let r = r0; r < r1; r++) {
+    let n = 0;
+    for (let c = c0, i = r * im.w + c0; c < c1; c++, i++) if (im.cls[i] >= thr) n++;
+    a += n * im.km2[r];
+  }
+  return a;
+}
+function classText(k, r) {
+  if (k == null) return '';
+  const f = factor(r), u = unitFor(r);
+  if (k === 0) return `under ${num(+(LEVELS[0] * f).toPrecision(2))} ${u}`;
+  const lo = num(+(LEVELS[k - 1] * f).toPrecision(2));
+  return k < LEVELS.length ? `${lo} till ${num(+(LEVELS[k] * f).toPrecision(2))} ${u}` : `minst ${lo} ${u}`;
+}
+
+// markören: en ring på samma plats i alla kartor och varje kartas klass där
+let hoverFrame = 0;
+function hoverAt(ll, from) {
+  live.hover = ll ? { ll, from } : null;
+  cancelAnimationFrame(hoverFrame);
+  hoverFrame = requestAnimationFrame(async () => {
+    for (const p of live.panes.values()) {
+      const em = p.label.querySelector('em');
+      if (!ll || p.el.hidden) { p.cross.remove(); em.textContent = ''; continue; }
+      if (p !== from && from !== 'point') p.cross.setLatLng(ll).addTo(p.map); else p.cross.remove();
+      if (!p.src || (live.res === '5' && live.layer === 'p10' && p.key === 'ours')) { em.textContent = ''; continue; }
+      const src = p.src;
+      try {
+        const im = await decode(urlFor(src), src.bounds);
+        if (p.src === src && live.hover?.ll === ll) em.textContent = 'här: ' + classText(classAt(im, ll), live.res);
+      } catch (e) { em.textContent = ''; }
+    }
+  });
+}
+
+/* ---------- regnyta över tid i det som syns ---------- */
+let areaTimer = 0, areaToken = 0;
+const areaSoon = () => { clearTimeout(areaTimer); areaTimer = setTimeout(areaUpdate, 450); };
+async function areaUpdate() {
+  const m = live.manifest;
+  if (!$('area').open || !m || !visiblePanes().length) return;
+  const tok = ++areaToken, r = live.res, list = framesFor(m, r), vb = visiblePanes()[0].map.getBounds(), thr = live.areaThr;
+  $('area-status').textContent = 'Räknar';
+  const series = [];
+  for (const p of visiblePanes()) {
+    const pts = [], done = new Map();
+    for (const f of list) {
+      const s = srcFor(p, f, 'rain');
+      let a = null;
+      if (s.file) {
+        const url = urlFor(s);
+        if (done.has(url)) a = done.get(url);
+        else {
+          try { a = areaOf(await decode(url, s.bounds), vb, thr); } catch (e) { a = null; }
+          done.set(url, a);
+        }
+      }
+      if (tok !== areaToken) return;
+      pts.push({ t: +new Date(f.time), a, obs: p.key === 'ours' && f.kind === 'obs' });
+    }
+    series.push({ key: p.key, pts });
+  }
+  live.area = { series, list, r, thr };
+  $('area-status').textContent = `Yta med minst ${num(LEVELS[thr - 1])} mm/h i medel under perioden, inom det som syns. Utanför en modells område räknas det som torrt.`;
+  areaDraw();
+}
+function areaDraw() {
+  const A = live.area, svg = $('area-chart');
+  if (!A || !$('area').open || A.r !== live.res) return;
+  const Wd = svg.clientWidth || 330, Hd = svg.clientHeight || 150, L0 = 38, R0 = 14, T0 = 8, B0 = 18;
+  const ts = A.list.map(f => +new Date(f.time)), x0 = ts[0], x1 = ts.at(-1);
+  const all = A.series.flatMap(s => s.pts.map(p => p.a)).filter(v => v != null);
+  const ymax = Math.max(100, ...all) * 1.08;
+  const X = t => L0 + (x1 > x0 ? (t - x0) / (x1 - x0) : 0.5) * (Wd - L0 - R0), Y = v => Hd - B0 - v / ymax * (Hd - T0 - B0);
+  const fmt = v => v >= 10000 ? `${num(Math.round(v / 1000))}k` : num(Math.round(v / 100) * 100);
+  let g = '';
+  for (const v of [0, ymax / 2 / 1.08, ymax / 1.08]) g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 4}" y="${Y(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
+  const step = (x1 - x0) > 4 * 3600000 ? 120 : 30;
+  for (let t = Math.ceil(x0 / (step * MIN)) * step * MIN; t <= x1; t += step * MIN) g += `<text x="${X(t)}" y="${Hd - 4}" text-anchor="middle">${clock.format(new Date(t))}</text>`;
+  const cur = ts[live.idx];
+  if (cur != null) g += `<line class="now" x1="${X(cur)}" x2="${X(cur)}" y1="${T0}" y2="${Hd - B0}"/>`;
+  if (A.hover != null) g += `<line x1="${X(ts[A.hover])}" x2="${X(ts[A.hover])}" y1="${T0}" y2="${Hd - B0}" stroke="var(--fg)" opacity=".35"/>`;
+  const read = [];
+  for (const s of A.series) {
+    const info = modelInfo(s.key);
+    const seg = pts => pts.length ? 'M' + pts.map(p => `${X(p.t).toFixed(1)},${Y(p.a).toFixed(1)}`).join('L') : '';
+    const ok = s.pts.filter(p => p.a != null);
+    if (s.key === 'ours') {
+      const ob = ok.filter(p => p.obs), fc = ok.filter(p => !p.obs);
+      g += `<path d="${seg(ob)}" fill="none" stroke="var(--past)" stroke-width="2"/>`;
+      g += `<path d="${seg(ob.slice(-1).concat(fc))}" fill="none" stroke="${info.color}" stroke-width="2"/>`;
+    } else g += `<path d="${seg(ok)}" fill="none" stroke="${info.color}" stroke-width="2"/>`;
+    const here = s.pts[A.hover ?? live.idx];
+    if (here?.a != null) read.push(`<b style="color:${s.key === 'ours' && here.obs ? 'var(--past)' : info.color}">${s.key === 'ours' && here.obs ? 'Radar' : info.name}</b> ${num(Math.round(here.a / 100) * 100)} km²`);
+  }
+  svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
+  svg.innerHTML = g;
+  A.geom = { X, ts };
+  $('area-readout').innerHTML = (A.hover != null ? `${clock.format(new Date(ts[A.hover]))}: ` : '') + read.join(' · ');
+}
+
+/* ---------- punkten: staplar för alla källor per tidssteg ---------- */
 let pointMarkers = [];
 const clearMarkers = () => { pointMarkers.forEach(mk => mk.remove()); pointMarkers = []; };
 
@@ -518,16 +1002,20 @@ async function fetchSnow(ll) {
 async function pointOpen(ll, quiet) {
   if (!live.manifest) return;
   clearMarkers();
-  pointMarkers = paneMaps.map(pm => L.circleMarker(ll, { radius: 5, weight: 2, color: '#1b1f24', fillOpacity: 0, interactive: false }).addTo(pm));
+  pointMarkers = [...live.panes.values()].map(p => L.circleMarker(ll, { radius: 5, weight: 2, color: '#1b1f24', fillOpacity: 0, interactive: false }).addTo(p.map));
   $('point').hidden = false;
   $('point-hint').hidden = true;
+  if ($('side').classList.contains('collapsed')) sideToggle(false);
   if (!quiet) $('point-status').textContent = 'Hämtar';
   $('point-title').textContent = `Punkt ${ll.lat.toFixed(2).replace('.', ',')}° N, ${ll.lng.toFixed(2).replace('.', ',')}° E`;
   const m = live.manifest;
+  if (!live.gauges) gaugesLoad();
   const [ours, met, snow] = await Promise.allSettled([loadValues(m).then(c => sampleOurs(m, c, ll)), fetchMet(ll), fetchSnow(ll)]);
-  live.point = { ll, ours: ours.value || null, met: met.value || null, snow: snow.value || null,
+  live.point = { ll, ours: ours.value || null, met: met.value || null, snow: snow.value || null, gauge: nearestGauge(ll), hover: null,
                  errors: { ours: ours.status === 'rejected', met: met.status === 'rejected', snow: snow.status === 'rejected' } };
   pointDraw();
+  if (!live.hover || live.hover.from === 'point') hoverAt(ll, 'point');
+  saveHash();
 }
 
 // medel av 5-minutersvärden per period (värdet vid t gäller de fem minuterna före t); null om något saknas
@@ -541,30 +1029,45 @@ function periodMean(series, end, minutes) {
   return s / (minutes / 5);
 }
 
+// serierna i punkten för tidslistans perioder, i kartans enhet
+function pointSeries(P, m, res) {
+  const r = String(res), f = factor(r);
+  const periods = (res === 5 ? m.frames.map(x => ({ end: +new Date(x.time), start: +new Date(x.time) - 5 * MIN, kind: x.kind, time: x.time }))
+    : listFor(m, r).map(x => ({ end: +new Date(x.time), start: +new Date(x.start), kind: x.kind, time: x.time })));
+  const val = (series, p) => res === 5 ? series.find(x => x.t === p.end)?.r ?? null : periodMean(series, p.end, res);
+  const S = [];
+  if (P.ours) S.push({ key: 'ours', name: 'Tim-KNEP', color: 'var(--ours)',
+    vals: periods.map(p => { const v = val(P.ours, p); return { v: v == null ? null : v * f, obs: p.kind === 'obs', mix: p.kind === 'mix' }; }) });
+  if (P.met) S.push({ key: 'met', name: 'MET Norge', color: 'var(--met)',
+    vals: periods.map(p => { const v = val(P.met.series, p); return { v: v == null ? null : v * f }; }) });
+  if (P.snow) S.push({ key: 'snow', name: 'SNOW', color: 'var(--snow)', vals: periods.map(p => {
+    const h = P.snow.find(x => res === 60 ? x.end === p.end : p.end > x.start && p.end <= x.end);
+    const g = res === 15 ? 0.25 : 1;  // timsumman som mm/h, mm per kvart eller mm per timme
+    return h ? { v: h.med == null ? null : h.med * g, lo: h.lo == null ? null : h.lo * g, hi: h.hi == null ? null : h.hi * g } : { v: null };
+  }) });
+  if (P.gauge && live.gauges) S.push({ key: 'gauge', name: `Mätare ${P.gauge.name}`, color: 'var(--gauge)', vals: periods.map(p => {
+    const v = gaugeValues({ time: p.time }, r)?.[P.gauge.sid];
+    return { v: v ?? null };
+  }) });
+  return { periods, S };
+}
+
 function pointDraw() {
   const P = live.point, m = live.manifest;
   if (!P || !m) return;
-  const res = +live.res, f = res === 5 ? 1 : res / 60;  // 5 min i mm/h, annars mm per period
-  const periods = res === 5 ? m.frames.map(x => ({ end: +new Date(x.time), start: +new Date(x.time) - 5 * MIN, kind: x.kind }))
-    : listFor(m, live.res).map(x => ({ end: +new Date(x.time), start: +new Date(x.start), kind: x.kind }));
+  const res = +live.res;
+  const { periods, S } = pointSeries(P, m, res);
   if (!periods.length) return;
-  const val = (series, p) => series ? (res === 5 ? series.find(x => x.t === p.end)?.r ?? null : periodMean(series, p.end, res)) : null;
-  const ours = periods.map(p => ({ ...p, v: P.ours ? (v => v == null ? null : v * f)(val(P.ours, p)) : null }));
-  const met = P.met ? periods.map(p => ({ ...p, v: (v => v == null ? null : v * f)(val(P.met.series, p)) })) : [];
-  const snowIn = (P.snow || []).filter(h => h.end > periods[0].start && h.start < periods.at(-1).end);
-  const snow = [];
-  for (const h of snowIn) {  // timvärdet som medelintensitet (5 min) eller fördelat på kvartarna
-    const g = res === 60 ? 1 : res === 15 ? 0.25 : 1;
-    snow.push({ start: Math.max(h.start, periods[0].start), end: Math.min(h.end, periods.at(-1).end),
-                med: h.med == null ? null : h.med * g, lo: h.lo == null ? null : h.lo * g, hi: h.hi == null ? null : h.hi * g });
-  }
-
-  const svg = $('point-chart'), Wd = svg.clientWidth || 420, Hd = svg.clientHeight || 160, L0 = 30, R0 = 14, T0 = 8, B0 = 18;
-  const x0 = periods[0].start, x1 = periods.at(-1).end;
-  const vals = [...ours, ...met].map(p => p.v).concat(snow.flatMap(s => [s.med, s.hi])).filter(v => v != null);
+  P.periods = periods; P.S = S;
+  const svg = $('point-chart'), Wd = svg.clientWidth || 330, Hd = svg.clientHeight || 150, L0 = 28, R0 = 14, T0 = 8, B0 = 18;
+  const x0 = periods[0].start, x1 = periods.at(-1).end, pw = (Wd - L0 - R0) / periods.length;
+  const vals = S.flatMap(s => s.vals.flatMap(v => [v.v, v.hi])).filter(v => v != null);
   const ymax = Math.max(res === 15 ? 0.25 : 1, ...vals) * 1.1;
   const X = t => L0 + (t - x0) / (x1 - x0) * (Wd - L0 - R0), Y = v => Hd - B0 - v / ymax * (Hd - T0 - B0);
   let g = '';
+  const cur = framesFor(m, live.res)[live.idx], ci = cur ? periods.findIndex(p => p.time === cur.time) : -1;
+  if (ci >= 0) g += `<rect class="cur" x="${L0 + ci * pw}" width="${pw}" y="${T0}" height="${Hd - T0 - B0}"/>`;
+  if (P.hover != null) g += `<rect class="hov" x="${L0 + P.hover * pw}" width="${pw}" y="${T0}" height="${Hd - T0 - B0}"/>`;
   for (const v of [0, ymax / 2, ymax / 1.1]) {
     g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 4}" y="${Y(v) + 3}" text-anchor="end">${num(+v.toPrecision(2))}</text>`;
   }
@@ -572,37 +1075,41 @@ function pointDraw() {
   for (let t = Math.ceil(x0 / (step * MIN)) * step * MIN; t <= x1; t += step * MIN) {
     g += `<text x="${X(t)}" y="${Hd - 4}" text-anchor="middle">${clock.format(new Date(t))}</text>`;
   }
-  for (const s of snow) {  // spridningen under allt annat, medianen ovanpå staplarna
-    if (s.lo != null && s.hi != null) g += `<rect x="${X(s.start)}" width="${X(s.end) - X(s.start)}" y="${Y(s.hi)}" height="${Math.max(1, Y(s.lo) - Y(s.hi))}" fill="var(--snow)" opacity=".18"/>`;
-  }
-  const snowMed = snow.filter(s => s.med != null).map(s => `<line x1="${X(s.start)}" x2="${X(s.end)}" y1="${Y(s.med)}" y2="${Y(s.med)}" stroke="var(--snow)" stroke-width="2.5"/>`).join('');
-  if (res === 5) {
-    const path = pts => pts.length ? 'M' + pts.map(p => `${X(p.end).toFixed(1)},${Y(p.v).toFixed(1)}`).join('L') : '';
-    const obs = ours.filter(p => p.kind === 'obs' && p.v != null), fc = ours.filter(p => p.kind !== 'obs' && p.v != null);
-    g += `<path d="${path(obs)}" fill="none" stroke="var(--past)" stroke-width="2"/>`;
-    g += `<path d="${path(obs.slice(-1).concat(fc))}" fill="none" stroke="var(--ours)" stroke-width="2"/>`;
-    g += `<path d="${path(met.filter(p => p.v != null))}" fill="none" stroke="var(--met)" stroke-width="1.5"/>`;
-  } else {
-    for (const p of ours) {
-      if (p.v == null) continue;
-      g += `<rect x="${X(p.start) + 1}" width="${Math.max(1, X(p.end) - X(p.start) - 2)}" y="${Y(p.v)}" height="${Y(0) - Y(p.v)}" fill="var(${p.kind === 'obs' ? '--past' : '--ours'})" opacity="${p.kind === 'mix' ? 0.7 : 0.9}"/>`;
-    }
-    for (const p of met) if (p.v != null) g += `<line x1="${X(p.start)}" x2="${X(p.end)}" y1="${Y(p.v)}" y2="${Y(p.v)}" stroke="var(--met)" stroke-width="2"/>`;
-  }
-  g += snowMed;
+  // smala staplar bredvid varandra, en per källa och tidssteg; SNOW:s spridning som ett streck
+  const k = Math.max(1, S.length), inner = pw * (k > 1 ? 0.88 : 0.7), bw = Math.max(0.8, inner / k), pad = (pw - bw * k) / 2;
+  periods.forEach((p, i) => {
+    S.forEach((s, j) => {
+      const e = s.vals[i];
+      if (e.v == null) return;
+      const x = L0 + i * pw + pad + j * bw, color = s.key === 'ours' && e.obs ? 'var(--past)' : s.color;
+      g += `<rect x="${x.toFixed(2)}" width="${Math.max(0.8, bw - (bw > 2.5 ? 0.6 : 0)).toFixed(2)}" y="${Y(e.v).toFixed(1)}" height="${Math.max(0.6, Y(0) - Y(e.v)).toFixed(1)}" fill="${color}" opacity="${e.mix ? 0.7 : 0.95}"/>`;
+      if (e.lo != null && e.hi != null && e.hi > e.lo) {
+        const cx = (x + bw / 2).toFixed(2);
+        g += `<line x1="${cx}" x2="${cx}" y1="${Y(e.hi).toFixed(1)}" y2="${Y(e.lo).toFixed(1)}" stroke="${color}" stroke-width="1" opacity=".55"/>`;
+      }
+    });
+  });
   const now = +new Date(m.analysis);
   g += `<line class="now" x1="${X(now)}" x2="${X(now)}" y1="${T0}" y2="${Hd - B0}"/>`;
   svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
   svg.innerHTML = g;
+  P.geom = { L0, pw, n: periods.length };
 
-  // hela kommande timmar: Tim-KNEP, MET Norge och SNOW i mm
-  const hours = (m.frames60 || []).filter(h => h.kind !== 'obs').map(h => ({ end: +new Date(h.time), start: +new Date(h.start) }));
-  let t = '<caption>Summa per timme, mm</caption><tr><th>Timme</th><th>Tim-KNEP</th><th>MET Norge</th><th>SNOW median</th></tr>';
+  const keys = S.map(s => s.key === 'ours'
+    ? `<span><i style="background:var(--past)"></i>Radar</span><span><i style="background:var(--ours)"></i>Tim-KNEP</span>`
+    : `<span><i style="background:${s.color}"></i>${s.name}${s.key === 'snow' ? ' median, streck min till max' : s.key === 'gauge' ? ` (${num(Math.round(P.gauge.km * 10) / 10)} km bort)` : ''}</span>`);
+  $('point-keys').innerHTML = keys.join('');
+  pointReadout();
+
+  // hela timmar: radar eller Tim-KNEP, MET Norge, SNOW och mätaren i mm
+  const hours = (m.frames60 || []).map(h => ({ end: +new Date(h.end || h.time), start: +new Date(h.start), kind: h.kind, time: h.time }));
+  const hasGauge = !!(P.gauge && live.gauges);
+  let t = `<caption>Summa per timme i mm, timmen som börjar vid tiden. Grått är radar.</caption><tr><th>Från</th><th>Tim-KNEP</th><th>MET Norge</th><th>SNOW median</th>${hasGauge ? '<th>Mätare</th>' : ''}</tr>`;
   for (const h of hours) {
     const o = P.ours ? periodMean(P.ours, h.end, 60) : null, mt = P.met ? periodMean(P.met.series, h.end, 60) : null;
-    const sn = (P.snow || []).find(x => x.end === h.end);
-    t += `<tr><td>${hour.format(new Date(h.start))} till ${hour.format(new Date(h.end))}</td><td>${mm(o)}</td><td>${mm(mt)}</td>`
-       + `<td>${sn?.med != null ? `${mm(sn.med)} (${mm(sn.lo)} till ${mm(sn.hi)})` : ''}</td></tr>`;
+    const sn = (P.snow || []).find(x => x.end === h.end), ga = hasGauge ? gaugeValues({ time: h.time }, '60')?.[P.gauge.sid] : null;
+    t += `<tr><td>${clock.format(new Date(h.start))}</td><td class="${h.kind === 'obs' ? 'obs' : ''}">${mm(o)}</td><td>${mm(mt)}</td>`
+       + `<td title="${sn?.med != null ? `min ${mm(sn.lo)}, max ${mm(sn.hi)}` : ''}">${sn?.med != null ? mm(sn.med) : ''}</td>${hasGauge ? `<td>${mm(ga)}</td>` : ''}</tr>`;
   }
   $('point-table').innerHTML = hours.length ? t : '';
 
@@ -611,16 +1118,71 @@ function pointDraw() {
   if (P.errors.met) notes.push('MET Norge svarade inte.');
   else if (P.met && P.met.coverage !== 'ok') notes.push('MET Norge har ingen radartäckning här.');
   if (P.errors.snow) notes.push('SNOW svarade inte (punkten kan ligga utanför SMHI:s område).');
-  notes.push(res === 5 ? 'mm/h var 5:e minut; SNOW:s timvärde ritas som medelintensitet.' :
+  if (live.gauges && !P.gauge) notes.push('Ingen mätare inom 15 km.');
+  notes.push(res === 5 ? 'mm/h var 5:e minut; SNOW:s timvärde och mätarens kvart som medelintensitet.' :
              res === 15 ? 'mm per kvart; SNOW:s timvärde är fördelat jämnt på kvartarna.' : 'mm per timme.');
+  notes.push('Klicka i diagrammet för att visa den tiden.');
   $('point-status').textContent = notes.join(' ');
 }
 
+function pointReadout() {
+  const P = live.point, m = live.manifest;
+  if (!P?.periods) return;
+  const cur = framesFor(m, live.res)[live.idx];
+  const i = P.hover ?? P.periods.findIndex(p => p.time === cur?.time);
+  if (i < 0 || !P.periods[i]) { $('point-readout').textContent = ''; return; }
+  const p = P.periods[i];
+  const span = live.res === '5' ? clock.format(new Date(p.end)) : `${clock.format(new Date(p.start))} till ${clock.format(new Date(p.end))}`;
+  $('point-readout').innerHTML = `${span}: ` + P.S.map(s => {
+    const e = s.vals[i], name = s.key === 'ours' && e.obs ? 'Radar' : s.key === 'gauge' ? 'Mätare' : s.name;
+    return `<b style="color:${s.key === 'ours' && e.obs ? 'var(--past)' : s.color}">${name}</b> ${e.v == null ? 'saknas' : mm(e.v)}`;
+  }).join(' · ');
+}
+
+function pointIndexAt(ev) {
+  const P = live.point, svg = $('point-chart');
+  if (!P?.geom) return null;
+  const box = svg.getBoundingClientRect(), x = (ev.clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
+  const i = Math.floor((x - P.geom.L0) / P.geom.pw);
+  return i >= 0 && i < P.geom.n ? i : null;
+}
+$('point-chart').addEventListener('mousemove', ev => {
+  if (!live.point) return;
+  const i = pointIndexAt(ev);
+  if (i === live.point.hover) return;
+  live.point.hover = i;
+  pointDraw();
+});
+$('point-chart').addEventListener('mouseleave', () => { if (live.point) { live.point.hover = null; pointDraw(); } });
+$('point-chart').addEventListener('click', ev => {
+  const i = pointIndexAt(ev), P = live.point;
+  if (i == null || !P) return;
+  const list = framesFor(live.manifest, live.res), j = list.findIndex(f => f.time === P.periods[i].time);
+  if (j >= 0) liveShow(j);
+});
+function areaIndexAt(ev) {
+  const A = live.area, svg = $('area-chart');
+  if (!A?.geom) return null;
+  const box = svg.getBoundingClientRect(), x = (ev.clientX - box.left) * (svg.viewBox.baseVal.width / box.width);
+  let best = null, d = Infinity;
+  A.geom.ts.forEach((t, i) => { const e = Math.abs(A.geom.X(t) - x); if (e < d) { d = e; best = i; } });
+  return best;
+}
+$('area-chart').addEventListener('mousemove', ev => { if (live.area) { live.area.hover = areaIndexAt(ev); areaDraw(); } });
+$('area-chart').addEventListener('mouseleave', () => { if (live.area) { live.area.hover = null; areaDraw(); } });
+$('area-chart').addEventListener('click', ev => {  // bara om diagrammet räknades på samma tidslista som visas
+  const i = areaIndexAt(ev), A = live.area;
+  if (i != null && A.r === live.res && A.list.length === framesFor(live.manifest, live.res).length) liveShow(i);
+});
 $('point-close').addEventListener('click', () => {
+  pointClose();
+});
+function pointClose() {
   live.point = null; clearMarkers();
   $('point').hidden = true; $('point-hint').hidden = false;
-});
-paneMaps.forEach(pm => pm.on('click', e => pointOpen(e.latlng)));
+  if (live.hover?.from === 'point') hoverAt(null);
+  saveHash();
+}
 
 /* ---------- händelser ---------- */
 const LAYERS = {
@@ -770,6 +1332,7 @@ function caseScores(m) {
   $('case-scores').innerHTML = html;
 }
 
+
 /* ---------- uppspelning ---------- */
 function player(btn, step, last, getIdx) {
   let timer = null;
@@ -785,16 +1348,6 @@ function player(btn, step, last, getIdx) {
   };
 }
 const livePlay = player($('play'), liveShow, () => live.manifest ? framesFor(live.manifest, live.res).length - 1 : 0, () => live.idx);
-$('back-toggle').addEventListener('click', () => {
-  const m = live.manifest;
-  if (!m) return;
-  const cur = framesFor(m, live.res)[live.idx];
-  live.back = !live.back;
-  $('back-toggle').setAttribute('aria-pressed', live.back);
-  const list = framesFor(m, live.res);
-  liveShow(live.back ? 0 : cur ? closestIndex(list, new Date(cur.time)) : 0);
-  if (live.point) pointDraw();
-});
 const casePlay = player($('case-play'), caseShow, () => cases.current ? caseFrames(cases.current).length - 1 : 0, () => cases.idx);
 $('play').addEventListener('click', livePlay);
 $('case-play').addEventListener('click', casePlay);
@@ -802,22 +1355,74 @@ $('slider').addEventListener('input', e => liveShow(+e.target.value));
 $('case-slider').addEventListener('input', e => caseShow(+e.target.value));
 $('live-res').querySelectorAll('button').forEach(b => b.addEventListener('click', () => liveRes(b.dataset.res)));
 $('case-res').querySelectorAll('button').forEach(b => b.addEventListener('click', () => caseRes(b.dataset.res)));
-$('bg-toggle').addEventListener('click', () => {
-  live.bg = !live.bg;
-  $('bg-toggle').setAttribute('aria-pressed', live.bg);
-  liveShow(live.idx);
+function toggle(id, key, after) {
+  $(id).setAttribute('aria-pressed', live[key]);
+  $(id).addEventListener('click', () => {
+    live[key] = !live[key];
+    store.set(key, live[key]);
+    $(id).setAttribute('aria-pressed', live[key]);
+    after?.();
+  });
+}
+toggle('bg-toggle', 'bg', () => liveShow(live.idx));
+toggle('obs-toggle', 'obs', () => { if (live.obs) gaugesLoad(); liveShow(live.idx); });
+toggle('back-toggle', 'back', () => {
+  const m = live.manifest;
+  if (!m) return;
+  const list = framesFor(m, live.res);
+  preload(live.back ? 0 : null);
+  liveShow(live.back ? 0 : list.map(f => f.kind).lastIndexOf('obs'));
+  areaSoon();
 });
 $('live-layers').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   live.layer = b.dataset.layer;
   pressed($('live-layers'), 'layer', live.layer);
+  preload(live.idx);
   liveShow(live.idx);
 }));
+$('area-thr').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  live.areaThr = +b.dataset.thr;
+  pressed($('area-thr'), 'thr', b.dataset.thr);
+  areaUpdate();
+}));
+$('area').addEventListener('toggle', () => { if ($('area').open) areaUpdate(); });
+function sideToggle(collapse) {
+  $('side').classList.toggle('collapsed', collapse);
+  $('side-toggle').textContent = collapse ? '›' : '‹';
+  $('side-toggle').title = collapse ? 'Visa panelen' : 'Fäll ihop panelen';
+  $('side-toggle').setAttribute('aria-expanded', !collapse);
+  store.set('collapsed', collapse);
+  $('liveview').classList.toggle('side-collapsed', collapse);
+  if (innerWidth < 700) $('side-toggle').textContent = collapse ? '⌃' : '⌄';
+}
+$('side-toggle').addEventListener('click', () => sideToggle(!$('side').classList.contains('collapsed')));
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   const [show, i] = mode === 'live' ? [liveShow, live.idx] : [caseShow, cases.idx];
   if (e.key === 'ArrowRight') show(i + 1);
   if (e.key === 'ArrowLeft') show(i - 1);
   if (e.key === ' ') { e.preventDefault(); (mode === 'live' ? livePlay : casePlay)(); }
+  if (mode !== 'live' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (['1', '2', '3'].includes(k) && !$('live-res').hidden) liveRes({ 1: '5', 2: '15', 3: '60' }[k]);
+  if (k === 'n') liveNow();
+  if (k === 'm') $('obs-toggle').click();
+  if (k === 'b' && !$('back-toggle').hidden) $('back-toggle').click();
+  if (k === 'escape' && live.point) pointClose();
+});
+function liveNow() {
+  const m = live.manifest;
+  if (!m) return;
+  const list = framesFor(m, live.res);
+  const i = live.res === '5' ? list.map(f => f.kind).lastIndexOf('obs') : list.findIndex(f => f.kind !== 'obs');
+  liveShow(Math.max(0, i));
+}
+$('now-btn').addEventListener('click', liveNow);
+$('share').addEventListener('click', async () => {
+  saveHash(true);
+  try { await navigator.clipboard.writeText(location.href); $('share').textContent = 'Kopierad'; }
+  catch (e) { $('share').textContent = 'Se adressfältet'; }
+  setTimeout(() => { $('share').textContent = 'Länk'; }, 1800);
 });
 
 /* ---------- flikar ---------- */
@@ -833,9 +1438,9 @@ function setMode(m) {
   if (m === 'live') {
     caseClear();
     cases.current = null;
-    paneMaps.forEach(pm => pm.invalidateSize());
+    layoutMosaic();
     liveShow(live.idx);
-    if (location.hash) history.replaceState(null, '', location.pathname);
+    saveHash(true);
   } else {
     map.invalidateSize();
     if (!cases.list.length) casesLoad(); else caseOpen(cases.slug || cases.list[0]?.path);
@@ -845,18 +1450,26 @@ $('tab-live').addEventListener('click', () => setMode('live'));
 $('tab-cases').addEventListener('click', () => setMode('cases'));
 
 let me = [];
-$('locate').addEventListener('click', () => panes.ours.map.locate({ setView: true, maxZoom: 9 }));
-panes.ours.map.on('locationfound', e => {
+$('locate').addEventListener('click', () => visiblePanes()[0]?.map.locate({ setView: true, maxZoom: 9 }));
+function located(e) {
   me.forEach(mk => mk.remove());
-  me = paneMaps.map(pm => L.circleMarker(e.latlng, { radius: 6, weight: 2, color: '#fff', fillColor: '#1f6feb', fillOpacity: 1, interactive: false }).addTo(pm));
+  me = [...live.panes.values()].map(p => L.circleMarker(e.latlng, { radius: 6, weight: 2, color: '#fff', fillColor: '#1f6feb', fillOpacity: 1, interactive: false }).addTo(p.map));
   if (mode === 'live' && !live.point) pointOpen(e.latlng);
-});
+}
 
+// kartorna finns från början, så att sidan inte hoppar när manifestet kommer
+for (const k of ['ours', 'met', 'snow']) makePane(k);
+live.panes.forEach(p => p.map.on('locationfound', located));
+modelChips();
+pressed($('live-res'), 'res', live.res);
+sideToggle(store.get('collapsed', innerWidth < 700));
+fitMosaic(true);
 liveLoad();
 setInterval(() => { if (mode === 'live') liveLoad(); }, 60000);
 setInterval(liveStatus, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && mode === 'live') liveLoad(); });
-addEventListener('resize', () => paneMaps.forEach(pm => pm.invalidateSize()));
+let resizeTimer = 0;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { placeFloats(); layoutMosaic(); if (live.point) pointDraw(); areaDraw(); }, 120); });
 if (location.hash.startsWith('#handelser')) setMode('cases');
 </script>
 </body>
