@@ -170,12 +170,12 @@ def snow_field(session: requests.Session, end: datetime) -> tuple[np.ndarray, st
     return v.reshape(MEPS_SHAPE)[::-1].copy(), d.get("referenceTime", "")
 
 
-def snow(out: Path, session: requests.Session, now: datetime) -> dict | None:
+def snow(out: Path, session: requests.Session, now: datetime, hours: float = 2.0) -> dict | None:
     d = out / "snow"
     d.mkdir(parents=True, exist_ok=True)
     rend = render.Renderer(MEPS)
     entries, names, ref = [], set(), ""
-    for end in snow_hours(now):
+    for end in snow_hours(now, hours):
         got = snow_field(session, end)
         if got is None:
             continue
@@ -192,10 +192,10 @@ def snow(out: Path, session: requests.Session, now: datetime) -> dict | None:
     return {"reference": ref, "bounds": rend.bounds, "frames60": entries}
 
 
-def update(out: Path, session: requests.Session, now: datetime) -> dict:
+def update(out: Path, session: requests.Session, now: datetime, hours: float = 2.0) -> dict:
     """Båda källorna för manifestet. En källa som fallerar saknas bara den här gången."""
     res = {"bounds": bounds()}
-    for key, fn in (("met", met), ("snow", snow)):
+    for key, fn in (("met", met), ("snow", lambda o, s, t: snow(o, s, t, hours))):
         try:
             got = fn(out, session, now)
         except (requests.RequestException, ValueError, KeyError, IndexError) as e:

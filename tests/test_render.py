@@ -39,3 +39,52 @@ def test_write_aggregates_whole_periods(tmp_path):
     assert codes.shape == (36, 40, 50)
     assert np.allclose(render.decode_values(codes[0]), 6.0, rtol=0.04)
     assert all((tmp_path / f["file"]).exists() for f in q + h)
+
+
+def test_warp_lookup_matches_reproject_and_png_colors(tmp_path):
+    """Uppslaget ger samma bild som rasterio med närmaste granne, och palett-PNG:n samma färger
+    som klasserna i COLORS (genomskinlig under den lägsta nivån)."""
+    from PIL import Image
+    from rasterio.warp import Resampling, reproject
+
+    grid = radar.Grid(CRS.from_epsg(3006), from_origin(400000, 7000000, 2000, 2000), (90, 70))
+    rng = np.random.default_rng(1)
+    field = (rng.lognormal(0, 1.5, grid.shape) * (rng.random(grid.shape) < 0.4)).astype(np.float32)
+    field[:5] = np.nan
+    rend = render.Renderer(grid)
+    ref = np.full(rend.shape, np.nan, np.float32)
+    reproject(field, ref, src_transform=grid.transform, src_crs=grid.crs, src_nodata=np.nan,
+              dst_transform=rend.transform, dst_crs=render.WEB, dst_nodata=np.nan, resampling=Resampling.nearest)
+    w = rend.warp(field)
+    assert np.array_equal(w, ref, equal_nan=True)
+
+    rend.png(field, tmp_path / "a.png")
+    rgba = np.asarray(Image.open(tmp_path / "a.png").convert("RGBA"))
+    idx = np.digitize(np.nan_to_num(w), render.LEVELS)
+    assert (rgba[idx == 0, 3] == 0).all()
+    assert np.array_equal(rgba[idx > 0], render.COLORS[idx[idx > 0] - 1])
+
+
+def test_history_renders_once_and_drops_old(tmp_path):
+    """Analysen bakåt: varje bild ritas en gång med tiden i namnet, hela kvartar och timmar läggs
+    till när de är klara, och det som är äldre än fönstret tas bort."""
+    grid = radar.Grid(CRS.from_epsg(3006), from_origin(400000, 6500000, 2000, 2000), (20, 30))
+    rend = render.Renderer(grid)
+    step = timedelta(minutes=5)
+    field = np.full((20, 30), 3.0, np.float32)
+    start = datetime(2024, 7, 1, 10, 5, tzinfo=UTC)
+    for k in range(12 * 3):  # tre timmar cykler, var och en med senaste timmens analyser
+        now = start + k * step
+        frames = [(now - j * step, field) for j in range(12)][::-1]
+        h = rend.history(tmp_path, frames, now, hours=2)
+    times = [f["time"] for f in h["frames"]]
+    assert times[0] == "2024-07-01T11:05:00Z" and times[-1] == "2024-07-01T13:00:00Z" and len(times) == 24
+    assert [f["time"] for f in h["frames60"]] == ["2024-07-01T12:00:00Z", "2024-07-01T13:00:00Z"]
+    assert h["frames15"][0]["start"] == "2024-07-01T11:00:00Z" and len(h["frames15"]) == 8
+    assert all((tmp_path / f["file"]).exists() for f in h["frames"] + h["frames15"] + h["frames60"])
+    assert len(list((tmp_path / "hist").glob("*.png"))) == 24 + 8 + 2
+    # en bild som redan finns ritas inte om
+    p = tmp_path / h["frames"][-1]["file"]
+    mtime = p.stat().st_mtime_ns
+    rend.history(tmp_path, [(now, field * 10)], now, hours=2)
+    assert p.stat().st_mtime_ns == mtime

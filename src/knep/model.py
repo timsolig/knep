@@ -1,6 +1,7 @@
 """Prognosmodellen.
 
 `nowcast` är referensen: Lucas-Kanade och semi-Lagrangesk extrapolering, ingen träning.
+Kedjan extrapolerar med advect.py (samma schema som pysteps, med OpenCV); referensen med pysteps.
 
 `Chain` är modellen som slog KNEP-proxyn i experiments/, plus tränade sannolikheter för extremer:
 
@@ -31,7 +32,7 @@ from pysteps.motion.lucaskanade import dense_lucaskanade
 from pysteps.utils.transformation import dB_transform
 from scipy.ndimage import gaussian_filter
 
-from . import extremes
+from . import advect, extremes
 
 STEP = timedelta(minutes=5)
 
@@ -132,36 +133,69 @@ class Result:
     motion: np.ndarray  # (2, H, W) pixlar per 5 min
 
 
-def motion_field(obs: np.ndarray, gap: int = 1, n: int = 7) -> np.ndarray:
+def motion_field(obs: np.ndarray, gap: int = 1, n: int = 7, step: int = 1) -> np.ndarray:
     """Lucas-Kanade på n bilder med gap 5-minuterssteg emellan, i pixlar per 5 min.
 
     Med gap 1 och n 7 är det 30 min historik bild för bild. Glesare bilder ger större förflyttning
     mellan bilderna i förhållande till bruset och tillväxten.
     """
     idx = [max(0, len(obs) - 1 - gap * m) for m in range(n - 1, -1, -1)]
-    return _quiet(dense_lucaskanade, _db(obs[idx])) / gap
+    xy, uv = _quiet(dense_lucaskanade, _db(obs[idx]), dense=False)
+    return dense_motion(xy, uv, obs.shape[1:], step) / gap
+
+
+def dense_motion(xy: np.ndarray, uv: np.ndarray, shape, step: int = 1) -> np.ndarray:
+    """De glesa vektorerna som ett tätt fält, som pysteps (declustring på 20 px, sedan inverterad
+    avståndsviktning över de 20 närmaste med potens 0,5). Med step 1 är det exakt pysteps; med
+    step > 1 räknas det på var step:e pixel och interpoleras bilinjärt däremellan, vilket med
+    step 4 går nio gånger fortare och skiljer högst 0,3 px per 5 min (där uppsättningen av
+    närmaste grannar byter). På 24 prognoser under Hans 2023 gav step 4 samma CSI och FSS som
+    step 1 på alla ledtider till 5 h (högst 0,001 i skillnad); kedjan använder step 4."""
+    import cv2
+    from pysteps.utils.cleansing import decluster
+    from scipy.spatial import cKDTree
+
+    h, w = shape
+    if xy.shape[0] == 0:
+        return np.zeros((2, h, w))
+    xy, uv = decluster(xy, uv, 20, 1)
+    if xy.shape[0] == 0:
+        return np.zeros((2, h, w))
+    if xy.shape[0] == 1 or np.ptp(uv, axis=0).max() == 0:
+        return np.ones((2, h, w)) * uv[0][:, None, None]
+    ys, xs = np.arange(0, h - 1 + step, step), np.arange(0, w - 1 + step, step)
+    gx, gy = np.meshgrid(xs, ys)
+    k = min(20, xy.shape[0])
+    dist, ind = cKDTree(xy).query(np.column_stack([gx.ravel(), gy.ravel()]), k=k)
+    if k == 1:
+        dist, ind = dist[:, None], ind[:, None]
+    wts = 1 / np.power(dist + 0.5, 0.5)
+    wts /= wts.sum(axis=1, keepdims=True)
+    coarse = np.einsum("pk,pkc->cp", wts, uv[ind]).reshape(2, len(ys), len(xs)).astype(np.float32)
+    mx, my = np.meshgrid(np.arange(w, dtype=np.float32) / step, np.arange(h, dtype=np.float32) / step)
+    return np.stack([cv2.remap(c, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE) for c in coarse]).astype(np.float64)
 
 
 class Chain:
     def __init__(self, ext_model: Path | None = None, prob_steps: int | None = None, motion_gap: int = 3,
-                 motion_frames: int = 3, target: str = "advected"):
+                 motion_frames: int = 3, target: str = "advected", motion_step: int = 4):
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
-        self.motion_gap, self.motion_frames = motion_gap, motion_frames
+        self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
         self.target = target  # "analysis" eller "advected": fördelningen följer med fältet ut ur området
 
     def run(self, obs: np.ndarray, now: datetime, steps: int, state: State | None = None) -> Result:
         """obs: (T, H, W) mm/h, 5 min mellan bilderna, äldst först, senaste = analysen vid now."""
         state = state if state is not None else State()
-        motion = motion_field(obs, self.motion_gap, self.motion_frames)
+        motion = motion_field(obs, self.motion_gap, self.motion_frames, self.motion_step)
         analysis = obs[-1]
-        raw = extrapolate(np.nan_to_num(analysis), motion, steps)
+        # bilinjärt för prognosen, och analysens värden flyttade med närmaste granne som mål för
+        # matchningen: samma värden, men bara de som är kvar i området
+        a = np.nan_to_num(analysis)
+        raw, tgt = advect.extrapolate([a, a], motion, steps, orders=[1, 0])
         raw[:, ~np.isfinite(analysis)] = np.nan  # utanför täckningen deltar inte i matchningen
-        if self.target == "advected":
-            # analysens värden flyttade med närmaste granne: samma värden, men bara de som är kvar i området
-            tgt = extrapolate(np.nan_to_num(analysis), motion, steps, interp_order=0)
-            tgt[:, ~np.isfinite(analysis)] = np.nan
-        else:
+        tgt[:, ~np.isfinite(analysis)] = np.nan
+        if self.target != "advected":
             tgt = [analysis] * steps
         corr = location_map(state, now, analysis.shape)
         rain = np.empty(raw.shape, np.float32)
@@ -180,7 +214,7 @@ class Chain:
         prob = None
         if self.models is not None:
             n = min(steps, self.prob_steps or steps)
-            adv = lambda f, s: extrapolate(np.nan_to_num(f), motion, s)
+            adv = lambda f, s: advect.extrapolate(np.nan_to_num(f), motion, s)
             past15 = obs[-4] if len(obs) >= 4 else None
             past30 = obs[-7] if len(obs) >= 7 else None
             t15, t30, speed, dom = extremes.tendencies(analysis, past15, past30, motion, steps, adv)

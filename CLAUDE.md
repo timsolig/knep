@@ -19,8 +19,8 @@ Nederbördsnowcast 0 till 2 h från SMHI:s radarkomposit. Körs på en Raspberry
 - `src/knep/composite.py` och `sources.py` kompositen: SMHI, OPERA och enskilda radarvolymer som reserv, lagrangesk utfyllnad vid bortfall
 - `src/knep/compare.py` MET Norges nowcast (thredds, OPeNDAP med 4 km) och SMHI:s SNOW (multipoint på MEPS rutnät) som kartor till mosaiken, under `compare` i manifestet
 - `src/knep/cases.py` namngivna händelser (`knep-case`), skriver till `web/cases/`
-- `src/knep/render.py` omprojicering till EPSG:3857, PNG per ruta i 5 min, kvart och timme, värdefil (`values.bin.gz`) och manifest.json
-- `web/index.html` sidan med flikarna Prognos (mosaik med min modell, MET Norge och SNOW i tre kartor som följer varandra, avgränsade till MEPS-området) och Händelser (Leaflet från cdnjs, ingen byggkedja); punktserien hämtar MET Norge och SMHI SNOW direkt från webbläsaren
+- `src/knep/render.py` omprojicering till EPSG:3857, PNG per ruta i 5 min, kvart och timme, värdefil (`values.bin.gz`) och manifest.json; radaranalysen 12 h bakåt ritas en gång per bild till `hist/` med tiden i namnet och listas under `history` i manifestet (`--back`)
+- `web/index.html` sidan med flikarna Prognos (mosaik med min modell Tim-KNEP, MET Norge och SNOW i tre kartor som följer varandra, avgränsade till MEPS-området) och Händelser (Leaflet från cdnjs, ingen byggkedja); punktserien hämtar MET Norge och SMHI SNOW direkt från webbläsaren (SNOW:s punktingång; kartorna tar multipoint-ingången på Pi:n). Knappen 12 h bakåt visar bara Tim-KNEP:s analys, eftersom MET Norge och SNOW bara har senaste körningen
 - `deploy/` driften som en container: `Dockerfile` (bara verktygen), `compose.yaml`, `drift.sh` (följer `main` och installerar varje ny commit, med återgång om den inte fungerar), `cycle.sh` (en cykel) och `publish.sh` som tvingar grenen `data`
 - `.github/workflows/pages.yml` slår ihop `web/` och grenen `data` och publicerar
 - `experiments/` jämförelsen mot en KNEP-proxy på öppna radarfall, med resultat i `experiments/results/`. Kör om den innan en ändring av modellen tas in

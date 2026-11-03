@@ -1,0 +1,191 @@
+[
+ {
+  "day": "2019-03-08",
+  "kind": "vår",
+  "part": "validering",
+  "wet": 0.0769,
+  "heavy": 0.0018
+ },
+ {
+  "day": "2019-03-17",
+  "kind": "vår",
+  "part": "validering",
+  "wet": 0.1076,
+  "heavy": 0.00536
+ },
+ {
+  "day": "2020-02-16",
+  "kind": "vinter",
+  "part": "test",
+  "wet": 0.1753,
+  "heavy": 0.01412
+ },
+ {
+  "day": "2020-02-22",
+  "kind": "vinter",
+  "part": "validering",
+  "wet": 0.0972,
+  "heavy": 0.02158
+ },
+ {
+  "day": "2020-05-10",
+  "kind": "vår",
+  "part": "validering",
+  "wet": 0.1047,
+  "heavy": 0.00351
+ },
+ {
+  "day": "2020-06-06",
+  "kind": "sommar",
+  "part": "test",
+  "wet": 0.1174,
+  "heavy": 0.00878
+ },
+ {
+  "day": "2020-11-21",
+  "kind": "höst",
+  "part": "validering",
+  "wet": 0.1149,
+  "heavy": 0.01684
+ },
+ {
+  "day": "2020-12-15",
+  "kind": "vinter",
+  "part": "validering",
+  "wet": 0.0894,
+  "heavy": 0.01049
+ },
+ {
+  "day": "2021-01-11",
+  "kind": "vinter",
+  "part": "test",
+  "wet": 0.092,
+  "heavy": 0.0015
+ },
+ {
+  "day": "2021-01-20",
+  "kind": "vinter",
+  "part": "validering",
+  "wet": 0.1004,
+  "heavy": 0.00624
+ },
+ {
+  "day": "2021-05-17",
+  "kind": "vår",
+  "part": "validering",
+  "wet": 0.1004,
+  "heavy": 0.00953
+ },
+ {
+  "day": "2021-05-26",
+  "kind": "vår",
+  "part": "test",
+  "wet": 0.1148,
+  "heavy": 0.01025
+ },
+ {
+  "day": "2021-08-17",
+  "kind": "Gävle",
+  "part": "test",
+  "wet": null,
+  "heavy": null
+ },
+ {
+  "day": "2021-08-18",
+  "kind": "sommar",
+  "part": "test",
+  "wet": 0.1821,
+  "heavy": 0.02317
+ },
+ {
+  "day": "2021-09-23",
+  "kind": "höst",
+  "part": "test",
+  "wet": 0.2415,
+  "heavy": 0.02662
+ },
+ {
+  "day": "2021-10-05",
+  "kind": "höst",
+  "part": "validering",
+  "wet": 0.1226,
+  "heavy": 0.01367
+ },
+ {
+  "day": "2021-10-20",
+  "kind": "höst",
+  "part": "validering",
+  "wet": 0.116,
+  "heavy": 0.0241
+ },
+ {
+  "day": "2023-08-07",
+  "kind": "Hans",
+  "part": "test",
+  "wet": null,
+  "heavy": null
+ },
+ {
+  "day": "2023-08-08",
+  "kind": "Hans",
+  "part": "validering",
+  "wet": 0.067,
+  "heavy": 0.01216
+ },
+ {
+  "day": "2023-11-04",
+  "kind": "höst",
+  "part": "validering",
+  "wet": 0.1235,
+  "heavy": 0.01089
+ },
+ {
+  "day": "2024-04-02",
+  "kind": "vår",
+  "part": "test",
+  "wet": 0.0926,
+  "heavy": 0.01041
+ },
+ {
+  "day": "2024-06-28",
+  "kind": "sommar",
+  "part": "validering",
+  "wet": 0.0563,
+  "heavy": 0.02832
+ },
+ {
+  "day": "2024-07-13",
+  "kind": "sommar",
+  "part": "validering",
+  "wet": 0.0928,
+  "heavy": 0.04277
+ },
+ {
+  "day": "2024-08-30",
+  "kind": "sommar",
+  "part": "test",
+  "wet": 0.0612,
+  "heavy": 0.0286
+ },
+ {
+  "day": "2025-01-06",
+  "kind": "vinter",
+  "part": "validering",
+  "wet": 0.0988,
+  "heavy": 0.00377
+ },
+ {
+  "day": "2025-07-29",
+  "kind": "sommar",
+  "part": "validering",
+  "wet": 0.1088,
+  "heavy": 0.02189
+ },
+ {
+  "day": "2025-10-30",
+  "kind": "höst",
+  "part": "test",
+  "wet": 0.1151,
+  "heavy": 0.00334
+ }
+]

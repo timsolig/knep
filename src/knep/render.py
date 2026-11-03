@@ -5,12 +5,16 @@ per timme (för jämförelse med KNEP:s kvartar och SNOW:s timmar). Samma färg 
 medelintensitet i alla tre, så legenden för summorna är intensitetsgränserna gånger periodens längd.
 Värdena finns också i en komprimerad fil på radarns rutnät, så att sidan kan rita en tidsserie för
 en punkt utan att avkoda färger.
+
+Radaranalysen de senaste tolv timmarna ritas en gång per bild till hist/ (Renderer.history), så att
+sidan kan bläddra bakåt utan att varje cykel ritar om allt.
 """
 
 from __future__ import annotations
 
 import gzip
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -22,6 +26,7 @@ from rasterio.warp import Resampling, calculate_default_transform, reproject, tr
 from .radar import Grid
 
 WEB = "EPSG:3857"
+MODEL_NAME = "Tim-KNEP"  # namnet på sidan
 
 # Nedre gräns i mm/h för varje färg. Under första gränsen ritas inget.
 LEVELS = [0.1, 0.5, 1, 2, 4, 8, 16, 32]
@@ -50,6 +55,9 @@ def legend(minutes: int = 5):
     f = 1.0 if minutes <= 5 else minutes / 60.0
     return [{"min": round(lvl * f, 3), "color": "rgba({},{},{},{:.2f})".format(*c[:3], c[3] / 255)} for lvl, c in zip(LEVELS, COLORS)]
 
+
+# radaranalysen bakåt på sidan, i underkatalogen hist/
+HISTORY_HOURS, HISTORY_DIR = 12, "hist"
 
 UNITS = {5: "mm/h", 15: "mm per 15 min", 60: "mm per timme"}
 STEP = timedelta(minutes=5)
@@ -112,35 +120,77 @@ class Renderer:
         self.shape = (dh, dw)
         w_, s_, e_, n_ = transform_bounds(WEB, "EPSG:4326", *array_bounds(dh, dw, self.transform))
         self.bounds = [[round(s_, 5), round(w_, 5)], [round(n_, 5), round(e_, 5)]]
+        self._map = None
+
+    def _lookup(self) -> tuple[np.ndarray, np.ndarray]:
+        """Närmaste granne mellan två fasta rutnät: vilken källpixel varje målpixel tar räknas en
+        gång, genom att omprojicera pixlarnas nummer, och sedan är varje bild ett uppslag."""
+        if self._map is None:
+            h, w = self.grid.shape
+            src = np.arange(h * w, dtype=np.float64).reshape(h, w)
+            dst = np.full(self.shape, np.nan, np.float64)
+            reproject(src, dst, src_transform=self.grid.transform, src_crs=self.grid.crs, src_nodata=np.nan,
+                      dst_transform=self.transform, dst_crs=WEB, dst_nodata=np.nan,
+                      resampling=Resampling.nearest)
+            valid = np.isfinite(dst)
+            self._map = valid, dst[valid].astype(np.int64)
+        return self._map
 
     def warp(self, field: np.ndarray) -> np.ndarray:
+        valid, src = self._lookup()
         out = np.full(self.shape, np.nan, np.float32)
-        reproject(
-            field.astype(np.float32),
-            out,
-            src_transform=self.grid.transform,
-            src_crs=self.grid.crs,
-            src_nodata=np.nan,
-            dst_transform=self.transform,
-            dst_crs=WEB,
-            dst_nodata=np.nan,
-            resampling=Resampling.nearest,
-        )
+        out[valid] = np.asarray(field, np.float32).ravel()[src]
         return out
 
+    def _png(self, value: np.ndarray, levels, colors, path: Path) -> None:
+        """PNG med palett: klass 0 genomskinlig, klass i färgen colors[i - 1] med dess alfa."""
+        idx = np.digitize(np.nan_to_num(self.warp(value), nan=0.0), levels).astype(np.uint8)
+        pal = np.vstack([np.zeros((1, 4), np.uint8), colors])
+        img = Image.fromarray(idx, "P")
+        img.putpalette(pal[:, :3].ravel().tolist())
+        img.save(path, transparency=bytes(pal[:, 3].tolist()), compress_level=6)
+
     def png(self, field: np.ndarray, path: Path) -> None:
-        idx = np.digitize(np.nan_to_num(self.warp(field), nan=0.0), LEVELS)
-        rgba = np.zeros(idx.shape + (4,), np.uint8)
-        rain = idx > 0
-        rgba[rain] = COLORS[idx[rain] - 1]
-        Image.fromarray(rgba, "RGBA").save(path, optimize=True)
+        self._png(field, LEVELS, COLORS, path)
 
     def png_prob(self, p: np.ndarray, path: Path) -> None:
-        idx = np.digitize(np.nan_to_num(self.warp(p), nan=0.0), PROB_LEVELS)
-        rgba = np.zeros(idx.shape + (4,), np.uint8)
-        on = idx > 0
-        rgba[on] = PROB_COLORS[idx[on] - 1]
-        Image.fromarray(rgba, "RGBA").save(path, optimize=True)
+        self._png(p, PROB_LEVELS, PROB_COLORS, path)
+
+    def history(self, out: Path, frames: list[tuple], now: datetime, hours: float = HISTORY_HOURS) -> dict:
+        """Radaranalysen bakåt: varje 5-minutersbild, kvart och timme ritas en gång till hist/ med
+        tiden i namnet och ligger kvar i hours timmar. Namnen ändras aldrig, så sidan kan cacha dem.
+
+        frames: (tid, fält) för analyserna i den här cykeln. Kvartar och timmar ritas när alla
+        deras bilder finns i frames, så den senaste timmen räcker för att fylla på.
+        """
+        d = out / HISTORY_DIR
+        d.mkdir(parents=True, exist_ok=True)
+        todo = [(t, "obs", f) for t, f in frames]
+        for t, _, f in todo:
+            path = d / f"{t:%Y%m%dT%H%M}.png"
+            if not path.exists():
+                self.png(f, path)
+        for minutes, prefix in ((15, "q"), (60, "h")):
+            for end, _, _, f in aggregate(todo, minutes):
+                path = d / f"{prefix}{end:%Y%m%dT%H%M}.png"
+                if not path.exists():
+                    self.png(f, path)
+        oldest = now - timedelta(hours=hours)
+        lists = {5: [], 15: [], 60: []}
+        for p in sorted(d.glob("*.png")):
+            m = re.fullmatch(r"([qh]?)(\d{8}T\d{4})", p.stem)
+            if not m:
+                continue
+            t = datetime.strptime(m.group(2), "%Y%m%dT%H%M").replace(tzinfo=UTC)
+            minutes = {"": 5, "q": 15, "h": 60}[m.group(1)]
+            if t - timedelta(minutes=minutes) < oldest or t > now:
+                p.unlink()
+                continue
+            entry = {"time": _iso(t), "kind": "obs", "file": f"{HISTORY_DIR}/{p.name}"}
+            if minutes > 5:
+                entry["start"] = _iso(t - timedelta(minutes=minutes))
+            lists[minutes].append(entry)
+        return {"hours": hours, "frames": lists[5], "frames15": lists[15], "frames60": lists[60]}
 
     def write(self, out: Path, analysis: datetime, frames: list[tuple], extra: dict | None = None) -> None:
         """Skriv PNG per ruta och upplösning, värdefilen och sist manifest.json, så att sidan aldrig
@@ -181,6 +231,7 @@ class Renderer:
                 old.unlink()
         tr = self.grid.transform
         manifest = {
+            "model": MODEL_NAME,
             "analysis": _iso(analysis),
             "generated": _iso(datetime.now(UTC)),
             "step_minutes": 5,
