@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from . import bias, compare, composite, gauges, model, models, radar, render
+from . import bias, compare, composite, gauges, model, models, radar, render, runs
 
 NO_NEW_DATA = 75
 log = logging.getLogger("knep")
@@ -133,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")
     p.add_argument("--back", type=float, default=render.HISTORY_HOURS,
                    help="timmar radaranalys bakåt på sidan (hist/), 0 stänger av")
+    p.add_argument("--runs", type=float, default=runs.HOURS,
+                   help="timmar med tidigare utgåvor (timsummor varje timme, runs/), 0 stänger av")
     p.add_argument("--no-gauges", action="store_true", help="hämta inte regnmätarna till sidan (gauges.json)")
     p.add_argument("--no-seamless", action="store_true", help="bara kedjan, utan MEPS rättad mot radarn (seamless.py)")
     p.add_argument("--seamless", action="store_true", help=argparse.SUPPRESS)  # standard sedan 5 h; finns kvar för äldre skript
@@ -224,6 +226,14 @@ def main(argv: list[str] | None = None) -> int:
         started = time.monotonic()
         extra["history"] = rend.history(args.out, [(t, f) for t, kind, f, *_ in frames if kind == "obs"], t0, args.back)
         log.info("analys bakåt: %d bilder på %.1f s", len(extra["history"]["frames"]), time.monotonic() - started)
+    if args.runs > 0:
+        try:  # utgåvan sparas första cykeln i timmen; ett fel här får inte stoppa prognosen
+            if runs.due(args.out, t0):
+                runs.archive(args.out, rend, t0, frames, extra.get("compare"))
+                log.info("sparade utgåvan %s", t0)
+            extra["runs"] = runs.listing(args.out, t0, args.runs)
+        except Exception as e:  # noqa: BLE001
+            log.warning("utgåvor: %s", e)
     rend.write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)
     log.info("skrev %d rutor till %s", len(frames), args.out)
 

@@ -174,6 +174,27 @@
   .keys i.ring { border-radius: 50%; border: 2px solid var(--gauge); width: 7px; height: 7px; }
   .keys i.grey { background: #8b949e; opacity: .7; }
   .gauge-tip { font-size: 12px; }
+  .contour { image-rendering: pixelated; }
+  .keys i.contour { background: none; border: 2px solid #111; border-radius: 2px; width: 7px; height: 7px; }
+  .keys i.dash { background: none; border-top: 2px dashed var(--past); height: 0; width: 12px; border-radius: 0; vertical-align: 3px; }
+  #issue { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 3px 6px; cursor: pointer; max-width: 230px; }
+  body.issue-mode #issue { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  body.issue-mode #timebar { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+  .seg button:disabled { opacity: .4; cursor: not-allowed; }
+  #verify h3 { margin-top: 10px; }
+  #help { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 60px; z-index: 1001; width: 40px; height: 40px; border-radius: 10px; border: 0;
+          background: var(--bg); box-shadow: var(--shadow); font-size: 17px; font-weight: 700; cursor: pointer; }
+  #intro { border: 0; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.3); padding: 0; width: min(620px, calc(100% - 24px)); max-height: calc(100% - 40px); color: var(--fg); }
+  #intro::backdrop { background: rgba(16, 24, 40, .45); }
+  #intro .ib { padding: 18px 22px 8px; overflow: auto; max-height: calc(100vh - 140px); }
+  #intro h2 { font-size: 20px; margin: 0 0 4px; }
+  #intro h4 { font-size: 14px; margin: 14px 0 3px; display: flex; align-items: center; gap: 7px; }
+  #intro p { margin: 0 0 4px; font-size: 13.5px; line-height: 1.45; }
+  #intro .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  #intro .if { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 22px 16px; border-top: 1px solid var(--line); }
+  #intro .if button { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+  #intro .if button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  @media (max-width: 699px) { #help { right: 58px; } #intro .ib { padding: 14px 16px 6px; } }
 </style>
 </head>
 <body>
@@ -183,6 +204,7 @@
   <button role="tab" id="tab-cases" aria-selected="false">Händelser</button>
 </nav>
 <button id="locate" title="Visa min plats" aria-label="Visa min plats">◎</button>
+<button id="help" title="Så läser du sidan" aria-label="Så läser du sidan">?</button>
 
 <div id="liveview">
 <div id="mosaic" aria-label="Modellerna sida vid sida"></div>
@@ -196,6 +218,7 @@
   </div>
   <div class="tb-sub">
     <div class="chips layers"><button class="nowbtn" id="now-btn" title="Senaste radarbilden (N)">Nu</button></div>
+    <select id="issue" aria-label="Utgåva" title="Senaste utgåvan, eller en tidigare för att jämföra prognoserna med radarn"></select>
     <div class="chips seg" id="live-res" role="group" aria-label="Upplösning">
       <button aria-pressed="true" data-res="5" title="Momentan intensitet var 5:e minut">5 min</button>
       <button aria-pressed="false" data-res="15" title="Summa per kvart, som KNEP">15 min</button>
@@ -204,7 +227,7 @@
     <div class="chips layers">
       <button aria-pressed="false" id="obs-toggle" title="SMHI:s regnmätare med samma färgskala: kvartssumma, timsumma eller kvartens medelintensitet i 5 min">Mätare</button>
       <button aria-pressed="true" id="bg-toggle" title="Senaste radarbilden i grått under prognoserna">Radar i bakgrunden</button>
-      <button aria-pressed="false" id="back-toggle" title="Radaranalysen de senaste tolv timmarna" hidden>12 h bakåt</button>
+      <button aria-pressed="true" id="contour-toggle" title="Svart kontur där radarn uppmätte minst 1 mm under timmen" hidden>Radarkontur</button>
     </div>
     <div class="chips layers" id="live-layers" hidden>
       <button aria-pressed="true" data-layer="rain">Intensitet</button>
@@ -233,7 +256,15 @@
       <div class="status" id="point-status"></div>
     </div>
     <div class="hint" id="point-hint">Klicka i en karta eller på en mätare för staplar i punkten. Under markören visar varje karta sin klass.
-      Tangenter: pilarna stegar, mellanslag spelar, N går till nu, 1, 2 och 3 byter upplösning, M visar mätarna, B tolv timmar bakåt, Esc stänger punkten.</div>
+      Tangenter: pilarna stegar, mellanslag spelar, N går till nu, 1, 2 och 3 byter upplösning, M visar mätarna, Esc stänger punkten. Frågetecknet uppe till höger förklarar sidan.</div>
+
+    <section id="verify" hidden>
+      <h3>Träff mot radarn</h3>
+      <svg id="verify-chart" class="chart" role="img" aria-label="Träff mot radarn per ledtid och modell"></svg>
+      <div class="readout" id="verify-readout"></div>
+      <div class="keys" id="verify-keys"></div>
+      <div class="status" id="verify-status"></div>
+    </section>
 
     <details id="area">
       <summary>Regnyta i kartutsnittet</summary>
@@ -294,6 +325,37 @@
   </div>
   <div class="status" id="case-empty">Laddar händelser</div>
 </section>
+
+<dialog id="intro" aria-labelledby="intro-title">
+  <div class="ib">
+    <h2 id="intro-title">Så läser du sidan</h2>
+    <p>Sidan jämför min nederbördsmodell Tim-KNEP med MET Norges nowcast och SMHI:s SNOW, och med vad radarn sedan uppmätte.</p>
+    <h4><span class="sw" style="background:var(--ours)"></span>Kartorna</h4>
+    <p>Varje karta är en modell. De följer varandra när du drar och zoomar, och samma färg betyder samma medelintensitet i alla kartor.
+       Välj vilka kartor som visas i panelen till vänster.</p>
+    <h4><span class="sw" style="background:var(--past)"></span>Tiden</h4>
+    <p>Tidslisten högst upp styr alla kartor. Grått är radar, alltså uppmätt, och blått är prognos. <b>Nu</b> går till senaste radarbilden.
+       5 min visar intensiteten, 15 min och 1 h summan per kvart och timme. Under prognoserna ligger senaste radarbilden i grått, så att du ser var regnet var när prognosen gjordes.</p>
+    <h4><span class="sw" style="border:2px solid #111"></span>Tidigare utgåvor och facit</h4>
+    <p>Prognosen räknas om var femte minut. Välj en tidigare utgåva i listan bredvid <b>Nu</b> för att se vad modellerna trodde för några timmar sedan.
+       Tidigare utgåvor visas per timme, som SNOW, och sparas i tolv timmar.</p>
+    <p>Den svarta konturen visar var radarn sedan uppmätte minst 1 mm under timmen. Färg innanför konturen är en träff, färg utanför är ett falsklarm,
+       och en tom kontur är regn som modellen missade. Konturen finns bara för timmar som redan har passerat.</p>
+    <p>Panelen visar då hur väl varje modell träffade per ledtid inom det du ser (FSS: 1 är perfekt, 0 är ingen träff). Den streckade linjen är persistens,
+       alltså att regnet från timmen före utgåvan står kvar. En modell under den linjen gjorde det inte bättre än att inte gissa alls.</p>
+    <h4><span class="sw" style="border:2px solid var(--gauge);border-radius:50%"></span>Punkten, mätarna och verktygen</h4>
+    <p>Klicka i en karta för staplar i punkten: radarn, modellerna och närmaste regnmätare bredvid varandra för varje tidssteg.
+       Under muspekaren visar varje karta sitt värde. <b>Mätare</b> ritar SMHI:s regnmätare med samma färgskala; de kommer ungefär en timme efter radarn.
+       <b>Regnyta i kartutsnittet</b> visar hur mycket regn varje modell har inom det du ser.</p>
+    <h4><span class="sw" style="background:var(--snow)"></span>Att tänka på</h4>
+    <p>MET Norge räknar två timmar framåt. SNOW finns per timme och är ensemblens median, så kraftiga skurar blir svagare där.
+       Tim-KNEP blandar in vädermodellen MEPS längre fram, och risken för minst 10 mm/h finns för de två första timmarna.</p>
+    <p class="status">Tangenter: pilarna stegar, mellanslag spelar, N går till nu, 1, 2 och 3 byter upplösning, M visar mätarna. Knappen Länk kopierar vyn.</p>
+  </div>
+  <div class="if">
+    <button id="intro-close" class="primary">Kom igång</button>
+  </div>
+</dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -360,19 +422,19 @@ const NORDEN = [[55.0, 6.0], [69.5, 30.0]];  // det som ska synas från början
 const LEVELS = [0.1, 0.5, 1, 2, 4, 8, 16, 32];  // som render.LEVELS: klass k är minst LEVELS[k - 1] mm/h
 const ALPHAS = [170, 200, 215, 225, 235, 240, 245, 250];  // klassernas alfa i PNG-paletten, en per klass
 
-const live = { manifest: null, res: store.get('res', '5'), idx: 0, layer: 'rain', bg: store.get('bg', true), back: store.get('back', false),
+const live = { manifest: null, res: store.get('res', '5'), idx: 0, layer: 'rain', bg: store.get('bg', true), contour: store.get('contour', true),
+               issue: null, issueList: null, resLatest: null, verify: null,
                obs: store.get('obs', false), hidden: new Set(store.get('hidden', [])), panes: new Map(), gauges: null,
                values: null, point: null, view: null, area: null, areaThr: 3, hover: null };
 
 const listFor = (m, r) => (r === '5' ? m.frames : r === '15' ? m.frames15 : m.frames60) || [];
 const listOf = (e, r) => (r === '5' ? e.frames : r === '15' ? e.frames15 : e.frames60) || [];
-// analysen bakåt (hist/): bara det som ligger före manifestets egna rutor
-const histFor = (m, r) => {
-  const h = m.history; if (!h) return [];
-  const l = (r === '5' ? h.frames : r === '15' ? h.frames15 : h.frames60) || [], first = listFor(m, r)[0];
-  return first ? l.filter(f => +new Date(f.time) < +new Date(first.time)) : l;
-};
-const framesFor = (m, r) => live.back ? [...histFor(m, r).map(f => ({ ...f, hist: true })), ...listFor(m, r)] : listFor(m, r);
+// Senaste utgåvan: manifestets rutor. En tidigare utgåva (manifestets runs, sparade av runs.py)
+// finns per timme, och facit är radarns timsumma ur hist/ för samma timme.
+const framesFor = (m, r) => live.issue ? live.issueList : listFor(m, r);
+const radarHour = (m, time) => (m.history?.frames60 || []).find(h => h.time === time) || null;
+const issueFrames = (m, run) => (run.models.ours?.frames60 || []).map(f => ({ ...f, kind: 'fc', issue: true, radar: radarHour(m, f.time) }));
+const earlierRuns = m => (m.runs || []).filter(r => +new Date(r.issued) < +new Date(m.analysis));
 const ago = minutes => { const h = Math.floor(minutes / 60), r = minutes % 60; return h ? `${h} h${r ? ` ${r} min` : ''}` : `${r} min`; };
 const unitFor = r => live.manifest?.units?.[r] || { 5: 'mm/h', 15: 'mm per 15 min', 60: 'mm per timme' }[r];
 const factor = r => r === '5' ? 1 : +r / 60;  // klassgränserna i mm/h gånger periodens längd
@@ -396,10 +458,13 @@ function makePane(key) {
   $('mosaic').append(el);
   const pm = L.map(el.firstChild, { zoomControl: false, attributionControl: false, maxZoom: 11, maxBounds: MEPS, maxBoundsViscosity: 1, preferCanvas: true });
   basemap().addTo(pm);
-  const p = { key, el, map: pm, label: el.querySelector('.plabel'), overlays: new Map(), shown: null, bg: null, src: null,
+  pm.createPane('contourPane').style.zIndex = 450;  // konturen över prognosen, mätarna överst
+  pm.createPane('gaugePane').style.zIndex = 460;
+  pm.getPane('contourPane').style.pointerEvents = 'none';
+  const p = { key, el, map: pm, contour: null, gaugeRenderer: L.canvas({ pane: 'gaugePane' }), label: el.querySelector('.plabel'), overlays: new Map(), shown: null, bg: null, src: null,
               gauges: L.layerGroup().addTo(pm), cross: L.circleMarker([0, 0], { radius: 7, weight: 1.5, color: '#1b1f24', fill: false, interactive: false }) };
   pm.on('move zoom', () => syncFrom(p));
-  pm.on('moveend', () => { if (!syncing) { areaSoon(); saveHash(); } });
+  pm.on('moveend', () => { if (!syncing) { areaSoon(); verifySoon(); saveHash(); } });
   pm.on('click', e => pointOpen(e.latlng));
   pm.on('mousemove', e => hoverAt(e.latlng, p));
   pm.on('mouseout', () => hoverAt(live.point ? live.point.ll : null, 'point'));
@@ -487,6 +552,7 @@ function parseHash() {
   const pt = ll(q.get('punkt')); if (pt) out.point = L.latLng(pt[0], pt[1]);
   if (['5', '15', '60'].includes(q.get('upp'))) out.res = q.get('upp');
   if (q.get('tid')) out.time = q.get('tid');
+  if (q.get('utg')) out.issue = q.get('utg');
   return out;
 }
 const want = parseHash();
@@ -502,6 +568,7 @@ function saveHash(now) {
     q.set('upp', live.res);
     const f = live.manifest && framesFor(live.manifest, live.res)[live.idx];
     if (f) q.set('tid', f.time);
+    if (live.issue) q.set('utg', live.issue.issued);
     if (live.point) q.set('punkt', `${live.point.ll.lat.toFixed(3)},${live.point.ll.lng.toFixed(3)}`);
     history.replaceState(null, '', '#' + q.toString().replace(/%2C/g, ',').replace(/%3A/g, ':'));
   };
@@ -512,6 +579,14 @@ function saveHash(now) {
 // vilken bild en karta visar för en tid i tidslisten (f ur framesFor)
 function srcFor(p, f, layer = live.layer) {
   const m = live.manifest, r = live.res;
+  if (f.issue) {
+    const e = live.issue.models[p.key];
+    if (!e) return { missing: 'fanns inte med i utgåvan' };
+    const x = e.frames60.find(y => y.time === f.time);
+    if (!x) { const last = e.frames60.at(-1); return { missing: last ? `prognosen slutade ${clock.format(new Date(last.time))}` : 'saknas i utgåvan' }; }
+    const lead = Math.round((new Date(f.time) - new Date(live.issue.issued)) / 3600000);
+    return { file: x.file, bounds: e.bounds, hist: true, text: `+${lead} h, ${clock.format(new Date(x.start))} till ${clock.format(new Date(x.time))}` };
+  }
   if (p.key === 'ours') {
     const file = r === '5' && layer === 'p10' && f.p10 ? f.p10 : f.file;
     return { file, bounds: m.bounds, hist: f.hist, text: f.kind === 'obs' ? (f.hist ? 'radaranalys' : 'radar') : `prognos från ${clock.format(new Date(m.analysis))}` };
@@ -578,10 +653,13 @@ function liveShow(i) {
   const f = list[i], t = +new Date(f.time);
   $('slider').max = list.length - 1;
   $('slider').value = i;
-  const split = list.map(x => x.kind).lastIndexOf('obs');
+  const split = live.issue ? list.map(x => !!x.radar).lastIndexOf(true) + 0.5 : list.map(x => x.kind).lastIndexOf('obs');
   $('slider').style.setProperty('--split', `${list.length > 1 ? Math.max(0, split) / (list.length - 1) * 100 : 0}%`);
   $('time').textContent = (day.format(new Date(f.time)) !== day.format(new Date()) ? dayTime : clock).format(new Date(f.time));
-  if (live.res === '5') {
+  if (live.issue) {
+    const lead = Math.round((t - new Date(live.issue.issued)) / 3600000);
+    $('kind').textContent = `Utgåva ${clock.format(new Date(live.issue.issued))}, +${lead} h: ${clock.format(new Date(f.start))} till ${clock.format(new Date(f.time))}${f.radar ? '' : ', ingen radar än'}`;
+  } else if (live.res === '5') {
     const lead = Math.round((t - new Date(m.analysis)) / MIN);
     $('kind').textContent = f.kind === 'fc' ? `Prognos +${lead} min` : lead === 0 ? 'Senaste radarbild' : `Radar ${ago(-lead)} före analysen`;
   } else {
@@ -598,17 +676,17 @@ function liveShow(i) {
     o?.setOpacity(1);
     p.shown = o;
     p.src = s.file ? s : null;
-    p.bg?.setOpacity(live.bg && future ? 0.55 : 0);
+    p.bg?.setOpacity(!live.issue && live.bg && future ? 0.55 : 0);
     paneLabel(p, s.missing || s.text, !!s.missing || s.stale);
     p.label.classList.toggle('loading', !!o && !o._ok);
   }
-  if (list.some(x => x.hist)) preload(i);
+  contourShow(f);
   gaugesDraw(f);
   legendDraw(f, future);
   $('live-layers').hidden = live.res !== '5' || !m.frames.some(x => x.p10);
-  $('back-toggle').hidden = !m.history?.frames?.length;
   if (live.point) pointDraw();
   areaDraw();
+  verifyDraw();
   hoverAt(live.hover?.ll, live.hover?.from);
   saveHash();
 }
@@ -619,18 +697,21 @@ function legendDraw(f, future) {
   $('legend-unit').textContent = p10 ? '%' : unitFor(live.res);
   $('legend').innerHTML = p10 ? legendHtml(m.prob_legend, undefined) : legendHtml(m.legends?.[live.res] || m.legend, undefined);
   const keys = [];
-  if (live.bg && future) keys.push('<span><i class="grey"></i>Senaste radarbilden, grå</span>');
+  if (!live.issue && live.bg && future) keys.push('<span><i class="grey"></i>Senaste radarbilden, grå</span>');
+  if (live.issue && live.contour) keys.push(f.radar ? '<span><i class="contour"></i>Radarn uppmätte minst 1 mm under timmen</span>'
+                                                    : '<span><i class="contour"></i>Ingen radarkontur än, timmen har inte passerat</span>');
   if (live.obs) {
     const g = gaugeValues(f);
     keys.push(`<span><i class="ring"></i>Mätare${live.res === '5' ? ', kvartens medel i mm/h' : ''}</span>`);
     const last = live.gauges && Object.keys(live.gauges[15] || {}).sort().at(-1);
     if (!g) keys.push(`<span>${!live.gauges ? 'mätarna hämtas' : !last ? 'inga mätarvärden' : `inga mätarvärden för tiden, senaste ${clock.format(new Date(last))}`
-      + (!live.back && m.history?.frames?.length && +new Date(f.time) > +new Date(last) ? '. SMHI lägger ut dem ungefär en timme efter radarn, se 12 h bakåt' : '')}</span>`);
+      + (!live.issue && earlierRuns(m).length && +new Date(f.time) > +new Date(last) ? '. SMHI lägger ut dem ungefär en timme efter radarn, välj en tidigare utgåva' : '')}</span>`);
   }
   $('legend-keys').innerHTML = keys.join('');
 }
 
 function liveRes(r) {
+  if (live.issue && r !== '60') return;  // tidigare utgåvor finns bara per timme
   const m = live.manifest;
   const cur = m ? framesFor(m, live.res)[live.idx] : null;
   live.res = r;
@@ -685,6 +766,10 @@ async function liveLoad() {
   const keep = oldList[live.idx] || null;
   live.manifest = m;
   live.values = null;
+  if (live.issue) {  // samma utgåva i det nya manifestet, med facit för timmar som har passerat sedan
+    const run = (m.runs || []).find(r => r.issued === live.issue.issued);
+    if (run) { live.issue = run; live.issueList = issueFrames(m, run); } else { live.issue = null; live.issueList = null; issueMode(); }
+  }
   const ver = `?v=${encodeURIComponent(m.analysis)}`;
   for (const u of [...decoded.keys()]) if (u.includes('?v=') && !u.endsWith(ver)) decoded.delete(u);  // förra cykelns bilder
   let added = false;
@@ -709,6 +794,7 @@ async function liveLoad() {
   let i = live.res === '5' ? lastOf(list) + (old && keep ? live.idx - lastOf(oldList) : 0) : list.findIndex(f => f.kind !== 'obs');
   if (live.res !== '5' && keep && old) i = closestIndex(list, new Date(keep.time));
   if (!old && want.time) { const j = list.findIndex(f => f.time === want.time); if (j >= 0) i = j; }  // tiden ur länken, om den finns kvar
+  issueOptions();
   preload(Math.max(0, i));
   liveShow(Math.max(0, i));
   liveStatus();
@@ -717,7 +803,197 @@ async function liveLoad() {
   if (live.point) pointOpen(live.point.ll, true);
   else if (!old && want.point) pointOpen(want.point);
   areaSoon();
+  verifySoon();
+  if (!old && want.issue && (m.runs || []).some(r => r.issued === want.issue)) setIssue(want.issue, want.time);  // utgåvan ur länken
 }
+
+/* ---------- utgåvorna ---------- */
+function issueOptions() {
+  const m = live.manifest, sel = $('issue');
+  if (!m) return;
+  const runs = earlierRuns(m);
+  sel.innerHTML = `<option value="">Senaste utgåvan ${clock.format(new Date(m.analysis))}</option>`
+    + runs.map(r => `<option value="${r.issued}">Utgåva ${clock.format(new Date(r.issued))}, ${ago(Math.round((new Date(m.analysis) - new Date(r.issued)) / MIN))} sedan</option>`).join('');
+  sel.value = live.issue?.issued || '';
+  sel.hidden = !runs.length;
+}
+function issueMode() {
+  const on = !!live.issue;
+  document.body.classList.toggle('issue-mode', on);
+  $('contour-toggle').hidden = !on;
+  $('bg-toggle').hidden = on;
+  $('verify').hidden = !on;
+  $('live-res').querySelectorAll('button').forEach(b => {
+    if (!b.dataset.title) b.dataset.title = b.title;
+    b.disabled = on && b.dataset.res !== '60';
+    b.title = b.disabled ? 'Tidigare utgåvor finns per timme, som SNOW' : b.dataset.title;
+  });
+  pressed($('live-res'), 'res', live.res);
+  issueOptions();
+}
+function setIssue(issued, time) {
+  const m = live.manifest;
+  if (!m) return;
+  const run = issued ? (m.runs || []).find(r => r.issued === issued) : null;
+  if (run && !live.issue) live.resLatest = live.res;
+  live.issue = run || null;
+  live.issueList = run ? issueFrames(m, run) : null;
+  if (run) live.res = '60';
+  else if (live.resLatest) { live.res = live.resLatest; live.resLatest = null; }
+  issueMode();
+  preload();
+  const list = framesFor(m, live.res);
+  let i = 0;
+  if (time) i = Math.max(0, list.findIndex(f => f.time === time));
+  else if (!run) i = live.res === '5' ? list.map(f => f.kind).lastIndexOf('obs') : list.findIndex(f => f.kind !== 'obs');
+  liveShow(Math.max(0, i));
+  if (live.point) pointDraw();
+  areaSoon();
+  verifySoon();
+}
+
+// facit: en svart kontur runt radarns timsumma över 1 mm, ovanpå varje karta
+const CONTOUR_THR = 3;  // klass 3: minst 1 mm/h i medel, alltså 1 mm under timmen
+const contours = new Map();
+function contourURL(file) {
+  const url = urlFor({ file, hist: true });
+  if (!contours.has(url)) {
+    contours.set(url, decode(url, live.manifest.bounds, 1).then(im => {
+      const cv = document.createElement('canvas');
+      cv.width = im.w; cv.height = im.h;
+      const ctx = cv.getContext('2d'), img = ctx.createImageData(im.w, im.h), d = img.data, c = im.cls, w = im.w, h = im.h;
+      const wet = (r, k) => r >= 0 && r < h && k >= 0 && k < w && c[r * w + k] >= CONTOUR_THR;
+      for (let r = 0; r < h; r++) for (let k = 0; k < w; k++) {
+        if (!wet(r, k) || (wet(r - 1, k) && wet(r + 1, k) && wet(r, k - 1) && wet(r, k + 1))) continue;
+        const i = (r * w + k) * 4;
+        d[i] = d[i + 1] = d[i + 2] = 17; d[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      return cv.toDataURL();
+    }));
+    if (contours.size > 30) contours.delete(contours.keys().next().value);
+  }
+  return contours.get(url);
+}
+async function contourShow(f) {
+  const on = !!(live.issue && live.contour && f?.radar);
+  for (const p of live.panes.values()) if (!on || p.el.hidden) p.contour?.setOpacity(0);
+  if (!on) return;
+  let src;
+  try { src = await contourURL(f.radar.file); } catch (e) { return; }
+  if (framesFor(live.manifest, live.res)[live.idx]?.time !== f.time || !live.contour || !live.issue) return;
+  for (const p of visiblePanes()) {
+    if (!p.contour) p.contour = L.imageOverlay(src, live.manifest.bounds, { interactive: false, className: 'contour', pane: 'contourPane' }).addTo(p.map);
+    else if (p.contour._url !== src) p.contour.setUrl(src);
+    p.contour.setOpacity(1);
+  }
+}
+
+/* ---------- träff mot radarn per ledtid (FSS) för en tidigare utgåva ---------- */
+// FSS vid 1 mm under timmen på 30 km skala inom kartutsnittet, räknat på radarbildens rutnät.
+// Persistens: radarns timme före utgåvan, oförändrad. 1 är perfekt och 0 ingen träff.
+const FSS_KM = 30;
+function fss(R, M, vb, thr) {
+  const c0 = Math.max(0, Math.floor((mercX(vb.getWest()) - R.xW) / (R.xE - R.xW) * R.w));
+  const c1 = Math.min(R.w, Math.ceil((mercX(vb.getEast()) - R.xW) / (R.xE - R.xW) * R.w));
+  const r0 = Math.max(0, Math.floor((R.yN - mercY(vb.getNorth())) / (R.yN - R.yS) * R.h));
+  const r1 = Math.min(R.h, Math.ceil((R.yN - mercY(vb.getSouth())) / (R.yN - R.yS) * R.h));
+  const w = c1 - c0, h = r1 - r0;
+  if (w < 4 || h < 4) return null;
+  const W1 = w + 1, IO = new Float64Array(W1 * (h + 1)), IF = new Float64Array(W1 * (h + 1));
+  const dx = (R.xE - R.xW) / R.w, dy = (R.yN - R.yS) / R.h;
+  for (let r = 0; r < h; r++) {
+    const y = R.yN - (r0 + r + 0.5) * dy, mr = Math.floor((M.yN - y) / (M.yN - M.yS) * M.h);
+    let so = 0, sf = 0;
+    for (let k = 0; k < w; k++) {
+      const x = R.xW + (c0 + k + 0.5) * dx, mc = Math.floor((x - M.xW) / (M.xE - M.xW) * M.w);
+      so += R.cls[(r0 + r) * R.w + c0 + k] >= thr ? 1 : 0;
+      sf += mr >= 0 && mr < M.h && mc >= 0 && mc < M.w && M.cls[mr * M.w + mc] >= thr ? 1 : 0;
+      IO[(r + 1) * W1 + k + 1] = IO[r * W1 + k + 1] + so;
+      IF[(r + 1) * W1 + k + 1] = IF[r * W1 + k + 1] + sf;
+    }
+  }
+  const latc = 2 * Math.atan(Math.exp((R.yN - (r0 + h / 2) * dy) / R_EARTH)) - Math.PI / 2;
+  const half = Math.max(1, Math.round(FSS_KM * 1000 / (dx * Math.cos(latc)) / 2));
+  let num = 0, den = 0;
+  for (let r = 0; r < h; r++) {
+    const ra = Math.max(0, r - half), rb = Math.min(h, r + half + 1);
+    for (let k = 0; k < w; k++) {
+      const ka = Math.max(0, k - half), kb = Math.min(w, k + half + 1), n = (rb - ra) * (kb - ka);
+      const po = (IO[rb * W1 + kb] - IO[ra * W1 + kb] - IO[rb * W1 + ka] + IO[ra * W1 + ka]) / n;
+      const pf = (IF[rb * W1 + kb] - IF[ra * W1 + kb] - IF[rb * W1 + ka] + IF[ra * W1 + ka]) / n;
+      num += (pf - po) ** 2; den += pf * pf + po * po;
+    }
+  }
+  return den > 0 ? 1 - num / den : null;
+}
+let verifyTimer = 0, verifyToken = 0;
+const verifySoon = () => { clearTimeout(verifyTimer); verifyTimer = setTimeout(verifyUpdate, 450); };
+async function verifyUpdate() {
+  const m = live.manifest, run = live.issue;
+  if (!m || !run || !visiblePanes().length) { live.verify = null; return; }
+  const tok = ++verifyToken, list = live.issueList, vb = visiblePanes()[0].map.getBounds();
+  $('verify-status').textContent = 'Räknar';
+  const hourBefore = new Date(+new Date(run.issued) - (new Date(run.issued).getUTCMinutes() * MIN)).toISOString().replace('.000', '');
+  const pers = radarHour(m, hourBefore);
+  const rows = [];
+  for (const [i, f] of list.entries()) {
+    const row = { i, time: f.time, vals: {} };
+    if (f.radar) {
+      try {
+        const R = await decode(urlFor({ file: f.radar.file, hist: true }), m.bounds);
+        for (const p of visiblePanes()) {
+          const s = srcFor(p, f, 'rain');
+          if (!s.file) continue;
+          try { row.vals[p.key] = fss(R, await decode(urlFor(s), s.bounds), vb, CONTOUR_THR); } catch (e) { /* bilden saknas */ }
+        }
+        if (pers) row.vals.persistens = fss(R, await decode(urlFor({ file: pers.file, hist: true }), m.bounds), vb, CONTOUR_THR);
+      } catch (e) { /* radarn saknas */ }
+    }
+    if (tok !== verifyToken) return;
+    rows.push(row);
+  }
+  live.verify = { issued: run.issued, rows, pers: !!pers };
+  const done = rows.filter(r => Object.keys(r.vals).length).length;
+  $('verify-status').textContent = done
+    ? `FSS vid 1 mm under timmen på ${FSS_KM} km skala, inom det du ser. 1 är perfekt och 0 ingen träff. Saknas ett värde regnade det inte i någon av dem. Tomt utanför radarns täckning räknas som torrt.`
+    : 'Ingen timme i utgåvan har passerat än, så det finns inget facit.';
+  verifyDraw();
+}
+function verifyDraw() {
+  const V = live.verify, svg = $('verify-chart');
+  if (!V || !live.issue || V.issued !== live.issue.issued) { svg.innerHTML = ''; $('verify-readout').innerHTML = ''; $('verify-keys').innerHTML = ''; return; }
+  const Wd = svg.clientWidth || 330, Hd = svg.clientHeight || 150, L0 = 30, R0 = 14, T0 = 8, B0 = 18, n = V.rows.length;
+  const X = i => L0 + (n > 1 ? i / (n - 1) : 0.5) * (Wd - L0 - R0), Y = v => Hd - B0 - Math.max(0, v) * (Hd - T0 - B0);
+  let g = '';
+  for (const v of [0, 0.5, 1]) g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 4}" y="${Y(v) + 3}" text-anchor="end">${num(v)}</text>`;
+  V.rows.forEach((r, i) => { g += `<text x="${X(i)}" y="${Hd - 4}" text-anchor="middle">+${Math.round((new Date(r.time) - new Date(V.issued)) / 3600000)} h</text>`; });
+  g += `<line class="now" x1="${X(live.idx)}" x2="${X(live.idx)}" y1="${T0}" y2="${Hd - B0}"/>`;
+  const keys = ['persistens', ...visiblePanes().map(p => p.key).filter(k => live.issue.models[k])];
+  for (const k of keys) {
+    const color = k === 'persistens' ? 'var(--past)' : modelInfo(k).color;
+    const pts = V.rows.map((r, i) => r.vals[k] != null ? [X(i), Y(r.vals[k])] : null);
+    let d = '', pen = false;
+    for (const q of pts) { if (!q) { pen = false; continue; } d += `${pen ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}`; pen = true; }
+    g += `<path d="${d}" fill="none" stroke="${color}" stroke-width="2"${k === 'persistens' ? ' stroke-dasharray="4 3"' : ''}/>`;
+    for (const q of pts) if (q) g += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="3" fill="${color}"/>`;
+  }
+  svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
+  svg.innerHTML = g;
+  const cur = V.rows[live.idx], f = (v) => v == null ? 'inget' : v.toFixed(2).replace('.', ',');
+  $('verify-readout').innerHTML = cur && Object.keys(cur.vals).length
+    ? `+${Math.round((new Date(cur.time) - new Date(V.issued)) / 3600000)} h: ` + keys.filter(k => k in cur.vals).map(k =>
+        `<b style="color:${k === 'persistens' ? 'var(--past)' : modelInfo(k).color}">${k === 'persistens' ? 'Persistens' : modelInfo(k).name}</b> ${f(cur.vals[k])}`).join(' · ')
+    : 'Ingen radar för den här timmen än.';
+  $('verify-keys').innerHTML = visiblePanes().filter(p => live.issue.models[p.key]).map(p => `<span><i style="background:${modelInfo(p.key).color}"></i>${modelInfo(p.key).name}</span>`).join('')
+    + (V.pers ? '<span><i class="dash"></i>Persistens, timmen före utgåvan</span>' : '');
+}
+$('verify-chart').addEventListener('click', ev => {
+  const V = live.verify, svg = $('verify-chart');
+  if (!V) return;
+  const box = svg.getBoundingClientRect(), x = (ev.clientX - box.left) / box.width, n = V.rows.length;
+  liveShow(Math.round(Math.max(0, Math.min(1, (x * (svg.viewBox.baseVal.width) - 30) / (svg.viewBox.baseVal.width - 44))) * (n - 1)));
+});
 
 /* ---------- regnmätarna ---------- */
 // Pi:n sparar SMHI:s kvarts- och timsummor i tolv timmar (gauges.json); finns filen inte hämtas
@@ -791,8 +1067,8 @@ function gaugesDraw(f) {
     if (!st) continue;
     const c = colorFor(v, items);
     for (const p of visiblePanes()) {
-      L.circleMarker([st[0], st[1]], c ? { radius: 5.5, weight: 1.5, color: '#1b1f24', fillColor: c, fillOpacity: 1, bubblingMouseEvents: false }
-                                       : { radius: 3, weight: 1.2, color: '#57606a', fillColor: '#fff', fillOpacity: 1, bubblingMouseEvents: false })
+      L.circleMarker([st[0], st[1]], c ? { radius: 5.5, weight: 1.5, color: '#1b1f24', fillColor: c, fillOpacity: 1, bubblingMouseEvents: false, renderer: p.gaugeRenderer }
+                                       : { radius: 3, weight: 1.2, color: '#57606a', fillColor: '#fff', fillOpacity: 1, bubblingMouseEvents: false, renderer: p.gaugeRenderer })
         .bindTooltip(`<div class="gauge-tip"><b>${st[2]}</b><br>${mm(v)} ${unit}</div>`, { direction: 'top', offset: [0, -4] })
         .on('click', () => pointOpen(L.latLng(st[0], st[1])))
         .addTo(p.gauges);
@@ -815,12 +1091,13 @@ const R_EARTH = 6378137, STRIDE = 2;
 const mercX = lon => R_EARTH * lon * Math.PI / 180;
 const mercY = lat => R_EARTH * Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
 const decoded = new Map();
-function decode(url, bounds) {
-  if (!decoded.has(url)) {
-    decoded.set(url, new Promise((resolve, reject) => {
+function decode(url, bounds, stride = STRIDE) {
+  const key = `${stride}|${url}`;
+  if (!decoded.has(key)) {
+    decoded.set(key, new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
-        const w = Math.ceil(img.naturalWidth / STRIDE), h = Math.ceil(img.naturalHeight / STRIDE);
+        const w = Math.ceil(img.naturalWidth / stride), h = Math.ceil(img.naturalHeight / stride);
         const cv = document.createElement('canvas');
         cv.width = w; cv.height = h;
         const ctx = cv.getContext('2d', { willReadFrequently: true });
@@ -847,7 +1124,7 @@ function decode(url, bounds) {
     }));
     if (decoded.size > 200) decoded.delete(decoded.keys().next().value);
   }
-  return decoded.get(url);
+  return decoded.get(key);
 }
 function classAt(im, ll) {
   const c = Math.floor((mercX(ll.lng) - im.xW) / (im.xE - im.xW) * im.w), r = Math.floor((im.yN - mercY(ll.lat)) / (im.yN - im.yS) * im.h);
@@ -921,6 +1198,16 @@ async function areaUpdate() {
     }
     series.push({ key: p.key, pts });
   }
+  if (live.issue) {  // radarns timsummor som facit
+    const pts = [];
+    for (const f of list) {
+      let a = null;
+      if (f.radar) { try { a = areaOf(await decode(urlFor({ file: f.radar.file, hist: true }), m.bounds), vb, thr); } catch (e) { a = null; } }
+      if (tok !== areaToken) return;
+      pts.push({ t: +new Date(f.time), a, obs: true });
+    }
+    series.unshift({ key: 'radar', pts });
+  }
   live.area = { series, list, r, thr };
   $('area-status').textContent = `Yta med minst ${num(LEVELS[thr - 1])} mm/h i medel under perioden, inom det som syns. Utanför en modells område räknas det som torrt.`;
   areaDraw();
@@ -943,7 +1230,7 @@ function areaDraw() {
   if (A.hover != null) g += `<line x1="${X(ts[A.hover])}" x2="${X(ts[A.hover])}" y1="${T0}" y2="${Hd - B0}" stroke="var(--fg)" opacity=".35"/>`;
   const read = [];
   for (const s of A.series) {
-    const info = modelInfo(s.key);
+    const info = s.key === 'radar' ? { name: 'Radar', color: 'var(--past)' } : modelInfo(s.key);
     const seg = pts => pts.length ? 'M' + pts.map(p => `${X(p.t).toFixed(1)},${Y(p.a).toFixed(1)}`).join('L') : '';
     const ok = s.pts.filter(p => p.a != null);
     if (s.key === 'ours') {
@@ -1059,6 +1346,11 @@ function pointSeries(P, m, res) {
 function pointDraw() {
   const P = live.point, m = live.manifest;
   if (!P || !m) return;
+  ['point-chart', 'point-readout', 'point-keys', 'point-table'].forEach(id => { $(id).hidden = !!live.issue; });
+  if (live.issue) {
+    $('point-status').textContent = 'Staplarna i punkten gäller senaste utgåvan. Välj den i listan bredvid Nu för att se dem. Under muspekaren visar kartorna fortfarande sitt värde.';
+    return;
+  }
   const res = +live.res;
   const { periods, S } = pointSeries(P, m, res);
   if (!periods.length) return;
@@ -1370,14 +1662,8 @@ function toggle(id, key, after) {
 }
 toggle('bg-toggle', 'bg', () => liveShow(live.idx));
 toggle('obs-toggle', 'obs', () => { if (live.obs) gaugesLoad(); liveShow(live.idx); });
-toggle('back-toggle', 'back', () => {
-  const m = live.manifest;
-  if (!m) return;
-  const list = framesFor(m, live.res);
-  preload(live.back ? 0 : null);
-  liveShow(live.back ? 0 : list.map(f => f.kind).lastIndexOf('obs'));
-  areaSoon();
-});
+toggle('contour-toggle', 'contour', () => liveShow(live.idx));
+$('issue').addEventListener('change', e => setIssue(e.target.value || null));
 $('live-layers').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
   live.layer = b.dataset.layer;
   pressed($('live-layers'), 'layer', live.layer);
@@ -1411,12 +1697,12 @@ document.addEventListener('keydown', e => {
   if (['1', '2', '3'].includes(k) && !$('live-res').hidden) liveRes({ 1: '5', 2: '15', 3: '60' }[k]);
   if (k === 'n') liveNow();
   if (k === 'm') $('obs-toggle').click();
-  if (k === 'b' && !$('back-toggle').hidden) $('back-toggle').click();
   if (k === 'escape' && live.point) pointClose();
 });
 function liveNow() {
   const m = live.manifest;
   if (!m) return;
+  if (live.issue) { setIssue(null); return; }
   const list = framesFor(m, live.res);
   const i = live.res === '5' ? list.map(f => f.kind).lastIndexOf('obs') : list.findIndex(f => f.kind !== 'obs');
   liveShow(Math.max(0, i));
@@ -1460,6 +1746,14 @@ function located(e) {
   me = [...live.panes.values()].map(p => L.circleMarker(e.latlng, { radius: 6, weight: 2, color: '#fff', fillColor: '#1f6feb', fillOpacity: 1, interactive: false }).addTo(p.map));
   if (mode === 'live' && !live.point) pointOpen(e.latlng);
 }
+
+// förklaringen: visas första gången, och med ? uppe till höger
+const INTRO = 1;  // höj när förklaringen ändras, så att den visas igen
+function introOpen() { try { $('intro').showModal(); } catch (e) { $('intro').setAttribute('open', ''); } }
+$('help').addEventListener('click', introOpen);
+$('intro-close').addEventListener('click', () => { $('intro').close(); store.set('intro', INTRO); });
+$('intro').addEventListener('close', () => store.set('intro', INTRO));
+if (store.get('intro', 0) < INTRO && !location.hash.startsWith('#handelser')) introOpen();
 
 // kartorna finns från början, så att sidan inte hoppar när manifestet kommer
 for (const k of ['ours', 'met', 'snow']) makePane(k);
