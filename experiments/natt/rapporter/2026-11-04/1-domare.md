@@ -114,6 +114,10 @@ Domen för båda är "inte bättre". Persistensen behåller formen (ingen utjäm
 
 Hoppet i läget `validering_gles` jämför utgåvor 3 h isär, så det finns bara till 2 h ledtid och är stort (cirka 1,4 gånger medelintensiteten); i läget `validering` jämförs utgåvor 1 h isär.
 
+### Snabbläget
+
+Efter rapportens första version hann `kedja_om` och `persistens` köras i läget `snabb` (6 träningsdagar, 4 km, 48 utgåvor): 7,3 min för kedjan med uppvärmning och 1,1 min för persistensen med 2 processer, alltså cirka 2,5 min per dygn och process för ett uppvärmt system. Tabellen ligger i `experiments/projektion/resultat/snabb.md`. Kedjan på 4 km: yta ≥ 5 mm/h −0,05 vid 1 h och −0,15 vid 5 h, volym −0,02 och −0,15, FSS 5 mm/h 30 km 0,702 vid 1 h. På 4 km är 8 till 16 km det minsta bandet, och där ligger kedjan på −0,54 redan vid 15 min. Med 6 dygn är intervallen breda (för persistensen mot kedjan ofta ±0,2 i log kvot efter 2 h), så snabbläget duger för att sortera bort det som är tydligt sämre, inte för att avgöra små skillnader.
+
 ## Tiderna
 
 Pi:n delade processorn med driften; processerna fick cirka 85 % var.
@@ -148,7 +152,7 @@ Rörelsecachen: 288 filer per dygn, cirka 15 kB styck (4,5 MB för två dygn); a
 
 1. Rätta histogrammens upplösning och domens minsta skillnad (se ovan) och kör om `kedja`, `persistens` och `kedja_utan_platskarta` i `validering_gles`.
 2. Kör de baslinjer som saknas: `uv run python experiments/projektion/kor_baslinjer.py /data/projektion/logg/baslinjer.log` fortsätter med `pysteps`, `kedja_utan_matchning` och `sprog` i `validering_gles` (uppskattat 30, 45 och 25 min) och sedan `kedja` och `persistens` i `validering`.
-3. Kör `kedja_om` i läget `traning` (baslinjen där) och `snabb` innan sökningen i uppgift 3 börjar.
+3. Kör `kedja_om` i läget `traning` (baslinjen där) innan sökningen i uppgift 3 börjar; i `snabb` finns den redan.
 4. För att nå 45 min i läget `validering`: spara radarns sida av måtten per utgåva och ledtid (kvartsmedel, histogram, spektrum) så att den räknas en gång för alla system, och låt systemen ge bara de kvartar som behövs.
 
 Status: delvis
