@@ -578,7 +578,7 @@ def _metrics():
     m["sedi10"] = (lambda s: _sedi(s["ct"][:, 2]), "träff")
     for j, (lo, hi) in enumerate(BANDS_KM):
         m[f"form{lo}_{hi}"] = (lambda s, j=j: _lr(s["spec"][:, j, 0], s["spec"][:, j, 1]), "spärr|")
-    m["hopp"] = (lambda s: s["jump"][:, 0] / np.maximum(s["jump"][:, 1], 1e-9), "spärr-")
+    m["hopp"] = (lambda s: np.where(s["jump"][:, 1] > 0, s["jump"][:, 0] / np.maximum(s["jump"][:, 1], 1e-9), np.nan), "spärr-")
     return m
 
 
