@@ -65,6 +65,14 @@ Analys = _v("Analys", target="analysis")
 BikubiskSkarp1 = _v("BikubiskSkarp1", interp="cubic", sharpen=1.0)
 BikubiskAnalys = _v("BikubiskAnalys", interp="cubic", target="analysis")
 BikubiskSkarp1Analys = _v("BikubiskSkarp1Analys", interp="cubic", sharpen=1.0, target="analysis")
+Bikubisk05 = _v("Bikubisk05", interp="cubic", blend=0.5)
+Narmast05 = _v("Narmast05", interp="nearest", blend=0.5)
+Narmast025 = _v("Narmast025", interp="nearest", blend=0.25)
+# bilinjärt de första timmarna (där den skarpa flytten kostar CSI), den skarpa flytten längre fram
+NarmastRamp = _v("NarmastRamp", interp="nearest", ramp=(60, 180))
+NarmastRamp2 = _v("NarmastRamp2", interp="nearest", ramp=(30, 120))
+NarmastRamp3 = _v("NarmastRamp3", interp="nearest", ramp=(180, 240))
+BikubiskRamp =_v("BikubiskRamp", interp="cubic", ramp=(60, 180))
 Referens = _v("Referens")  # samma som kedja_om, för att kontrollera att Variant.observe är rätt
 
 

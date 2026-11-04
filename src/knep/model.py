@@ -185,7 +185,8 @@ def dense_motion(xy: np.ndarray, uv: np.ndarray, shape, step: int = 1) -> np.nda
 class Chain:
     def __init__(self, ext_model: Path | None = None, prob_steps: int | None = None, motion_gap: int = 3,
                  motion_frames: int = 3, target: str = "advected", motion_step: int = 4,
-                 match: bool = True, location: bool = True, interp: str = "linear", sharpen: float = 0.0):
+                 match: bool = True, location: bool = True, interp: str = "linear", sharpen: float = 0.0,
+                 blend: float = 1.0, ramp: tuple[float, float] | None = None):
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
         self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
@@ -193,17 +194,32 @@ class Chain:
         self.match, self.location = match, location  # av för ablationer; i drift alltid på
         # flytten: "linear" (drift), "nearest", eller "cubic" (bikubiskt, klippt till [0, största
         # värdet bland avgångspunktens grannar], så att inga nya toppar uppstår)
+        # blend < 1 blandar den flytten med den bilinjära: blend * interp + (1 - blend) * bilinjärt;
+        # ramp = (t0, t1) i minuter ledtid låter vikten växa från 0 (bilinjärt) vid t0 till blend vid t1
         if interp not in ("linear", "nearest", "cubic"):
             raise ValueError(interp)
-        self.interp, self.sharpen = interp, sharpen
+        self.interp, self.sharpen, self.blend, self.ramp = interp, sharpen, blend, ramp
 
     def project(self, a: np.ndarray, motion: np.ndarray, steps):
         """Analysen a (utan NaN) flyttad: (prognosen, målet för matchningen), (steg, H, W) vardera."""
+        fields, orders = [a, a], [{"linear": 1, "nearest": 0, "cubic": 3}[self.interp], 0]
         if self.interp == "cubic":
             from scipy.ndimage import maximum_filter
-            raw, tgt, top = advect.extrapolate([a, a, maximum_filter(a, 3)], motion, steps, orders=[3, 0, 0])
-            return np.clip(raw, 0.0, top), tgt
-        return advect.extrapolate([a, a], motion, steps, orders=[0 if self.interp == "nearest" else 1, 0])
+            fields, orders = fields + [maximum_filter(a, 3)], orders + [0]
+        mix = self.interp != "linear" and (self.blend < 1 or self.ramp is not None)
+        if mix:
+            fields, orders = fields + [a], orders + [1]
+        out = advect.extrapolate(fields, motion, steps, orders=orders)
+        raw, tgt = out[0], out[1]
+        if self.interp == "cubic":
+            raw = np.clip(raw, 0.0, out[2])
+        if mix:
+            w = np.full(len(raw), self.blend, np.float32)
+            if self.ramp is not None:  # vikten växer linjärt från 0 vid ramp[0] till blend vid ramp[1] min
+                t = 5.0 * np.arange(1, len(raw) + 1)
+                w *= np.clip((t - self.ramp[0]) / max(self.ramp[1] - self.ramp[0], 1e-9), 0, 1).astype(np.float32)
+            raw = w[:, None, None] * raw + (1 - w[:, None, None]) * out[-1]
+        return raw, tgt
 
     def matched(self, raw: np.ndarray, tgt: np.ndarray) -> np.ndarray:
         return cdf_match(raw, tgt, self.sharpen) if self.match else raw

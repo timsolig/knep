@@ -121,6 +121,15 @@ def test_chain_projection_options():
         r = model.Chain(interp=interp, match=False).run(obs, T0, 12, motion=base.motion).rain
         # mindre utsmetat än bilinjärt, men inga toppar över analysens och inga negativa värden
         assert np.nanmax(r[-1]) > np.nanmax(lin[-1]) and np.nanmax(r) <= a.max() + 1e-4 and np.nanmin(r) >= 0
+    # blandningen med det bilinjära ligger mitt emellan
+    cub = model.Chain(interp="cubic", match=False).run(obs, T0, 12, motion=base.motion).rain
+    half = model.Chain(interp="cubic", blend=0.5, match=False).run(obs, T0, 12, motion=base.motion).rain
+    np.testing.assert_allclose(np.nan_to_num(half), np.nan_to_num(0.5 * cub + 0.5 * lin), atol=1e-4)
+    # rampen: bilinjärt till 20 min, sedan gradvis till den bikubiska vid 40 min
+    ramp = model.Chain(interp="cubic", ramp=(20, 40), match=False).run(obs, T0, 12, motion=base.motion).rain
+    np.testing.assert_allclose(np.nan_to_num(ramp[:4]), np.nan_to_num(lin[:4]), atol=1e-5)
+    np.testing.assert_allclose(np.nan_to_num(ramp[5]), np.nan_to_num(0.5 * cub[5] + 0.5 * lin[5]), atol=1e-4)
+    np.testing.assert_allclose(np.nan_to_num(ramp[8:]), np.nan_to_num(cub[8:]), atol=1e-5)
     # skärpt rangordning: samma värden som kedjan (ur målet), annan placering
     sh = model.Chain(sharpen=2.0).run(obs, T0, 12, motion=base.motion).rain
     np.testing.assert_allclose(np.sort(sh[-1][np.isfinite(sh[-1])]), np.sort(base.rain[-1][np.isfinite(base.rain[-1])]), rtol=1e-5)
