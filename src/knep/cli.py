@@ -7,6 +7,7 @@ en gång per dygn räknas veckofaktorn och en kandidat till ny karta. Modellen �
 för kraftig nederbörd om models/extremes.pkl finns.
 
 Till mosaiken på sidan hämtas också MET Norges nowcast och SMHI:s SNOW som kartor (compare.py).
+Varje timme verifieras de tre mot radarn och regnmätarna, 7 och 30 dygn bakåt (verify.py).
 
 Avslutar med kod 75 när det inte finns någon ny radarbild att räkna på.
 """
@@ -23,7 +24,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from . import bias, compare, composite, gauges, model, models, radar, render, runs
+from . import bias, compare, composite, gauges, model, models, radar, render, runs, verify
 
 NO_NEW_DATA = 75
 log = logging.getLogger("knep")
@@ -110,6 +111,15 @@ def _analyses(times, cache, state_dir, session, fallback):
     return out, grid, sources, missing
 
 
+def _source_of(state_dir: Path, t: datetime) -> np.ndarray | None:
+    """Källkoderna per pixel för analysen t, ur det sparade tillståndet."""
+    p = state_dir / f"analys_{t:%Y%m%d%H%M}.npz"
+    try:
+        return np.load(p)["source"] if p.exists() else None
+    except (OSError, KeyError, ValueError):
+        return None
+
+
 def _prune(directory: Path, pattern: str, keep: int) -> None:
     for p in sorted(directory.glob(pattern))[:-keep]:
         p.unlink()
@@ -136,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--runs", type=float, default=runs.HOURS,
                    help="timmar med tidigare utgåvor (timsummor varje timme, runs/), 0 stänger av")
     p.add_argument("--no-gauges", action="store_true", help="hämta inte regnmätarna till sidan (gauges.json)")
+    p.add_argument("--no-verify", action="store_true", help="ingen verifiering mot radarn och mätarna (verif.json)")
     p.add_argument("--no-seamless", action="store_true", help="bara kedjan, utan MEPS rättad mot radarn (seamless.py)")
     p.add_argument("--seamless", action="store_true", help=argparse.SUPPRESS)  # standard sedan 5 h; finns kvar för äldre skript
     args = p.parse_args(argv)
@@ -210,7 +221,8 @@ def main(argv: list[str] | None = None) -> int:
             share[name] = round(float((sources == code).sum() / max(valid.sum(), 1)), 4)
     if not args.time and not args.no_compare:  # källorna har bara senaste loppet
         started = time.monotonic()
-        extra["compare"] = compare.update(args.out, session, t0, args.hours)
+        store = None if args.no_verify else verify.source_dir(args.cache / "verif")
+        extra["compare"] = compare.update(args.out, session, t0, args.hours, store)
         log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
     if not args.time and not args.no_gauges:  # SMHI ger alla stationer bara för senaste timmen
         try:
@@ -234,6 +246,15 @@ def main(argv: list[str] | None = None) -> int:
             extra["runs"] = runs.listing(args.out, t0, args.runs)
         except Exception as e:  # noqa: BLE001
             log.warning("utgåvor: %s", e)
+    if not args.time and not args.no_verify:  # jämförelsekällorna och mätarna finns bara i realtid
+        started = time.monotonic()
+        try:  # verifieringen får aldrig stoppa prognosen
+            v = verify.cycle(args.cache / "verif", args.out, grid, t0, frames, lambda t: _source_of(state_dir, t))
+            if v:
+                extra["verification"] = v
+            log.info("verifiering på %.1f s", time.monotonic() - started)
+        except Exception as e:  # noqa: BLE001
+            log.warning("verifiering: %s", e)
     rend.write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)
     log.info("skrev %d rutor till %s", len(frames), args.out)
 

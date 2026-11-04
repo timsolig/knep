@@ -104,3 +104,17 @@ def test_renderer_accepts_lambert_grids():
     g = Grid(compare.MET_CRS, Affine(4000, 0, -796000, 0, -4000, 1125000), (534, 424))
     (s, w), (n, e) = compare.render.Renderer(g).bounds
     assert 50 < s < 56 and 70 < n < 76 and w < 0 and e > 30
+
+
+def test_met_and_snow_store_hours_for_verification(tmp_path, monkeypatch):
+    store = tmp_path / "verif" / "src"
+    compare.met(tmp_path, _Session(T0), T0, store)
+    (f,) = store.glob("met_*.npz")
+    d = np.load(f)
+    assert len(d["ends"]) == len(compare.met(tmp_path, _Session(T0), T0)["frames60"]) and str(d["reference"]) == "2026-10-29T19:10:00Z"
+    assert d["fields"].shape[1:] == (8, 10) and np.allclose(d["fields"], 3.0)
+    field = np.ones(compare.MEPS_SHAPE, np.float32)
+    monkeypatch.setattr(compare, "snow_field", lambda s, end: (field, "2026-10-29T19:00:00Z"))
+    compare.snow(tmp_path, None, T0, 2.0, store)
+    snow = sorted(store.glob("snow_*.npz"))
+    assert len(snow) == len(compare.snow_hours(T0, 2.0)) and np.load(snow[0])["fields"].shape == (1, *compare.MEPS_SHAPE)
