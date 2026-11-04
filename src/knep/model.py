@@ -178,16 +178,22 @@ def dense_motion(xy: np.ndarray, uv: np.ndarray, shape, step: int = 1) -> np.nda
 
 class Chain:
     def __init__(self, ext_model: Path | None = None, prob_steps: int | None = None, motion_gap: int = 3,
-                 motion_frames: int = 3, target: str = "advected", motion_step: int = 4):
+                 motion_frames: int = 3, target: str = "advected", motion_step: int = 4,
+                 match: bool = True, location: bool = True):
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
         self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
         self.target = target  # "analysis" eller "advected": fördelningen följer med fältet ut ur området
+        self.match, self.location = match, location  # av för ablationer; i drift alltid på
 
-    def run(self, obs: np.ndarray, now: datetime, steps: int, state: State | None = None) -> Result:
-        """obs: (T, H, W) mm/h, 5 min mellan bilderna, äldst först, senaste = analysen vid now."""
+    def run(self, obs: np.ndarray, now: datetime, steps: int, state: State | None = None,
+            motion: np.ndarray | None = None) -> Result:
+        """obs: (T, H, W) mm/h, 5 min mellan bilderna, äldst först, senaste = analysen vid now.
+
+        motion: ett förberäknat rörelsefält (motion_field med kedjans inställningar), annars räknas det här."""
         state = state if state is not None else State()
-        motion = motion_field(obs, self.motion_gap, self.motion_frames, self.motion_step)
+        if motion is None:
+            motion = motion_field(obs, self.motion_gap, self.motion_frames, self.motion_step)
         analysis = obs[-1]
         # bilinjärt för prognosen, och analysens värden flyttade med närmaste granne som mål för
         # matchningen: samma värden, men bara de som är kvar i området
@@ -197,11 +203,11 @@ class Chain:
         tgt[:, ~np.isfinite(analysis)] = np.nan
         if self.target != "advected":
             tgt = [analysis] * steps
-        corr = location_map(state, now, analysis.shape)
+        corr = location_map(state, now, analysis.shape) if self.location else np.zeros(analysis.shape, np.float32)
         rain = np.empty(raw.shape, np.float32)
         matched30 = None
         for k in range(steps):
-            m = cdf_match(raw[k], tgt[k])
+            m = cdf_match(raw[k], tgt[k]) if self.match else raw[k]
             if k == 5:
                 matched30 = m
             rain[k] = m * 10 ** (corr * min(1.0, (k + 1) / 6) / 10)

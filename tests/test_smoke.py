@@ -89,6 +89,25 @@ def test_chain_moves_and_keeps_peaks():
     assert res.prob is None
 
 
+def test_chain_options_for_ablations():
+    obs = np.stack([_rain(k) for k in range(-6, 1)])
+    base = model.Chain().run(obs, T0, 12)
+    # ett förberäknat rörelsefält ger samma prognos
+    same = model.Chain().run(obs, T0, 12, motion=base.motion)
+    np.testing.assert_array_equal(np.nan_to_num(same.rain), np.nan_to_num(base.rain))
+    # utan matchning är det den bilinjära flytten, som smetar ut toppen
+    raw = model.Chain(match=False).run(obs, T0, 12, motion=base.motion)
+    assert np.nanmax(raw.rain[-1]) < np.nanmax(base.rain[-1])
+    # utan platskarta används inte tillståndet
+    state = model.State()
+    for k in range(12):
+        t = T0 - k * model.STEP
+        state.obs[t.isoformat()] = obs[-1] * 4
+        state.fc30[t.isoformat()] = obs[-1]
+    off = model.Chain(location=False).run(obs, T0, 12, state, motion=base.motion)
+    np.testing.assert_array_equal(np.nan_to_num(off.rain), np.nan_to_num(base.rain))
+
+
 def test_location_map_learns_a_stationary_bias():
     """En plats där radarn alltid ser 3 dB mer än prognosen ska få en positiv korrektion."""
     state = model.State()
