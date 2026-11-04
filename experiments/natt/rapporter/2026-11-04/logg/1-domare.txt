@@ -30,3 +30,4 @@ Domaren är byggd och committad, men uppgiften är bara delvis klar (`Status: de
 - Hoppet visades som 0 i stället för saknat när ingen tidigare utgåva täcker ledtiden. Det är rättat i tabellen, och inga sparade summor ändrades.
 
 Ingen körning går kvar i bakgrunden, och allt nytt under `/data/projektion` är cirka 7 MB.
+===== 2026-11-04T20:25:04Z försök 2 =====

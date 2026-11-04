@@ -75,6 +75,9 @@ BMAX_Q = [50.0, 90.0]
 BANDS_KM = [(4, 8), (8, 16)]
 TILE_KM = 256
 EDGES = np.concatenate([[0.0], np.geomspace(WET, 500.0, 400)])  # histogrammens kanter i mm/h
+# Minsta skillnad i |log kvot| (kons och spärr|) som räknas som bättre eller sämre i domen, åt båda hållen.
+# Facken är cirka 2 % breda i log, så skillnader under ungefär 0,01 i percentilerna är inte meningsfulla.
+MIN_LOG = 0.01
 
 
 # ---------- lägen ----------
@@ -631,6 +634,18 @@ def compare(sys_days: dict, ref_days: dict, days: list[str], nboot: int = 1000, 
     return out
 
 
+def mark(r: dict, i: int) -> str:
+    """"*" om intervallet är helt på den bättre sidan, "!" helt på den sämre, annars "".
+    För log kvot (kons, spärr|) måste intervallet dessutom ligga minst MIN_LOG från 0."""
+    tol = MIN_LOG if r["kind"] in ("kons", "spärr|") else 0.0
+    lo, hi = r["lo"][i], r["hi"][i]
+    if np.isfinite(hi) and hi < -tol:
+        return "*"
+    if np.isfinite(lo) and lo > tol:
+        return "!"
+    return ""
+
+
 def verdict(cmp: dict, leads=SHOW) -> tuple[str, list[str]]:
     """Bättre bara om någon konservering är bättre (intervallet helt under 0), ingen konservering
     eller träff är sämre (helt över 0) och ingen spärr är sämre (helt över 0), på ledtiderna leads."""
@@ -640,10 +655,10 @@ def verdict(cmp: dict, leads=SHOW) -> tuple[str, list[str]]:
         if r["kind"] == "info":
             continue
         for i in idx:
-            lo, hi = r["lo"][i], r["hi"][i]
-            if np.isfinite(hi) and hi < 0 and r["kind"] == "kons":
+            m = mark(r, i)
+            if m == "*" and r["kind"] == "kons":
                 better.append(f"{k}@{LEADS[i] * 15}")
-            if np.isfinite(lo) and lo > 0:
+            if m == "!":
                 worse.append(f"{k}@{LEADS[i] * 15}")
     ok = bool(better) and not worse
     return ("bättre" if ok else "inte bättre"), worse if worse else better
@@ -666,7 +681,7 @@ def table(mode: str, systems: list[str], ref: str | None = None, nboot: int = 10
              f"{len(days)} dygn, baslinje `{ref}`. Kons och form är log kvot mot radarn (0 är rätt), träff och spärrar som poäng; "
              "hopp är medelskillnaden mellan utgåvor för samma tid relativt intensiteten. Under varje system: skillnaden "
              "mot baslinjen med 95 %-intervall (bootstrap över dygnen), orienterad så att negativt är bättre; "
-             "`*` intervallet helt på den bättre sidan, `!` helt på den sämre.", ""]
+             "`*` intervallet helt på den bättre sidan, `!` helt på den sämre (för log kvot dessutom minst 0,01 från 0).", ""]
     head = "| mått | slag | " + " | ".join(f"{k * 15} min" for k in SHOW) + " |"
     sep = "|---|---|" + "---|" * len(SHOW)
     idx = [LEADS.index(k) for k in SHOW]
@@ -688,8 +703,7 @@ def table(mode: str, systems: list[str], ref: str | None = None, nboot: int = 10
             for k, r in cmp.items():
                 cells = []
                 for i in idx:
-                    mark = "*" if r["hi"][i] < 0 else ("!" if r["lo"][i] > 0 else "")
-                    cells.append(f"{fmt(r['system'][i], r['kind'])} ({r['diff'][i]:+.3f} [{r['lo'][i]:+.3f}, {r['hi'][i]:+.3f}]){mark}")
+                    cells.append(f"{fmt(r['system'][i], r['kind'])} ({r['diff'][i]:+.3f} [{r['lo'][i]:+.3f}, {r['hi'][i]:+.3f}]){mark(r, i)}")
                 lines.append(f"| {k} | {r['kind']} | " + " | ".join(cells) + " |")
             v, why = verdict(cmp)
             summary[name] = v

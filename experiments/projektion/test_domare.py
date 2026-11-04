@@ -115,6 +115,17 @@ def test_inflated_peaks_show_in_conservation_and_compare():
     assert np.allclose(np.nan_to_num(same["fss5_30"]["diff"]), 0)
 
 
+def test_mark_min_log_difference():
+    one = np.array([0.0])
+    tiny = {"kind": "kons", "lo": one - 0.008, "hi": one - 0.002}
+    assert D.mark(tiny, 0) == ""                      # under MIN_LOG räknas inte, åt något håll
+    assert D.mark({"kind": "spärr|", "lo": one + 0.002, "hi": one + 0.008}, 0) == ""
+    assert D.mark({"kind": "kons", "lo": one - 0.05, "hi": one - 0.02}, 0) == "*"
+    assert D.mark({"kind": "spärr|", "lo": one + 0.02, "hi": one + 0.05}, 0) == "!"
+    # poängen (FSS, CSI) har ingen tolerans: en säker försämring räknas
+    assert D.mark({"kind": "träff", "lo": one + 0.001, "hi": one + 0.002}, 0) == "!"
+
+
 def test_quarters_shape():
     x = np.arange(60 * 4, dtype=np.float32).reshape(60, 2, 2)
     q = D.quarters(x)
