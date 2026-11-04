@@ -1,0 +1,32 @@
+===== 2026-11-04T18:49:41Z försök 1 =====
+Domaren är byggd och committad, men uppgiften är bara delvis klar (`Status: delvis` i rapporten). Tre av de sex baslinjerna har bedömts på valideringen, och kravet att en full körning ska ta högst cirka 45 min nås inte.
+
+**Vad som finns**
+- `experiments/projektion/domare.py` med fyra lägen:
+  - `validering`: samma utgåvetider som `/data/sverige/kedja`, 381 st.
+  - `validering_gles`: var 3:e timme.
+  - `traning`: 28 dagar, var 3:e timme.
+  - `snabb`: 6 träningsdagar på 4 km.
+- Ingen testdag finns i något läge, och det kontrolleras både i koden och i ett test.
+- Ett system är en klass med `reset`, `observe` och `forecast` och ger 20 kvartsmedel. Med uppvärmning anropas `observe` var 5:e minut under 90 min före varje utgåva, så att platskartan byggs upp som i drift.
+- Rörelsefälten sparas per 5-minuterstid under `/data/projektion/cache/rorelse/` (cirka 15 kB styck).
+- Baslinjerna `kedja`, `kedja_om`, `kedja_utan_matchning`, `kedja_utan_platskarta`, `persistens`, `pysteps` och `sprog` finns som system. `kedja_om` gav exakt driftens sparade prognoser efter värdefilens kodning, så alla system kodas på samma sätt innan de bedöms.
+- I `src/knep/model.py` har kedjan fått tre val: förberäknat rörelsefält och att stänga av matchningen eller platskartan. Standardvärdena ger samma kedja som förut, och testet för valen ligger i `tests/test_smoke.py`.
+- 11 tester för måtten. `uv run pytest` gick igenom (75 test) före varje commit.
+
+**Körda baslinjer** (i `validering_gles`, 125 utgåvor; tabellerna ligger i `experiments/projektion/resultat/`)
+- `kedja`, `persistens` och `kedja_utan_platskarta`. Dessutom `kedja_om` och `persistens` i snabbläget.
+- Kedjan behåller toppvärdena men tappar ytan:
+  - 99- och 99,9-percentilen av de våta rutorna ligger nära radarn, inom ±0,1 i log kvot.
+  - Ytan över 5 mm/h och volymen krymper till −0,26 och −0,30 vid 5 h.
+  - Blockmaxet ligger 0,06 till 0,13 under radarn redan från 15 min.
+  - Effekten i bandet 4 till 8 km är −0,67 redan vid 15 min.
+- Persistens och kedjan utan platskarta får båda domen "inte bättre". Platskartan ger en liten men säker vinst i CSI och SEDI för det kraftiga de första timmarna.
+
+**Det som inte blev gjort eller inte håller**
+- `pysteps`, `kedja_utan_matchning` och `sprog` hann inte köras, och inte heller timläget `validering`. `kor_baslinjer.py` fortsätter från de dygn som redan är sparade.
+- Tiden: en uppvärmd kedja tog cirka 21 min per dygn och process. En full timvis validering blir därför cirka 2,8 h första gången och uppskattningsvis 2 h när rörelsefälten är sparade. `validering_gles` är det som ryms inom ungefär 45 min, och rapporten föreslår att kandidater bedöms där.
+- Domaren har en svaghet: histogrammen har cirka 3 % breda fack, så skillnader på 0,002 kan flaggas som sämre. Rättningen kräver att baslinjerna körs om, så jag lät den ligga och skrev ned den som nästa steg.
+- Hoppet visades som 0 i stället för saknat när ingen tidigare utgåva täcker ledtiden. Det är rättat i tabellen, och inga sparade summor ändrades.
+
+Ingen körning går kvar i bakgrunden, och allt nytt under `/data/projektion` är cirka 7 MB.
