@@ -1,0 +1,10 @@
+===== 2026-11-03T22:56:17Z försök 1 =====
+Kvartssummorna hämtas fortfarande. Fallbygget startar av sig självt när de är klara, och jag fortsätter när jobben hör av sig.
+
+Kvartssummorna är vid 76 av 187 stationer (klart cirka 00:00). Bakgrundskedjan bygger sedan alla fall och hör av sig när den är klar.
+
+Kvartssummorna är vid 151 av 187 stationer. Bygget av fallen startar när de är klara.
+
+Bygget av fallen pågår i bakgrunden (cirka 25 min).
+
+Bygget har kommit till valideringsdagarna (296 fall hittills, inga fel). Väntar på att det blir klart.

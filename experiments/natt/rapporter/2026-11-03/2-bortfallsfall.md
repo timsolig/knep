@@ -34,7 +34,34 @@ Källor som inte sparas: OPERA-kompositen innehåller de släckta radarerna och 
 
 ## Siffror
 
-(fylls i när körningen är klar)
+Körningen gick 23:36 till cirka 00:05 (en process, ungefär 30 s per dag), utan fel. Logg: `/data/bortfall/fall_bygg.log`. `fall.py kontroll`:
+
+| | Träning | Validering |
+|---|---|---|
+| Fall | 223 (28 dagar; 2023-01-04 fick 7) | 128 (16 dagar) |
+| 30 / 60 / 120 / 180 / 360 min | 47 / 44 / 42 / 46 / 44 | 26 / 28 / 28 / 23 / 23 |
+| Radarer släckta 1 / 2 / 3 / 4 / alla 12 | 39 / 62 / 78 / 29 / 15 | 19 / 30 / 43 / 25 / 11 |
+| Hålets storlek, median (min till max) | 5730 px (390 till 77 695) | 4463 px (349 till 77 759) |
+| Våt andel av hålet vid start, median | 0,14 | 0,18 |
+| MEPS för hela fönstret | 223 | 112 (de 16 som saknas är 2019) |
+| Mätare p7 och p14 | alla | alla |
+| Storlek | 290 MB, störst 5,6 MB | 168 MB, störst 7,6 MB |
+
+Hålen i ett typiskt dygn (täckningen från en bild, `fall.py hal`): bara `sehem` (42 000 km², mest Östersjön) och `sella` (1 560 km²) ger hål ensamma; resten av Sverige ses av en annan radar inom 240 km. 15 olika hål återstår efter rensningen, från 1 560 km² (`sella`) till 292 000 km² (alla svenska). Antalet hål per dag varierar (9 till 19) eftersom täckningen räknas per dag och SMHI:s komposit har haft olika täckning genom åren; därför förekommer till exempel `sekrn` ensam vissa dagar.
+
+Data i natt: fallen 438 MB och p14 1,8 MB. Med rapport 1 är nattens nya data ungefär 1,4 GB av 2 GB; ledigt på `/data` är 3,6 GB.
+
+## Vad som fungerade och inte
+
+- Fungerade: hålen, urvalet och lagringen; provkörningen visade rätt MEPS-timmar (till exempel timmen 09 till 10 ur 06Z-körningen, ledtid 3) och mätare i hålet. p14 hämtades klart (185 stationer, 663 864 värden i `/data/bortfall/matare/p14.npz`), så rapport 1:s rest är gjord.
+- Begränsningar att känna till:
+  - Hålet följer uppgiftens definition med alla radarer i `RADARS` och 240 km. Det är försiktigt: med det täta nätet blir de flesta hål där flera radarer släckts, och de enskilda svenska radarerna ger sällan hål. Ett verkligt bortfall i SMHI:s komposit kan bli större om grannländernas radarer inte bidrar fullt ut där.
+  - Fall samma dag delar ofta regn (8 fall av 15 möjliga hål per dag). Domaren ska göra bootstrap över dagar.
+  - I fältet `radar` finns hela utsnittet; i hålet under bortfallet är det facit och får inte ges till systemen. Domaren ska maskera det (`hal` och bilderna från index 12).
+  - Ingen OPERA och inga volymer (se ovan).
+- Inte tillåtet i natt: omdirigering och heredoc i skalet, därför `--logg` även i `fall.py`.
+
+`uv run pytest`: 68 passerade.
 
 ## Filer
 
@@ -46,6 +73,12 @@ Inga ändringar i `src/knep/`.
 
 ## Nästa steg
 
-Uppgift 3 (domaren) läser `index.json` och fallen; se ovan för fälten.
+Uppgift 3 (domaren) läser `/data/bortfall/fall/validering/index.json` och fallen; fälten står ovan. Bilden med index `uppvarmning_bilder` (12) är bortfallets första bild och ålder 0; bild `uppvarmning_bilder + k` har åldern 5k min. Baslinjerna (hål, `fill_gaps`, utjämnad) kan köras direkt på utsnittet, med rörelsen skattad på uppvärmningen. För prognosen efteråt finns radarn 180 min efter slutet i `/data/radar/`.
 
-Status: delvis
+```sh
+uv run python experiments/bortfall/fall.py hal          # hålen
+uv run python experiments/bortfall/fall.py kontroll     # vad som finns
+uv run python experiments/bortfall/fall.py bygg --del traning --om --logg /data/bortfall/fall_bygg.log   # bygger om (samma fall)
+```
+
+Status: klar
