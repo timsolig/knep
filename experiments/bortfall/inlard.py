@@ -27,6 +27,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+
+# domaren kör två processer; varje process får en tråd (Pi:n delas med driften)
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 import pickle
 import sys
 import time
@@ -255,9 +259,12 @@ def trana(a) -> None:
     print("fall", len(filer), "pixlar", len(y), "andel våta", round(float((y >= VAT).mean()), 3), flush=True)
     kw = dict(max_iter=300, learning_rate=0.08, max_leaf_nodes=31, min_samples_leaf=200,
               early_stopping=True, validation_fraction=0.1, random_state=0)
+    from threadpoolctl import threadpool_limits
+
     t0 = time.monotonic()
-    klass = HistGradientBoostingClassifier(**kw).fit(X, y >= VAT)
-    regr = HistGradientBoostingRegressor(**kw).fit(X, np.log1p(y))
+    with threadpool_limits(2):
+        klass = HistGradientBoostingClassifier(**kw).fit(X, y >= VAT)
+        regr = HistGradientBoostingRegressor(**kw).fit(X, np.log1p(y))
     print("tränat på", round(time.monotonic() - t0), "s; iterationer", klass.n_iter_, regr.n_iter_, flush=True)
     MODELLER.mkdir(parents=True, exist_ok=True)
     with open(MODELLER / "inlard.pkl", "wb") as f:
