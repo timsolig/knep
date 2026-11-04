@@ -225,6 +225,17 @@ def test_facit_scores_perfectly():
     assert r["klasser"][0]["bilder"] == 6 and r["klasser"][1]["bilder"] == 12 and r["klasser"][2]["bilder"] == 6
 
 
+def test_gauge_outliers_are_dropped():
+    f = _fall()
+    g = f.matare["p14"]
+    n = len(g["mm"])
+    g["mm"] = g["mm"].copy()
+    g["mm"][0], g["mm"][1] = 180.0, -1.0   # som felen i arkivet
+    r = dm.kor_fall(dm.Facit(), f)
+    used = sum(r["klasser"][k]["mp14"][2] for k in range(3))
+    assert used == n - 1 - 2  # den sista ligger utanför bortfallet, två är spärrade
+
+
 def test_hole_baseline_scores_zero():
     r = dm.kor_fall(dm.Hal(), _fall())
     m = dm.matt(r["klasser"][0])

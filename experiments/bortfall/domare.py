@@ -44,7 +44,8 @@ klass, så att de kan läggas ihop över dagar och dras om i bootstrap.
   `som_skev` är samma med tecken (positiv: brantare kant än radarn).
 - Mätare (oberoende kontroll): kvartssummor (p14) och timsummor (p7) från mätare i hålet, vars hela
   period ligger i bortfallet. Medelabsolutfel i mm mot mätaren, för systemet och för radarn.
-  Klassen ges av åldern vid periodens slut.
+  Klassen ges av åldern vid periodens slut. Värden under 0 och över MATARE_MAX_MM (30 mm per
+  kvart, 60 mm per timme) är fel i arkivet och räknas inte.
 
 Bootstrap
 ---------
@@ -83,6 +84,10 @@ PIXEL_KM = 2.0
 CSI_MM = (0.5, 1.0, 5.0)
 SOM_PX = 2
 MATARE_FORDROJNING = timedelta(minutes=60)
+# Fysisk spärr för mätarna: arkivet har uppenbart felaktiga värden (en station med 180 mm per
+# kvart i timmar, ett värde på 498 071 mm). Över 20 mm per kvart och 40 mm per timme finns i
+# arkivet nästan bara sådana, så gränserna 30 och 60 mm tar bort felen och inget riktigt skyfall.
+MATARE_MAX_MM = {"p14": 30.0, "p7": 60.0}
 BOOT_N, BOOT_FRO = 2000, 20261103
 MIN_DAGAR = 5   # färre dagar än så ger ingen dom (bootstrapintervallet säger då inget)
 
@@ -389,6 +394,8 @@ def matare_sums(s_klasser: list[dict], fall: Fall, analyser: np.ndarray) -> None
             slut = datetime.fromtimestamp(float(g["tid"][i]), tz=t_first.tzinfo)
             forsta = slut - timedelta(minutes=minutes - 5)   # bilderna forsta .. slut täcker perioden
             if forsta < t_first or slut > t_last or not np.isfinite(g["mm"][i]):
+                continue
+            if not 0 <= g["mm"][i] <= MATARE_MAX_MM[p]:
                 continue
             j0 = int((forsta - t_first) / timedelta(minutes=5))
             r, c = int(g["rad"][i]), int(g["kol"][i])
