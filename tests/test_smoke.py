@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 
 import numpy as np
+import pytest
 import rasterio
 from rasterio.transform import from_origin
 
@@ -106,6 +107,25 @@ def test_chain_options_for_ablations():
         state.fc30[t.isoformat()] = obs[-1]
     off = model.Chain(location=False).run(obs, T0, 12, state, motion=base.motion)
     np.testing.assert_array_equal(np.nan_to_num(off.rain), np.nan_to_num(base.rain))
+
+
+def test_chain_projection_options():
+    obs = np.stack([_rain(k) for k in range(-6, 1)])
+    base = model.Chain().run(obs, T0, 12)
+    # standardvärdena är driftens kedja
+    same = model.Chain(interp="linear", sharpen=0.0).run(obs, T0, 12, motion=base.motion)
+    np.testing.assert_array_equal(np.nan_to_num(same.rain), np.nan_to_num(base.rain))
+    lin = model.Chain(match=False).run(obs, T0, 12, motion=base.motion).rain
+    a = np.nan_to_num(obs[-1])
+    for interp in ("cubic", "nearest"):
+        r = model.Chain(interp=interp, match=False).run(obs, T0, 12, motion=base.motion).rain
+        # mindre utsmetat än bilinjärt, men inga toppar över analysens och inga negativa värden
+        assert np.nanmax(r[-1]) > np.nanmax(lin[-1]) and np.nanmax(r) <= a.max() + 1e-4 and np.nanmin(r) >= 0
+    # skärpt rangordning: samma värden som kedjan (ur målet), annan placering
+    sh = model.Chain(sharpen=2.0).run(obs, T0, 12, motion=base.motion).rain
+    np.testing.assert_allclose(np.sort(sh[-1][np.isfinite(sh[-1])]), np.sort(base.rain[-1][np.isfinite(base.rain[-1])]), rtol=1e-5)
+    with pytest.raises(ValueError):
+        model.Chain(interp="spline")
 
 
 def test_location_map_learns_a_stationary_bias():

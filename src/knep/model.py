@@ -62,14 +62,20 @@ def nowcast(obs: np.ndarray, steps: int) -> np.ndarray:
     return forecast
 
 
-def cdf_match(f, target):
-    """Ger f målfältets värdefördelning men behåller f:s rangordning (nollor ordnas efter grannskapet)."""
+def cdf_match(f, target, sharpen: float = 0.0, sigma: float = 1.5):
+    """Ger f målfältets värdefördelning men behåller f:s rangordning (nollor ordnas efter grannskapet).
+
+    sharpen > 0 rangordnar efter ett skärpt fält, f + sharpen (f - G_sigma f), så att toppen i ett
+    utsmetat område hamnar på färre rutor; värdena kommer fortfarande bara ur målet."""
     ok = np.isfinite(f)
     tv = np.sort(target[np.isfinite(target)])
     n = int(ok.sum())
     if n == 0 or tv.size == 0:
         return f
-    key = f[ok] + 1e-3 * gaussian_filter(np.nan_to_num(f), 2.0)[ok]
+    z = np.nan_to_num(f)
+    key = f[ok] + 1e-3 * gaussian_filter(z, 2.0)[ok]
+    if sharpen:
+        key = key + sharpen * (z - gaussian_filter(z, sigma))[ok]
     order = np.argsort(key, kind="stable")
     q = (np.arange(n) + 0.5) / n
     vals = np.empty(n, np.float32)
@@ -179,12 +185,28 @@ def dense_motion(xy: np.ndarray, uv: np.ndarray, shape, step: int = 1) -> np.nda
 class Chain:
     def __init__(self, ext_model: Path | None = None, prob_steps: int | None = None, motion_gap: int = 3,
                  motion_frames: int = 3, target: str = "advected", motion_step: int = 4,
-                 match: bool = True, location: bool = True):
+                 match: bool = True, location: bool = True, interp: str = "linear", sharpen: float = 0.0):
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
         self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
         self.target = target  # "analysis" eller "advected": fördelningen följer med fältet ut ur området
         self.match, self.location = match, location  # av för ablationer; i drift alltid på
+        # flytten: "linear" (drift), "nearest", eller "cubic" (bikubiskt, klippt till [0, största
+        # värdet bland avgångspunktens grannar], så att inga nya toppar uppstår)
+        if interp not in ("linear", "nearest", "cubic"):
+            raise ValueError(interp)
+        self.interp, self.sharpen = interp, sharpen
+
+    def project(self, a: np.ndarray, motion: np.ndarray, steps):
+        """Analysen a (utan NaN) flyttad: (prognosen, målet för matchningen), (steg, H, W) vardera."""
+        if self.interp == "cubic":
+            from scipy.ndimage import maximum_filter
+            raw, tgt, top = advect.extrapolate([a, a, maximum_filter(a, 3)], motion, steps, orders=[3, 0, 0])
+            return np.clip(raw, 0.0, top), tgt
+        return advect.extrapolate([a, a], motion, steps, orders=[0 if self.interp == "nearest" else 1, 0])
+
+    def matched(self, raw: np.ndarray, tgt: np.ndarray) -> np.ndarray:
+        return cdf_match(raw, tgt, self.sharpen) if self.match else raw
 
     def run(self, obs: np.ndarray, now: datetime, steps: int, state: State | None = None,
             motion: np.ndarray | None = None) -> Result:
@@ -198,7 +220,7 @@ class Chain:
         # bilinjärt för prognosen, och analysens värden flyttade med närmaste granne som mål för
         # matchningen: samma värden, men bara de som är kvar i området
         a = np.nan_to_num(analysis)
-        raw, tgt = advect.extrapolate([a, a], motion, steps, orders=[1, 0])
+        raw, tgt = self.project(a, motion, steps)
         raw[:, ~np.isfinite(analysis)] = np.nan  # utanför täckningen deltar inte i matchningen
         tgt[:, ~np.isfinite(analysis)] = np.nan
         if self.target != "advected":
@@ -207,7 +229,7 @@ class Chain:
         rain = np.empty(raw.shape, np.float32)
         matched30 = None
         for k in range(steps):
-            m = cdf_match(raw[k], tgt[k]) if self.match else raw[k]
+            m = self.matched(raw[k], tgt[k])
             if k == 5:
                 matched30 = m
             rain[k] = m * 10 ** (corr * min(1.0, (k + 1) / 6) / 10)
