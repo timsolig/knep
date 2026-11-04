@@ -38,3 +38,20 @@ Väntar.
 Väntar på `bobwtv8s7`.
 
 Två dygn kvar. Väntar.
+
+Uppgift 1 (domaren) är fortfarande bara delvis klar: S-PROG har inte körts, och en full körning i timläget tar längre än cirka 45 min. Raden `Status: delvis` står sist i rapporten `experiments/natt/rapporter/2026-11-04/1-domare.md`.
+
+**Gjort i försök 2**
+- **Domen rättad:** för mått i log kvot (konservering och form) räknas en skillnad nu bara om hela intervallet ligger minst 0,01 från 0, åt båda hållen lika. Det tar bort felet där en skillnad på 0,002 i blockmaxet flaggades som sämre. FSS, CSI, SEDI och hoppen har ingen sådan marginal, så en säker försämring där räknas fortfarande. Facken ändrades inte, så de sparade summorna gäller och det räckte att göra om tabellen. Ändringen har ett nytt test, och `uv run pytest` gick igenom (76 test) före commit.
+- **Två baslinjer körda i läget `validering_gles`** (var 3:e timme, 16 dygn, 125 utgåvor): `pysteps` på 27,6 min och kedjan utan matchning på 52,1 min, båda med 2 processer. Tabellen i `experiments/projektion/resultat/validering_gles.md` är omgjord för alla fem körda system, och alla får domen "inte bättre" mot kedjan.
+
+**Vad baslinjerna visar om var extremerna försvinner**
+- **Matchningen:** den påverkar varken volymen eller ytan över 5 mm/h nämnvärt. Det den gör är att hålla toppen i varje regnområde. Utan den ligger blockmaxets 90-percentil 0,06 längre under radarn redan från 15 min, och de minsta skalorna (bandet 4 till 8 km) blir 0,05 sämre. I gengäld blir FSS och CSI för 5 mm/h något bättre utan matchning, med 0,001 till 0,003, och hoppen mellan utgåvor blir mindre.
+- **Flytten:** volymen tappas till −0,30 i log kvot vid 5 h i både kedjan och pysteps, och ingen omfördelning av värdena inom fältet rättar det. Ett system som ska hålla kvar extremerna behöver alltså tillföra ny regnyta (tillväxt eller MEPS), inte bara skärpa topparna.
+
+**Inte klart**
+- **S-PROG:** den hann inte köras. Jag stoppade körningen innan något dygn sparades, för att hinna med rapporten. Den startas med `uv run python experiments/projektion/kor_forsok2.py /data/projektion/logg/baslinjer.log sprog` och tar uppskattningsvis 25 min.
+- **Tidskravet:** en uppvärmd kedja tar cirka 2 h i timläget `validering`. Inom 45 min ryms läget `validering_gles` (28 min utan uppvärmning, 52 min med) och snabbläget. Rapporten föreslår att kandidater bedöms där.
+- **Avvikelse från regeln:** under 5 min körde jag testerna medan körningen med 2 processer gick, alltså tre processer samtidigt. Det står i rapporten.
+
+Inget körs längre i bakgrunden, och allt är committat på `natt/2026-11-04`.
