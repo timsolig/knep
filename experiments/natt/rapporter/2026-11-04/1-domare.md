@@ -59,7 +59,8 @@ Bara en del av baslinjerna hann köras, och bara i läget `validering_gles` (var
 | `kedja` | `validering_gles` och 2 dygn av `validering` (som `kedja_om`, för tidmätningen) |
 | `persistens` | `validering_gles` |
 | `kedja_utan_platskarta` | `validering_gles` |
-| `pysteps`, `kedja_utan_matchning`, `sprog` | **inte körda** (hann inte; se tiderna nedan) |
+| `pysteps`, `kedja_utan_matchning` | `validering_gles`, i försök 2 (se avsnittet Försök 2) |
+| `sprog` | **inte körd** (hann inte i något av försöken) |
 | `kedja`, `persistens` i `validering` (varje timme) | **inte körda** |
 
 ### Kedjan (driften) mot radarn, log kvot där 0 är rätt
@@ -127,6 +128,8 @@ Pi:n delade processorn med driften; processerna fick cirka 85 % var.
 | `kedja` (läser driftens filer), `validering_gles`, 125 utgåvor | 5,5 min | 5,2 s, allt i domaren |
 | `persistens`, `validering_gles` | 3,6 min | 6,8 s |
 | `kedja_utan_platskarta`, `validering_gles` | 28,5 min | 27 s, varav 20 s prognosen (med Lucas-Kanade vid utgåvan, nu sparat) |
+| `pysteps`, `validering_gles` (försök 2) | 27,6 min | cirka 25 s |
+| `kedja_utan_matchning`, `validering_gles`, uppvärmd (försök 2) | 52,1 min | 48 s, med uppvärmningen 90 min före varje utgåva |
 | `kedja_om`, `validering`, 2 dygn x 24 utgåvor | 20,8 min | 1240 s per dygn, varav 528 s prognoserna (22 s styck) och resten uppvärmningen var 5:e minut (med Lucas-Kanade första gången) och måtten |
 
 **Kravet på cirka 45 min för en full körning på valideringen nås inte med varje timme som utgåvetid.** Ett uppvärmt system som kedjan tar cirka 16 x 1240 s / 2 ≈ 2,8 h första gången och uppskattningsvis 2 h när rörelsefälten finns sparade; ett system utan uppvärmning cirka 1,4 h; bara domarens egen del (läsa radarn och räkna måtten) cirka 16 min. Det dyra är kedjans 60 steg med fördelningsmatchning i varje steg (cirka 10 s utan konkurrens), uppvärmningens 288 körningar per dygn och 4 till 6 s mått per utgåva. Det som går att hålla inom 45 min är läget `validering_gles` (ett system utan uppvärmning cirka 30 min, med uppvärmning uppskattningsvis 45 till 60 min) och `snabb` för sökningen (persistensen tog 19 s för ett dygn). Förslaget till de följande uppgifterna är att bedöma kandidater i `validering_gles`, med `kedja` som baslinje på samma tider, och köra finalisten i `validering` om tiden räcker.
@@ -141,7 +144,60 @@ Rörelsecachen: 288 filer per dygn, cirka 15 kB styck (4,5 MB för två dygn); a
 - S-PROG i 15-minuterssteg med värdet vid kvartens slut är inte exakt samma sak som kvartsmedlet. Det har inte provats än.
 - Extremmodellen finns inte med; driftens sparade kedja kördes utan den (`kedja.py` använder `Chain(None)`), så baslinjen är jämförbar med `kedja_om`.
 
+## Försök 2
+
+Försök 1 slutade med tre baslinjer okörda. I försök 2 gjordes:
+
+- **Domens minsta skillnad** (`MIN_LOG = 0,01` i `domare.py`, funktionen `mark`): för mått som är log kvot (konservering och form) räknas en skillnad som bättre eller sämre bara om hela intervallet ligger minst 0,01 från 0, åt båda hållen lika. För poängen (FSS, CSI, SEDI) och hoppet finns ingen tolerans, så en säker försämring där räknas fortfarande. Det rättar bristen ovan där en skillnad på 0,002 i blockmaxet flaggades. Facken behölls (400 st, cirka 2 % breda i log och linjärt interpolerade inom facket), så de sparade summorna gäller fortfarande. Det räcker alltså att göra om tabellerna för baslinjerna, och det är gjort. Test: `test_mark_min_log_difference`.
+- **De saknade baslinjerna** i `validering_gles` med `experiments/projektion/kor_forsok2.py`: `pysteps` (27,6 min med 2 processer) och `kedja_utan_matchning` (52,1 min). **S-PROG hann inte**: med cirka 25 min kvar av körtiden stoppades körningen innan S-PROG hade sparat något dygn, för att hinna med rapporten. Tabellen `experiments/projektion/resultat/validering_gles.md` är omgjord för alla fem körda system med den nya domen.
+
+### Domen för de körda baslinjerna (validering_gles, 16 dygn, 125 utgåvor, mot `kedja`)
+
+| system | dom | körtid, 2 processer |
+|---|---|---|
+| `persistens` | inte bättre | 3,6 min |
+| `kedja_utan_platskarta` | inte bättre | 28,5 min |
+| `pysteps` | inte bättre | 27,6 min |
+| `kedja_utan_matchning` | inte bättre | 52,1 min (uppvärmd) |
+| `sprog` | **inte körd** | uppskattat 25 min |
+
+### pysteps och kedjan utan matchning, skillnaden mot kedjan
+
+Negativt är bättre, `*` och `!` som ovan (för log kvot minst 0,01 från 0).
+
+| mått | system | 15 min | 1 h | 2 h | 3 h | 5 h |
+|---|---|---|---|---|---|---|
+| \|log kvot\| yta ≥ 5 | pysteps | +0,001 | +0,060 | +0,080 | +0,069 | +0,054 |
+| | utan matchning | −0,022 | +0,021 | +0,024 ! | +0,023 | +0,024 |
+| \|log kvot\| yta ≥ 10 | pysteps | −0,119 * | +0,097 | +0,103 | +0,077 | +0,053 |
+| | utan matchning | −0,062 * | +0,031 | +0,066 | +0,062 | +0,058 |
+| \|log kvot\| volym | pysteps | +0,017 | +0,017 | +0,017 | +0,022 | +0,020 |
+| | utan matchning | 0,000 | −0,001 | 0,000 | +0,001 | 0,000 |
+| \|log kvot\| blockmax 90-percentil | pysteps | +0,074 ! | +0,062 ! | +0,071 ! | +0,097 ! | +0,092 ! |
+| | utan matchning | +0,058 ! | +0,058 ! | +0,065 ! | +0,063 ! | +0,062 ! |
+| FSS 5 mm/h 30 km | pysteps | +0,001 | +0,022 ! | +0,031 ! | +0,030 ! | +0,011 ! |
+| | utan matchning | −0,001 * | −0,001 * | −0,002 * | −0,002 | −0,001 |
+| CSI 5 mm/h | pysteps | 0,000 | +0,010 ! | +0,010 ! | +0,008 ! | +0,002 |
+| | utan matchning | −0,003 * | −0,001 * | −0,001 * | −0,001 * | 0,000 |
+| SEDI 10 mm/h | pysteps | +0,010 ! | +0,007 | +0,007 | +0,005 | +0,020 |
+| | utan matchning | +0,004 ! | +0,001 ! | −0,003 | −0,004 | −0,002 |
+| \|log kvot\| effekt 4 till 8 km (spärr) | pysteps | +0,052 ! | +0,044 ! | +0,044 ! | +0,028 ! | +0,015 |
+| | utan matchning | +0,053 ! | +0,051 ! | +0,048 ! | +0,045 ! | +0,042 ! |
+
+Vad det säger om var extremerna försvinner:
+
+- **Fördelningsmatchningen** gör nästan ingenting för volymen och ytan över 5 mm/h. Kedjan utan matchning har samma volym (skillnad 0,000) och ytan är bara 0,02 sämre. Det matchningen gör är att hålla **toppen per regnområde**: utan den ligger blockmaxets 90-percentil 0,06 längre under radarn redan från 15 min, och effekten i bandet 4 till 8 km är 0,05 sämre. Den kostar lite: utan matchning blir FSS och CSI för 5 mm/h 0,001 till 0,003 bättre, med intervallet helt på den bättre sidan, och hoppen mellan utgåvor blir 0,02 mindre.
+- **Volymen och ytan tappas i själva flytten.** Både kedjan och pysteps tappar volymen till −0,30 vid 5 h. Det är regn som lämnar det uppmätta området eller som inte uppstår i en ren extrapolering, och ingen omfördelning av värdena inom fältet rättar det. Skillnaden mellan kedjans glesa rörelsefält och pysteps täta fält är liten för volymen (0,02), men pysteps är sämre i FSS och CSI från 1 h.
+- För uppgift 2 betyder det att en projektion som konserverar extremerna behöver lägga till ny yta (tillväxt och nybildning, eller MEPS) och inte bara skärpa toppar. Toppen per block och de minsta skalorna går redan förlorade i den bilinjära flytten vid 15 min.
+
+### Avvikelser i försök 2
+
+- Under 5 min körde jag `uv run pytest` medan körningen med 2 processer gick, alltså tre processer samtidigt. Därefter väntade jag med tabellen tills körningen var stoppad.
+- Kravet på 45 min för en full körning i timläget `validering` nås fortfarande inte för uppvärmda system (se Tiderna). I `validering_gles` tar system utan uppvärmning 28 min, och den uppvärmda kedjan utan matchning 52 min.
+
 ## Filer
+
+- Försök 2: `experiments/projektion/domare.py` (`MIN_LOG`, `mark`), `experiments/projektion/test_domare.py` (`test_mark_min_log_difference`), `experiments/projektion/kor_forsok2.py` (ny), `experiments/projektion/resultat/validering_gles.md` (omgjord med fem system)
 
 - `experiments/projektion/domare.py` (ny), `experiments/projektion/test_domare.py` (ny), `experiments/projektion/kor_baslinjer.py` (ny), `experiments/projektion/traning.json` (kopia), `experiments/projektion/resultat/validering_gles.md` (tabellen)
 - `src/knep/model.py`: `Chain(match=True, location=True)` och `Chain.run(…, motion=None)`; standardvärdena ger samma kedja som förut
@@ -150,8 +206,8 @@ Rörelsecachen: 288 filer per dygn, cirka 15 kB styck (4,5 MB för två dygn); a
 
 ## Nästa steg
 
-1. Rätta histogrammens upplösning och domens minsta skillnad (se ovan) och kör om `kedja`, `persistens` och `kedja_utan_platskarta` i `validering_gles`.
-2. Kör de baslinjer som saknas: `uv run python experiments/projektion/kor_baslinjer.py /data/projektion/logg/baslinjer.log` fortsätter med `pysteps`, `kedja_utan_matchning` och `sprog` i `validering_gles` (uppskattat 30, 45 och 25 min) och sedan `kedja` och `persistens` i `validering`.
+1. Domens minsta skillnad är gjord i försök 2. Facken (400) ändrades inte. Blockmaxets intervall är fortfarande hackiga, eftersom antalet block är litet och percentilen hoppar mellan fack, men skillnaderna ovan är 0,06 och större. Fler fack kräver att alla baslinjer körs om.
+2. Kör S-PROG: `uv run python experiments/projektion/kor_forsok2.py /data/projektion/logg/baslinjer.log sprog` (uppskattat 25 min). Sedan `kedja` och `persistens` i `validering` med `kor_baslinjer.py`, om timläget behövs.
 3. Kör `kedja_om` i läget `traning` (baslinjen där) innan sökningen i uppgift 3 börjar; i `snabb` finns den redan.
 4. För att nå 45 min i läget `validering`: spara radarns sida av måtten per utgåva och ledtid (kvartsmedel, histogram, spektrum) så att den räknas en gång för alla system, och låt systemen ge bara de kvartar som behövs.
 

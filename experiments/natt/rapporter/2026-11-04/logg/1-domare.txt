@@ -31,3 +31,10 @@ Domaren är byggd och committad, men uppgiften är bara delvis klar (`Status: de
 
 Ingen körning går kvar i bakgrunden, och allt nytt under `/data/projektion` är cirka 7 MB.
 ===== 2026-11-04T20:25:04Z försök 2 =====
+Jag väntar på händelsen.
+
+Väntar.
+
+Väntar på `bobwtv8s7`.
+
+Två dygn kvar. Väntar.
