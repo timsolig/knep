@@ -57,3 +57,4 @@ The chain's remaining loss of rain area and volume at long lead times (−0.26 a
 **Suggested next steps:**
 1. Add a seamless (MEPS-blended) system and baseline to the judge, then put the chain's small scales back on top of the blended field.
 2. Fill rain coming in over the coverage edge from MEPS or OPERA instead of zero.
+===== 2026-11-05T01:29:26Z försök 2 =====

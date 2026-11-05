@@ -137,6 +137,24 @@ def test_chain_projection_options():
         model.Chain(interp="spline")
 
 
+def test_fill_outside_and_inflow():
+    a = np.full((20, 30), np.nan, np.float32)
+    a[:, 10:] = 4.0
+    # standard: nollor utanför täckningen, som nan_to_num i drift
+    np.testing.assert_array_equal(model.fill_outside(a), np.nan_to_num(a))
+    f = model.fill_outside(a, decay=5.0)
+    np.testing.assert_array_equal(f[:, 10:], a[:, 10:])
+    # randvärdet avtar med avståndet från täckningen
+    assert np.allclose(f[10, 9], 4.0 * np.exp(-1 / 5), rtol=1e-3) and f[10, 0] < f[10, 5] < f[10, 9]
+    # kedjan med inflödet: regn flyttas in över randen där kedjan annars har nollor
+    obs = np.stack([np.where(np.arange(30) >= 10, 4.0, np.nan)[None, :].repeat(20, 0)] * 7).astype(np.float32)
+    motion = np.zeros((2, 20, 30))
+    motion[0] = 1.0  # en pixel per steg åt höger
+    base = model.Chain(match=False, location=False).run(obs, T0, 6, motion=motion).rain
+    inn = model.Chain(match=False, location=False, inflow=50.0).run(obs, T0, 6, motion=motion).rain
+    assert np.nanmin(base[-1][:, 10:13]) == 0.0 and np.nanmin(inn[-1][:, 10:13]) > 3.0
+
+
 def test_location_map_learns_a_stationary_bias():
     """En plats där radarn alltid ser 3 dB mer än prognosen ska få en positiv korrektion."""
     state = model.State()

@@ -62,6 +62,20 @@ def nowcast(obs: np.ndarray, steps: int) -> np.ndarray:
     return forecast
 
 
+def fill_outside(analysis: np.ndarray, decay: float = 0.0, smooth: float = 2.0) -> np.ndarray:
+    """Analysen utan NaN. Med decay > 0 (pixlar) fylls rutorna utanför täckningen med det utjämnade
+    värdet vid närmaste täckta ruta, avtagande som exp(-avståndet / decay), så att regnet vid randen
+    kan flyttas in i området i stället för nollor. decay = 0 ger nollor (drift)."""
+    ok = np.isfinite(analysis)
+    a = np.where(ok, analysis, 0.0).astype(np.float32)
+    if decay <= 0 or ok.all() or not ok.any():
+        return a
+    from scipy.ndimage import distance_transform_edt
+    g = gaussian_filter(a, smooth) / np.maximum(gaussian_filter(ok.astype(np.float32), smooth), 1e-6)
+    d, (iy, ix) = distance_transform_edt(~ok, return_indices=True)
+    return np.where(ok, a, g[iy, ix] * np.exp(-d / decay)).astype(np.float32)
+
+
 def cdf_match(f, target, sharpen: float = 0.0, sigma: float = 1.5):
     """Ger f målfältets värdefördelning men behåller f:s rangordning (nollor ordnas efter grannskapet).
 
@@ -186,7 +200,7 @@ class Chain:
     def __init__(self, ext_model: Path | None = None, prob_steps: int | None = None, motion_gap: int = 3,
                  motion_frames: int = 3, target: str = "advected", motion_step: int = 4,
                  match: bool = True, location: bool = True, interp: str = "linear", sharpen: float = 0.0,
-                 blend: float = 1.0, ramp: tuple[float, float] | None = None):
+                 blend: float = 1.0, ramp: tuple[float, float] | None = None, inflow: float = 0.0):
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
         self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
@@ -199,6 +213,13 @@ class Chain:
         if interp not in ("linear", "nearest", "cubic"):
             raise ValueError(interp)
         self.interp, self.sharpen, self.blend, self.ramp = interp, sharpen, blend, ramp
+        # inflow > 0: rutorna utanför täckningen fylls från randen (fill_outside, avtagande med
+        # inflow pixlar), så att regn som kommer in över randen finns i prognosen och i målet
+        self.inflow = inflow
+
+    def prepared(self, analysis: np.ndarray) -> np.ndarray:
+        """Analysen som flyttas: NaN blir 0, eller med inflow fylls utsidan från randen."""
+        return fill_outside(analysis, self.inflow)
 
     def project(self, a: np.ndarray, motion: np.ndarray, steps):
         """Analysen a (utan NaN) flyttad: (prognosen, målet för matchningen), (steg, H, W) vardera."""
@@ -235,7 +256,7 @@ class Chain:
         analysis = obs[-1]
         # bilinjärt för prognosen, och analysens värden flyttade med närmaste granne som mål för
         # matchningen: samma värden, men bara de som är kvar i området
-        a = np.nan_to_num(analysis)
+        a = self.prepared(analysis)
         raw, tgt = self.project(a, motion, steps)
         raw[:, ~np.isfinite(analysis)] = np.nan  # utanför täckningen deltar inte i matchningen
         tgt[:, ~np.isfinite(analysis)] = np.nan
