@@ -22,3 +22,39 @@ Jag hittade inget fel i verifieringen. Persistensen slår verkligen Tim-KNEP på
 
 Rapporten ligger i `experiments/natt/rapporter/2026-11-05/1-verif-persistens.md` och allt är committat (d80efb4).
 ===== 2026-11-05T08:13:07Z försök 2 =====
+Jag hittade inget fel i `src/knep/verify.py`, men den här sessionen kunde inte heller avgöra varför Tim-KNEP förlorar. Rapporten har status **delvis**. Nätet nekades igen, så radarn för 4 och 5 november (arkivet här slutar 2025) och MEPS för de dygnen gick inte att hämta. Jag försökte inte på annat sätt.
+
+**Från försök 1, oförändrat:**
+- Persistensen är radarns timsumma för timmen före utgåvan och jämförs mot rätt giltighetstimme.
+- Tim-KNEP:s timsummor för +1 till +5 h är rätt timmar.
+- Alla modeller räknas på samma rutor och med samma kontingenstabeller.
+- De tre testerna i `tests/test_verify_persistence.py` fångar alla tre felen jag förde in med avsikt.
+
+**Nytt i försök 2:** jag jämförde persistensen med kedjan (driftens prognoser utan MEPS och utan blandning) på de 16 valideringsdagarna. Räkningen är densamma som i verify.py, med utgåvor var 6:e timme. CSI för timsumman ≥ 1 mm:
+
+| ledtid | persistens | kedjan |
+|---|---|---|
+| +1 h | 0,36 | 0,60 |
+| +3 h | 0,17 | 0,27 |
+| +5 h | 0,10 | 0,18 |
+
+Kedjan slår persistensen vid +1 h alla 16 dagarna och ligger aldrig under 0,45. Det ändrar hur novembersiffrorna ska läsas:
+
+- **Persistensen är inte ovanligt stark.** Den ligger inom valideringsdagarnas spann, men faller ovanligt lite med ledtiden.
+- **Tim-KNEP är ovanligt svag redan vid +1 h.** 0,136 är långt under kedjans normala nivå, fast kedjan har vikten 0,82 i blandningen där. Den sömlösa blandningen förklarar fallet efter +2 h men inte svagheten vid +1 h. Om den kommer från kedjan, blandningen eller driftens underlag går inte att avgöra med det som finns här.
+- **Radarn själv stämmer dåligt med regnmätarna de här timmarna.** Radarns timsumma är bara 0,16 till 0,24 av mätarnas, medan SNOW (MEPS) har en kvot nära 1 och bäst CSI mot mätarna. Radarn missade alltså troligen mycket av nederbörden den natten. Ett sådant facit gynnar persistensen och straffar allt som innehåller MEPS. Mätarunderlaget är tunt: 846 mätartimmar.
+
+**Inget behöver köras om i drift**, eftersom inget fel hittades i verifieringen.
+
+**Ett möjligt fel i `src/knep/cli.py:213`, inte rättat:** när en radarbild mitt i historiken saknas och utfyllnadstillståndet inte finns än, får de äldre analyserna fel tid med 5 minuter. Det kan bara hända innan `gaps.npz` finns och förklarar inte november. Jag lät det vara eftersom det rör driftens huvudflöde och inte går att prova här.
+
+**Nästa steg** (står i rapporten):
+1. Spara kedjans timsummor före blandningen som en egen modell i verifieringen. Det avgör direkt om svagheten vid +1 h kommer från kedjan eller blandningen.
+2. Titta i driftens `cache/state/` och `cache/verif/obs5/` för 4 november 19 till 24 UTC: hur stor del av rutorna som var uppmätta av SMHI.
+
+`uv run pytest` gick igenom (82 tester), och allt är committat som `f3b5178`. Provkörningens fil `experiments/projektion/results/persistens_validering_prov.json` ligger kvar utanför committen, eftersom det nekades att ta bort den.
+
+Filer:
+- `experiments/natt/rapporter/2026-11-05/1-verif-persistens.md`
+- `experiments/projektion/persistens_validering.py`
+- `experiments/projektion/results/persistens_validering.json`
