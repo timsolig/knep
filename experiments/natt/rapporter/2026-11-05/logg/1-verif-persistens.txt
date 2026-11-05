@@ -1,1 +1,23 @@
 ===== 2026-11-05T08:04:41Z försök 1 =====
+Jag hittade inget fel i verifieringen. Persistensen slår verkligen Tim-KNEP på 4 och 5 november. Jag har bara stöd i verif.json, för jag kunde inte kontrollera det mot radarn eftersom hämtningen nekades. Status i rapporten: **delvis**.
+
+**Det jag granskade i `src/knep/verify.py`:**
+- **Persistensens timme:** den är radarns timme som slutar på utgåvans heltimme och jämförs mot timmen som slutar k timmar senare.
+- **Tim-KNEP:s timmar:** de slutar på rätt timmar för +1 till +5 h och räknas på samma sätt som radarns.
+- **Mask och tabeller:** alla modeller får samma mask, och kontingenstabellerna räknas med samma funktion.
+- **Persistensens lägre n:** det är avsiktligt. Timmen före utgåvan måste vara uppmätt, vilket tar bort 7 till 13 % av blocken. Jämförelsen mot Tim-KNEP görs ändå på exakt samma block, och där leder persistensen med +0,07 till +0,17 i CSI vid 1 mm.
+
+**Tester:** Jag lade till tre tester i `tests/test_verify_persistence.py`, med regn som rör sig, ett stillastående område, en lucka i mätningen och rutor där Tim-KNEP saknar värden. De befintliga testerna har stillastående regn och skulle inte märka om en timme var förskjuten. Jag förde tillfälligt in tre fel (fel persistenstimme, Tim-KNEP en timme fel, mask utan Tim-KNEP), och alla fångas. Det tredje fångades först efter att jag lade till rutorna där Tim-KNEP saknar värden. Hela sviten går igenom (82 tester), och `src/knep/` är oförändrad.
+
+**Varför persistensen är stark:** Ungefär en fjärdedel av ytan över 1 mm låg kvar i samma block i fem timmar. Persistensens träffar vid 1 mm är nästan lika vid alla ledtider (542, 397, 378, 441, 413 block den 4 november), så regnet stod still.
+
+**Var Tim-KNEP förlorar:**
+- **Vid +1 h:** här är det nästan bara kedjan (vikt 0,82), och den förlorar ändå mot en timme gammal persistens. Det tyder på att kedjan flyttar bort regn som står still.
+- **Efter +2 h:** kedjans vikt i blandningen faller till 0,30 och sedan 0,10. Vid +3 till +5 h har Tim-KNEP samma CSI som SNOW (0,003 till 0,008), så läget i fältet kommer då nästan helt från MEPS. Det mesta av förlusten efter +2 h kommer alltså från den sömlösa blandningen.
+- **Förbehåll:** viktsiffrorna gäller standardinställningen. I drift kan vikterna ha justerats efter senaste timmens träffsäkerhet, och det framgår av manifestet, som inte finns här. Underlaget är också bara sex utgåvor på två dygn, så verif.json har inga intervall.
+
+**Det som inte gick:** Radarn för november 2026 finns inte i `/data` (arkivet slutar 2025), och MEPS slutar 2025-10-30. Jag skrev `experiments/projektion/persistens_nov.py`, som hämtar radarn ur SMHI:s arkiv och kör kedjan utan MEPS. Att köra det nekades, så skriptet är aldrig kört. Med det kan man skilja kedjan från blandningen med riktiga radardata.
+
+**Drift:** Inget behöver köras om, eftersom inget fel hittades. I rapporten föreslår jag att kedjans timsummor före blandningen sparas som en egen modell i verifieringen, så att driften själv visar varifrån förlusten kommer.
+
+Rapporten ligger i `experiments/natt/rapporter/2026-11-05/1-verif-persistens.md` och allt är committat (d80efb4).
