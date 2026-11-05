@@ -52,3 +52,6 @@ def test_top_weight_keeps_chain_tail():
 def test_tag_roundtrip():
     assert S.Var().tag() == "bas"
     assert S.Var(top_w=0.5).tag() == "top_w=0.5"
+    v = S.Var(t50_q=300.0, top_w=1.0, top_thr=5.0, fine_km=16.0, t50_fine=45.0)
+    assert S.from_tag(v.tag()) == v
+    assert S.from_tag("bas") == S.Var()

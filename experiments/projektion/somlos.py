@@ -343,10 +343,21 @@ def objective(sc: dict, base: dict) -> tuple[float, dict]:
     return kons + pen, {"kons": kons, "straff": pen}
 
 
-def run_variants(vars_: list[Var], days: list[str], procs: int = 1) -> None:
+def from_tag(tag: str) -> Var:
+    if tag == "bas":
+        return Var()
+    import re
+
+    kw = {k: float(x) for k, x in re.findall(r"(?:^|_)([a-z][a-z0-9_]*?)=([^_]+)", tag)}
+    v = Var(**kw)
+    assert v.tag() == tag, (tag, v.tag())
+    return v
+
+
+def run_variants(vars_: list[Var], days: list[str], procs: int = 1, mode: str = "snabb") -> None:
     from multiprocessing import get_context
 
-    jobs = [("snabb", d, vars_) for d in days]
+    jobs = [(mode, d, vars_) for d in days]
     if procs <= 1:
         for j in jobs:
             run_day_multi(*j)
@@ -458,7 +469,9 @@ def timing(day: str, hour: int) -> None:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("vad", choices=["spara", "sök", "tid"])
+    ap.add_argument("vad", choices=["spara", "sök", "tid", "final"])
+    ap.add_argument("--var", nargs="*", default=[], help="finalisterna som taggar (Var.tag), för final")
+    ap.add_argument("--läge", dest="mode", default="validering_meps")
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--procs", type=int, default=2)
@@ -468,6 +481,9 @@ def main():
     if a.vad == "spara":
         D.SYSTEMS["kedja_spar"] = KedjaSpar
         D.run("snabb", "kedja_spar", a.procs)
+    elif a.vad == "final":
+        vs = [Var()] + [from_tag(t) for t in a.var if t != "bas"]
+        run_variants(vs, D.mode_days(a.mode), a.procs, a.mode)
     elif a.vad == "sök":
         search(a.n, a.seed, a.procs, D.RESULTS / "somlos_sok.jsonl")
     else:
