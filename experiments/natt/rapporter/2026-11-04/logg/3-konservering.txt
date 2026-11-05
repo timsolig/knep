@@ -1,0 +1,59 @@
+===== 2026-11-04T22:53:39Z försök 1 =====
+I'll pick up when the first two variants are done.
+
+First Bikubisk day done in 118 s. Waiting for more.
+
+Still waiting for the first variants.
+
+Waiting.
+
+Waiting.
+
+Bicubic flow: the 4 to 8 km form is much better (+0.53 in log ratio), and FSS is slightly better, but CSI at 1 and 5 mm/h is slightly worse (0.001 to 0.009, with the interval on the worse side). Waiting for the nearest neighbour and the others.
+
+Waiting for Narmast.
+
+Waiting.
+
+Waiting for the notification that Narmast is done.
+
+Waiting for `Analys` and `Skarp1`.
+
+Waiting for `BikubiskAnalys`.
+
+Waiting for the blended variants.
+
+Waiting for `NarmastRamp`.
+
+`Narmast025` is done and the ramps have started. Waiting.
+
+Waiting for `NarmastRamp3`.
+
+Waiting for the validation.
+
+None of the variants I tried passed the judge, so baseline stays as it is. The best candidate, a ramp from bilinear to nearest-neighbour flow (`NarmastRamp3`), came out "inte bättre" (not better) on the validation days. Nothing was worse at the judged lead times, but no conservation measure was reliably better either. The full report is in `experiments/natt/rapporter/2026-11-04/3-konservering.md` (Status: delvis), and everything is committed on `natt/2026-11-04`. The full test suite passed (77 tests).
+
+**Search on the training days** (6 days at 4 km, against the chain re-run):
+- **Sharper flow** (nearest neighbour or clipped bicubic instead of bilinear) restores the field's structure. At 1 h the 4 to 8 km band goes from −1.32 to −0.15 in log ratio. Percentiles, block maxima and FSS get slightly better and the jumps between runs get smaller. The cost is CSI at 1 and 5 mm/h over the first 3 h, up to 0.016 at 15 min. A sharp field with small position errors hits fewer exact pixels. Mixing with the bilinear flow scales the gain and the cost together, so no mixing weight avoids the cost.
+- **Sharpened ranking** in the matching and **matching against the whole analysis** were both clearly worse on FSS and CSI. Matching against the whole analysis does recover about half the volume at 5 h, but puts it in the wrong places. I discarded both.
+- **The ramp** uses the chain unchanged up to 3 h, then nearest neighbour from 4 h. It was the only variant with no worse cell, so I chose it as the finalist.
+
+**Validation** (16 days, 125 runs, 2 km, against the chain in production):
+- The 4 to 8 km band error at 5 h is roughly halved (−0.53 instead of −1.07), FSS at 1 mm/h is slightly better and the jumps are slightly smaller. Those are significant.
+- Block maxima move 0.03 to 0.06 closer to the radar after 4 h, but the interval includes 0.
+- Area above 5 mm/h gets slightly worse (0.011 to 0.014), just inside the judge's tolerance.
+- At 4 h, which the judge computes but leaves out of its verdict, CSI at 5 mm/h is significantly worse by 0.0003. If 4 h counted, that alone would also make it "inte bättre".
+
+The chain's remaining loss of rain area and volume at long lead times (−0.26 and −0.30 at 5 h) cannot be fixed by the flow or the matching. As report 2 found, it is rain coming in over the edge of the radar coverage, plus new cells.
+
+**What I didn't do:**
+- The step of testing finalists at 2 km on more training days, so that the validation run (78 min) would fit.
+- The ablations of the finalist on validation.
+- A target learned per lead time, per-object conservation, scale separation and multi-frame motion.
+- The MEPS blending. That is where report 2 found the biggest loss of peaks, but the judge has no seamless system to compare it against.
+
+**Changes in `src/knep/`:** new options on the chain for the flow (bicubic or nearest neighbour), a mix with bilinear and its ramp over lead time, and sharpened ranking. They come with tests, and the defaults give the production chain exactly. The new code is in `experiments/projektion/`: the variants are in `konservering.py` and the results tables in `resultat/konservering_*.md`. New data is about 40 MB.
+
+**Suggested next steps:**
+1. Add a seamless (MEPS-blended) system and baseline to the judge, then put the chain's small scales back on top of the blended field.
+2. Fill rain coming in over the coverage edge from MEPS or OPERA instead of zero.
