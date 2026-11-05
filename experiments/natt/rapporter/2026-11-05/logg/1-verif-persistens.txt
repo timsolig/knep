@@ -21,3 +21,4 @@ Jag hittade inget fel i verifieringen. Persistensen slår verkligen Tim-KNEP på
 **Drift:** Inget behöver köras om, eftersom inget fel hittades. I rapporten föreslår jag att kedjans timsummor före blandningen sparas som en egen modell i verifieringen, så att driften själv visar varifrån förlusten kommer.
 
 Rapporten ligger i `experiments/natt/rapporter/2026-11-05/1-verif-persistens.md` och allt är committat (d80efb4).
+===== 2026-11-05T08:13:07Z försök 2 =====

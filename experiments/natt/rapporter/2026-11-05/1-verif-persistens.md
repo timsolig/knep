@@ -1,6 +1,47 @@
 # Uppgift 1: verifieringens persistens
 
-## Slutsats
+## Försök 2: det nya (läs detta först)
+
+Försök 2 kunde inte heller hämta radarn för 4 och 5 november, eftersom nätet nekades igen. Jag försökte inte på annat sätt. I stället jämförde jag persistensen med kedjan på de 16 valideringsdagarna, med kedjans prognoser i drift ur `/data/sverige/kedja` (utan MEPS och utan blandning) och samma räkning som verify.py: block om 4 km, timmedel med minst 11 av 12 bilder och samma rutor för båda. Skriptet är `experiments/projektion/persistens_validering.py`, med utgåvor var 6:e timme (00, 06, 12 och 18 UTC) och cirka 25 s per dag. Resultatet ligger i `experiments/projektion/results/persistens_validering.json`. Bara delen `validering` i dagar.json lästes (`load_days("validering")`).
+
+CSI för timsumman, alla 16 dagarna ihop:
+
+| ledtid | persistens ≥ 0,1 | kedjan ≥ 0,1 | persistens ≥ 1 | kedjan ≥ 1 | persistens ≥ 5 | kedjan ≥ 5 |
+|---|---|---|---|---|---|---|
+| +1 h | 0,605 | 0,745 | 0,361 | 0,601 | 0,171 | 0,378 |
+| +2 h | 0,472 | 0,567 | 0,224 | 0,368 | 0,087 | 0,155 |
+| +3 h | 0,394 | 0,478 | 0,166 | 0,272 | 0,055 | 0,090 |
+| +4 h | 0,344 | 0,417 | 0,130 | 0,224 | 0,043 | 0,056 |
+| +5 h | 0,309 | 0,375 | 0,103 | 0,181 | 0,045 | 0,035 |
+
+Per dag, vid 1 mm och +1 h, ligger kedjan mellan 0,45 och 0,77 och slår persistensen alla 16 dagarna med 0,17 till 0,33. Vid +5 h slår persistensen kedjan bara 2019-03-08 (0,049 mot 0,033), 2020-02-22 (0,065 mot 0,029), 2023-08-08 (0,087 mot 0,060) och 2023-11-04 (0,187 mot 0,167). Vid 5 mm från +4 h är de jämna (kedjan tappar de kraftiga, vilket hör till nattens huvudfråga). Andelen av ytan över 1 mm som låg kvar i samma block efter 5 h är 0,07 till 0,35 (median cirka 0,14).
+
+Det ändrar tolkningen av november:
+
+1. **Persistensen är inte ovanligt stark i november.** 0,215 vid +1 h och cirka 0,17 vid +5 h (1 mm) ligger inom valideringsdagarnas spann (de mest stillastående dagarna, 2021-10-05, 2023-11-04 och 2024-07-13, har 0,18 till 0,20 vid +5 h). Det ovanliga är att persistensen nästan inte faller med ledtiden. Det gör den på alla valideringsdagar.
+2. **Tim-KNEP är ovanligt svag redan vid +1 h.** 0,136 vid 1 mm är under en fjärdedel av kedjans sämsta valideringsdag (0,45), och ingen valideringsdag har kedjan under persistensen vid +1 h. Vid +1 h har kedjan vikten 0,82 i blandningen, så om kedjan hade varit normal borde Tim-KNEP ha legat närmare 0,4. Antingen var kedjan ovanligt dålig de här timmarna, eller så drar redan 18 % MEPS (och kvantilblandningen) ned den, eller så är något i driftens underlag fel. Med verif.json går det inte att avgöra vilket.
+3. **Även MET Norge och SNOW är nästan utan träff mot radarn** (CSI vid 1 mm 0,018 och 0,006 vid +1 h, FSS vid 1 mm under 0,09 på alla skalor). En nowcast från radar som MET Norge borde ha mer än så vid +1 h.
+4. **Radarn själv stämmer dåligt med regnmätarna de här timmarna.** I verif.json har radarns timsumma kvoten 0,16 till 0,24 mot mätarna och CSI 0,17 till 0,23 vid 0,1 mm, medan SNOW har CSI 0,46 till 0,55 och kvoten 0,6 till 1,1 mot mätarna. Tim-KNEP mot mätarna har kvoten 0,28 vid +1 h (som radarn) och 0,65 till 0,97 från +2 h (som MEPS). Det tyder på att radarn missade mycket av nederbörden (till exempel låg nederbörd under strålen eller snö, vilket passar en novembernatt), och att den nederbörd radarn ändå såg låg stilla. Ett facit som ser lite och stillastående nederbörd gynnar persistensen och straffar allt som har MEPS i sig. Underlaget är 846 mätartimmar (cirka 28 stationer per timme), alltså tunt.
+
+Slutsatsen för försök 2: verify.py räknar rätt (granskningen och testerna från försök 1 står kvar). Siffrorna för 4 och 5 november är verkliga i den meningen att de följer av facit. Men facit (radarn) är svagt de här timmarna, och att Tim-KNEP förlorar mot persistensen är inte representativt. På valideringsdagarna slår kedjan persistensen vid alla ledtider vid 1 mm. Den sömlösa blandningen förklarar fallet efter +2 h, men inte att Tim-KNEP är svag redan vid +1 h. Det behöver kontrolleras i drift (se nästa steg 5 och 6).
+
+### En liten sak i `cli.py` (inte rättad)
+
+`cli.py:213` bygger analysernas tider med `zip(times[-len(fields):], obs)`. `_analyses` hoppar över en tid när SMHI-bilden saknas och det inte finns något utfyllnadstillstånd (`gap is None`), och då förutsätter zip:en att de saknade bilderna ligger först. Saknas en bild mitt i, får alla äldre analyser fel tid med 5 min, och det följer med till verifieringens obs5. Det händer bara innan `gaps.npz` finns (första cykeln efter en tom cache), så det förklarar inte november. Jag rättade det inte, eftersom det rör driftens huvudflöde och inte går att prova här. Rättningen är att `_analyses` returnerar tiderna tillsammans med fälten.
+
+### Nästa steg (tillägg)
+
+5. Spara kedjans timsummor före blandningen som modellen `kedja` i verifieringen (punkt 2 nedan). Det avgör direkt om svagheten vid +1 h kommer från kedjan eller blandningen.
+6. Titta i driftens `cache/state/` och `cache/verif/obs5/` för 4 november 19 till 24 UTC: hur stor andel av rutorna som var uppmätta (SMHI) och om analyserna är rimliga mot SMHI:s egna bilder. Om radarn var nere i delar av landet (utfyllnad eller OPERA) förklarar det både det svaga facit och den svaga kedjan.
+7. När fler dygn finns: jämför `ours` med `persistens` per dygn i `daily`. Om persistensen bara vinner när radarn har låg kvot mot mätarna är det facit och inte modellen.
+
+### Filer (försök 2)
+
+- `experiments/projektion/persistens_validering.py` (nytt): persistensen mot kedjan på valideringsdagarna.
+- `experiments/projektion/results/persistens_validering.json` (nytt): resultatet, per dag och totalt.
+- `src/knep/` är fortfarande oförändrad.
+
+## Slutsats från försök 1
 
 Jag hittade inget fel i verifieringen. Persistensen är radarns timsumma för timmen som slutar på utgåvans heltimme hh. Den jämförs mot timmen som slutar hh + k. Tim-KNEP:s timsumma k är medlet av de tolv 5-minutersbilderna som slutar hh + k. Alla modeller räknas på block där facit och Tim-KNEP finns, plus modellens egna block, och kontingenstabellerna räknas med samma funktion. Persistensens lägre n är avsiktligt: timmen hh måste vara uppmätt (SMHI, OPERA eller volymer i minst 11 av 12 bilder). Det tar bort 7 till 13 % av blocken, och jämförelsen mot Tim-KNEP görs parvis på exakt de blocken (`ours@persistens`). Fördelen kvarstår där: +0,07 till +0,17 i CSI vid 1 mm.
 
