@@ -54,8 +54,12 @@ def target(grid: radar.Grid) -> composite.TargetGrid:
 
 
 def _analyses(times, cache, state_dir, session, fallback):
-    """Analyser för times (äldst först): sparade om de redan byggts, annars SMHI plus reserv och utfyllnad."""
-    out, grid, sources, missing = [], None, None, []
+    """Analyser för times (äldst först): sparade om de redan byggts, annars SMHI plus reserv och utfyllnad.
+
+    Returnerar också tiderna för de analyser som finns, eftersom en tid hoppas över när SMHI-bilden
+    saknas och det inte finns något utfyllnadstillstånd.
+    """
+    out, kept, grid, sources, missing = [], [], None, None, []
     gap = composite.GapState.load(state_dir / "gaps.npz")
     motion_path = state_dir / "motion.npy"
     motion = np.load(motion_path) if motion_path.exists() else None
@@ -70,6 +74,7 @@ def _analyses(times, cache, state_dir, session, fallback):
         if saved.exists():
             d = np.load(saved)
             out.append(d["rain"])
+            kept.append(t)
             sources = d["source"]
             continue
         if rain is None and gap is None:
@@ -101,10 +106,11 @@ def _analyses(times, cache, state_dir, session, fallback):
         rain, src, _, gap = composite.fill_gaps(rain, src, gap, motion)
         np.savez_compressed(saved, rain=rain.astype(np.float32), source=src)
         out.append(rain)
+        kept.append(t)
         sources = src
     if gap is not None:
         gap.save(state_dir / "gaps.npz")
-    return out, grid, sources, missing
+    return out, kept, grid, sources, missing
 
 
 def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requests.Session, *,
@@ -115,7 +121,7 @@ def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requ
     vid mätarna och räkna veckofaktorn (bara i realtid, eftersom den hämtar senaste timmens mätare).
     """
     times = [t0 - k * radar.STEP for k in range(history)][::-1]
-    fields, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback)
+    fields, kept, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback)
     if len(fields) < 2 or grid is None:
         log.error("för få radarbilder bakåt från %s", t0)
         return None
@@ -137,7 +143,7 @@ def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requ
             cov = np.isfinite(rain[-1])
             extra["volume_correction"] = {"median": round(float(np.median(k[cov])), 3) if cov.any() else 1.0,
                                           "week": round(float(np.exp(corr.mfb)), 3), "tail_gamma": round(corr.gamma, 3)}
-    return Analys(t0, times[-len(fields):], rain, grid, sources, missing, extra)
+    return Analys(t0, kept, rain, grid, sources, missing, extra)
 
 
 def source_of(state_dir: Path, t: datetime) -> np.ndarray | None:

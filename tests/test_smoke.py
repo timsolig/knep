@@ -139,3 +139,31 @@ def test_cli_applies_volume_correction(tmp_path):
     truth = _rain(0)
     inside = np.isfinite(analysis) & (truth > 2)
     assert np.allclose(analysis[inside], 1.5 * truth[inside], rtol=0.12)
+
+
+def test_analysis_times_follow_missing_frames(tmp_path):
+    """Saknas en bild mitt i och finns inget utfyllnadstillstånd, får de äldre analyserna ändå rätt tid.
+
+    Det händer när äldre analyser redan är sparade men gaps.npz saknas, och då hoppas tiden över.
+    """
+    import requests
+
+    from knep import analys
+
+    class Offline(requests.Session):
+        def get(self, *a, **k):
+            raise requests.ConnectionError("offline")
+
+    cache, state = tmp_path / "cache", tmp_path / "state"
+    cache.mkdir()
+    state.mkdir()
+    _write_cache(cache, n=7)
+    analys.bygg(T0, 7, cache, state, Offline())  # sparar analyserna och gaps.npz
+    gone = T0 - 3 * radar.STEP
+    (cache / f"{gone:%Y%m%d%H%M}.tif").unlink()
+    for p in [state / "gaps.npz", *state.glob(f"analys_{gone:%Y%m%d%H%M}.npz"),
+              *(state / f"analys_{t:%Y%m%d%H%M}.npz" for t in (T0 - k * radar.STEP for k in range(3)))]:
+        p.unlink()
+    a = analys.bygg(T0, 7, cache, state, Offline())
+    assert len(a.times) == len(a.rain) == 6
+    assert gone not in a.times and a.times[0] == T0 - 6 * radar.STEP and a.times[-1] == T0
