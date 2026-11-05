@@ -73,3 +73,21 @@ Väntar fortfarande på Inflode25.
 Valideringen pågår; jag väntar på att den blir klar.
 
 Väntar.
+
+Ingen variant slog baslinjen i domaren, så driften är oförändrad. Rapporten `experiments/natt/rapporter/2026-11-04/3-konservering.md` slutar med `Status: delvis`. Allt är committat på `natt/2026-11-04`, och `uv run pytest` gick igenom (78 tester) innan kodändringen committades. Inflödet gav ändå nattens första konservering som är säkert bättre på valideringen.
+
+**Det som var gjort sedan försök 1:** rapporten var skriven. Den skarpa flytten tar tillbaka formen men kostar CSI de första 3 h. Rampen `NarmastRamp3` (närmaste granne efter 3 h) fick "inte bättre". Det som återstod av förlusten var regn som kommer in över täckningens rand.
+
+**Försök 2, inflödet över randen:** kedjan har i dag nollor utanför täckningen. Det nya valet `Chain(inflow=L)` fyller utsidan med det utjämnade randvärdet, som avtar med avståndet. Standardvärdet ger exakt driftens kedja, och ett test visar det.
+
+- På träningsdagarna prövades L = 25, 75 och 250 km. Träffen och spärrarna blev bättre med alla tre, men ytan över 10 och 20 mm/h blev för stor. Jag valde `Inflode25` som finalist och körde `Inflode75` på valideringen som jämförelse.
+- På valideringen (16 dygn) med `Inflode25`:
+  - **Bättre (säkert):** volymen från 2 h (−0,055 i |log kvot| vid 5 h) och ytan över 5 mm/h från 3 h (−0,078 vid 5 h). Det är nattens första säkra förbättring av konserveringen. CSI vid 5 mm/h blev också bättre till 3 h, och båda spärrarna och hoppen mellan utgåvor blev bättre.
+  - **Domen "inte bättre"** beror på att ytan över 10 mm/h blir säkert större vid 15 och 30 min (+0,019) och ytan över 20 mm/h vid 30 min.
+- `Inflode75` fick samma dom av samma tre celler. Den ger mer volym (−0,105 vid 5 h), men toppvärdena blir för höga längre fram.
+
+**Varför det fälls:** kedjan överskattar redan ytan över 10 mm/h tidigt, på 13 av 16 dygn, och överskottet kommer från platskartan. Utan platskarta är felet +0,06 vid 15 min i stället för +0,13. Inflödet lägger till regn ovanpå det. På de dygn där regn faktiskt kommer in hamnar inflödet nära radarn.
+
+**Nästa steg** (i rapporten): pröva `Inflode25` tillsammans med en platskarta som inte förstärker de högsta intensiteterna, först på träningsdagarna. Om överskottet vid 15 och 30 min försvinner borde varianten gå igenom domen. Därefter kan randvärdet ersättas med MEPS eller OPERA.
+
+Testdelen lästes inte. Ny data i natt är några MB, och 3,1 GB är fortfarande ledigt på `/data`.
