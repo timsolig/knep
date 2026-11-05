@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from pyproj import Transformer
 
-from knep import composite
+from knep.analys import composite
 
 h5py = pytest.importorskip("h5py")
 
@@ -107,7 +107,7 @@ def test_missing_radar_is_reported():
 
 
 def test_radars_covering_a_hole_nearest_first():
-    from knep import sources
+    from knep.analys import sources
     grid = composite.TargetGrid(**GRID)
     r, c = _pixel(grid, 16.7, 61.6)  # vid Hudiksvall
     hole = np.zeros(grid.shape, bool)
@@ -146,7 +146,7 @@ class _FakeS3:
 
 def test_pvol_nearest_in_time_is_downloaded(tmp_path):
     from datetime import UTC, datetime
-    from knep import sources
+    from knep.analys import sources
     keys = [f"2026/01/01/SE/sehuv/PVOL/sehuv@20260101T{hm}@0@PVOL.h5" for hm in ("1200", "1205", "1210")]
     s3 = _FakeS3(keys)
     path = sources.fetch_pvol(s3, "sehuv", datetime(2026, 1, 1, 12, 6, tzinfo=UTC), tmp_path)

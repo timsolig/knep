@@ -11,15 +11,25 @@ Nederbördsnowcast 0 till 5 h från SMHI:s radarkomposit. Körs på en Raspberry
 
 ## Struktur
 
-- `src/knep/radar.py` hämtning och avkodning. GeoTIFF 0..255 i EPSG:3006, dBZ = 0,4 · v − 30, 0 = inget eko, 255 = utanför täckning, Z = 200 R^1,5
-- `src/knep/model.py` modellen. `Chain.run(obs, tid, steg, tillstånd)` är kedjan (rörelse, extrapolering, fördelningsmatchning, platskarta, sannolikheter för kraftig nederbörd); `nowcast(obs, steps)` är referensen. Tillståndet (senaste timmens analyser och 30-minutersprognoser) sparas i `cache/state/`
-- `src/knep/seamless.py` och `nwp.py` MEPS rättad mot radarn och blandad med kedjan, så att prognosen räcker 5 h (standard; `--no-seamless` stänger av). Bara i realtid, eftersom MEPS bara finns för senaste körningen. Sannolikheterna för kraftig nederbörd gäller de första 2 h (`--prob-hours`), som extremmodellen är kalibrerad för
-- `src/knep/extremes.py` särdrag och sannolikheter som delas av drift och träning; modellen ligger i `models/extremes.pkl`
-- `src/knep/bias.py` volymkorrektion mot SMHI:s regnmätare (`knep-bias`); kartan ligger i `models/bias.npz`, underlaget, veckofaktorn och kandidaten till ny karta i `cache/bias/`
+Koden är delad i två produkter och det som bygger sidan av dem. `cli.py` kör en cykel i ordningen analys, prognos, produkter.
+
+**Analysen** (`src/knep/analys/`): nederbörden som den är nu. `analys.bygg(t0, ...)` ger en `Analys` (tider, fält i mm/h, rutnät, källor, saknade radarer); prognosen läser bara den.
+
+- `src/knep/analys/radar.py` hämtning och avkodning. GeoTIFF 0..255 i EPSG:3006, dBZ = 0,4 · v − 30, 0 = inget eko, 255 = utanför täckning, Z = 200 R^1,5
+- `src/knep/analys/composite.py` och `sources.py` kompositen: SMHI, OPERA och enskilda radarvolymer som reserv, lagrangesk utfyllnad vid bortfall
+- `src/knep/analys/bias.py` volymkorrektion mot SMHI:s regnmätare (`knep-bias`); kartan ligger i `models/bias.npz`, underlaget, veckofaktorn och kandidaten till ny karta i `cache/bias/`
+- `src/knep/analys/gauges.py` SMHI:s regnmätare till sidan (kvart, parameter 14, och timme, parameter 7): bara senaste timmen finns för alla stationer, så varje cykel lägger till den i `gauges.json` och behåller 12 h. SMHI lägger ut värdena ungefär en timme efter radarn
+
+**Prognosen** (`src/knep/prognos/`): 0 till 5 h framåt ur analysen. `prognos.kor(analys, ...)` ger en `Prognos`. Rörelsefältet i `cache/state/motion.npy` är det enda som går tillbaka till analysen (utfyllnaden vid bortfall i nästa cykel).
+
+- `src/knep/prognos/model.py` modellen. `Chain.run(obs, tid, steg, tillstånd)` är kedjan (rörelse, extrapolering, fördelningsmatchning, platskarta, sannolikheter för kraftig nederbörd); `nowcast(obs, steps)` är referensen. Tillståndet (senaste timmens analyser och 30-minutersprognoser) sparas i `cache/state/`
+- `src/knep/prognos/seamless.py` och `nwp.py` MEPS rättad mot radarn och blandad med kedjan, så att prognosen räcker 5 h (standard; `--no-seamless` stänger av). Bara i realtid, eftersom MEPS bara finns för senaste körningen. Sannolikheterna för kraftig nederbörd gäller de första 2 h (`--prob-hours`), som extremmodellen är kalibrerad för
+- `src/knep/prognos/extremes.py` särdrag och sannolikheter som delas av drift och träning; modellen ligger i `models/extremes.pkl`
+
+**Produkter, verifiering och drift**:
+
 - `src/knep/models.py` modellversioner (`knep-models`): filerna ligger i GitHub Releases, `models/models.json` låser tagg och sha256; nya versioner med `deploy/release_model.sh`
-- `src/knep/composite.py` och `sources.py` kompositen: SMHI, OPERA och enskilda radarvolymer som reserv, lagrangesk utfyllnad vid bortfall
 - `src/knep/compare.py` MET Norges nowcast (thredds, OPeNDAP med 4 km) och SMHI:s SNOW (multipoint på MEPS rutnät) som kartor till mosaiken, under `compare` i manifestet
-- `src/knep/gauges.py` SMHI:s regnmätare till sidan (kvart, parameter 14, och timme, parameter 7): bara senaste timmen finns för alla stationer, så varje cykel lägger till den i `gauges.json` och behåller 12 h. SMHI lägger ut värdena ungefär en timme efter radarn
 - `src/knep/runs.py` tidigare utgåvor: första cykeln i varje timme sparas prognosernas timsummor (Tim-KNEP, MET Norge, SNOW) i `runs/` i 12 h (`--runs`) och listas under `runs` i manifestet. Sidan jämför dem med radarns timsummor i `hist/`, som är facit
 - `src/knep/verify.py` verifieringen till fliken Verifiering: första cykeln i varje timme sparas Tim-KNEP:s, MET Norges, SNOW:s och persistensens timsummor för +1 till +5 h på 4 km (radarns rutnät i block om 2) i `cache/verif/pending/`; när mätarna har kommit (2,5 h efter sista timmen) räknas kontingenstabeller, kontinuerliga summor och FSS mot radarn (bara uppmätta rutor) och mot regnmätarna, per dygn i `cache/verif/days/` (35 dygn). `verif.json` har 7 och 30 dygn med 90 %-intervall (bootstrap över dygnen), skillnaden mot Tim-KNEP på samma urval, råa summor per dygn och underlaget (område, mätare, loppens ålder). `compare.py` sparar jämförelsekällornas timsummor som tal i `cache/verif/src/`; `--no-verify` stänger av
 - `src/knep/cases.py` namngivna händelser (`knep-case`), skriver till `web/cases/`

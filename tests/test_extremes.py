@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from knep import extremes
+from knep.prognos import extremes
 
 
 def _field():

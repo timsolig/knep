@@ -28,7 +28,8 @@ import numpy as np
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-from knep import nwp, radar  # noqa: E402
+from knep.analys import radar  # noqa: E402
+from knep.prognos import nwp  # noqa: E402
 
 HERE = Path(__file__).parent
 DATA = Path("/data")

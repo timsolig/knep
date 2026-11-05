@@ -12,7 +12,8 @@ from datetime import timedelta
 
 import numpy as np
 
-from knep import radar, seamless
+from knep.analys import radar
+from knep.prognos import seamless
 
 NQ = 20
 

@@ -44,8 +44,9 @@ from rasterio.crs import CRS
 from rasterio.transform import Affine
 from rasterio.warp import Resampling, reproject
 
-from . import composite, render
-from .radar import Grid
+from . import render
+from .analys import composite
+from .analys.radar import Grid
 
 log = logging.getLogger("knep")
 

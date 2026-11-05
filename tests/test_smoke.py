@@ -7,7 +7,9 @@ import numpy as np
 import rasterio
 from rasterio.transform import from_origin
 
-from knep import cli, model, radar
+from knep import cli
+from knep.analys import radar
+from knep.prognos import model
 
 # SMHI-kompositens ungefärliga rutnät i SWEREF99 TM, 2 km
 WEST, NORTH, RES, W, H = 126648, 7771252, 2000, 475, 894
@@ -114,7 +116,8 @@ def test_state_roundtrip(tmp_path):
 
 
 def test_cli_applies_volume_correction(tmp_path):
-    from knep import bias, composite, render
+    from knep import render
+    from knep.analys import bias, composite
 
     cache, out = tmp_path / "cache", tmp_path / "out"
     cache.mkdir()
