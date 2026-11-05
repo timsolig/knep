@@ -223,6 +223,7 @@ class Chain:
         # platskartan senaste timmens fel i dB; den stillastående delen avtar som exp(-ledtid / tau min).
         # None (drift) flyttar allt.
         self.stay, self.terrain = stay, terrain
+        self.stay_target = "split"  # "whole": matchningens mål är det odelade fältet (bara platsen ändras)
 
     def stay_fraction(self, motion: np.ndarray, corr: np.ndarray) -> np.ndarray | None:
         if self.stay is None:
@@ -247,6 +248,8 @@ class Chain:
         still = (stay * a).astype(np.float32)
         raw, tgt = self._project((a - still).astype(np.float32), motion, steps)
         d = np.exp(-5.0 * np.arange(1, len(raw) + 1) / self.stay[3]).astype(np.float32)[:, None, None]
+        if self.stay_target == "whole":  # målet är hela analysen flyttad som i kedjan: bara platsen ändras
+            return raw + d * still, self._project(a, motion, steps)[1]
         return raw + d * still, tgt + d * still
 
     def _project(self, a, motion, steps):

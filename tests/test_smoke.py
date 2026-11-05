@@ -172,6 +172,9 @@ def test_chain_stay_keeps_terrain_rain():
     out = hill.run(obs, T0, 6, motion=motion).rain
     assert out[-1][10, 20] > 6.0 and base[-1][10, 20] == 0.0
     np.testing.assert_allclose(np.nansum(out[-1]), np.nansum(base[-1]), rtol=1e-3)  # volymen kvar
+    hill.stay_target = "whole"  # målet ur det odelade fältet, som i kedjan
+    a = obs[-1]
+    np.testing.assert_array_equal(hill.project(a, motion, 6, s)[1], hill.project(a, motion, 6)[1])
 
 
 def test_location_map_learns_a_stationary_bias():

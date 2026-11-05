@@ -35,9 +35,12 @@ def terrain(res: int) -> np.ndarray:
 class Stay(Variant):
     stay: tuple = (0.0, 0.0, 0.0, 60.0)
 
+    stay_target = "split"
+
     def __init__(self):
         super().__init__()
         self.chain.stay = self.stay
+        self.chain.stay_target = self.stay_target
 
     def _res(self, ctx):
         super()._res(ctx)
@@ -83,6 +86,8 @@ LyftFel = _v("LyftFel", (0.5, 0.01, 0.5, 120.0))
 LyftFelLang = _v("LyftFelLang", (0.5, 0.01, 0.5, 600.0))
 LyftFelStark = _v("LyftFelStark", (0.8, 0.03, 1.0, 120.0))
 LyftFelSvag = _v("LyftFelSvag", (0.3, 0.005, 0.3, 120.0))
+# matchningens mål ur det odelade fältet: delningen ändrar bara var värdena hamnar
+LyftHel = type("LyftHel", (Lyft,), {"name": "LyftHel", "stay_target": "whole"})
 
 
 if __name__ == "__main__":

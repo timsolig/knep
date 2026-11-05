@@ -74,9 +74,15 @@ Vad valideringen säger:
 
 Slutsatsen: delningen efter lyftet hjälper träffen den första timmen men kostar ytan och volymen längre fram, så som den är byggd (avtagande stillastående del) håller den inte kvar extremerna. Med 6 dygn är intervallen breda och resultatet ska läsas som riktning.
 
+## Sist: målet ur det odelade fältet (`LyftHel`, bara träningsdagarna)
+
+Med tiden som var kvar prövades nästa steg 1 på träningsdagarna: `Chain.stay_target = "whole"` gör matchningens mål till hela analysen flyttad med närmaste granne, som i kedjan, så att delningen bara ändrar var värdena hamnar och inte vilka värden som finns. `LyftHel` är `Lyft` med det målet.
+
+Resultatet (snabb, 6 dygn, mot `kedja_om`, tabellen i `resultat/terrang_snabb.md`): förlusten av yta och volym är borta (ytan ≥ 5 mm/h och volymen inom ±0,002 av kedjan på alla ledtider, mot +0,020 och +0,013 vid 5 h för `Lyft`), träffen är kvar (FSS 5 mm/h 10 km −0,001* vid 2, 3 och 5 h, CSI 1 mm/h −0,001* vid 1 till 3 h, formen 4 till 8 km −0,05* vid 1 h, hoppen −0,001*), men konserveringen blir inte heller bättre (topparna och blockmaxet inom ±0,005). Domen: **inte bättre**, med en sämre cell (FSS 10 mm/h 10 km vid 30 min). Den kördes inte på valideringen. Den är den naturliga utgångspunkten för nästa försök: den gör det uppdraget frågar efter (terrängbundet regn flyttas inte bort) utan kostnad i volym, men den håller inte kvar fler extremer än kedjan, eftersom kedjans matchning redan återställer fördelningen; det som tappas längre fram är inflödet (rapport 3), inte terrängen.
+
 ## Filer
 
-- `src/knep/model.py`: `Chain(stay=, terrain=)`, `Chain.stay_fraction`, `Chain.project(…, stay=)` (den gamla flytten är `_project`), platskartan räknas före flytten i `run`.
+- `src/knep/model.py`: `Chain(stay=, terrain=)`, `Chain.stay_target`, `Chain.stay_fraction`, `Chain.project(…, stay=)` (den gamla flytten är `_project`), platskartan räknas före flytten i `run`.
 - `tests/test_smoke.py`: `test_chain_stay_keeps_terrain_rain`.
 - `experiments/projektion/hojd.py` (ny): höjdmodellen.
 - `experiments/projektion/terrang.py` (ny): varianterna för domaren.
@@ -86,7 +92,7 @@ Slutsatsen: delningen efter lyftet hjälper träffen den första timmen men kost
 
 ## Nästa steg
 
-1. **Bevara volymen i delningen.** Den stillastående delen ska inte avta till inget utan lämnas tillbaka till den rörliga, eller så ska matchningens mål vara det odelade fältet flyttat med närmaste granne (som i kedjan), så att delningen bara flyttar var värdena hamnar och inte vilka värden som finns. Det tar bort förlusten av yta och volym i både `Lyft` och `Fel`, och är billigt (en rad i `project`).
+1. **Bevara volymen i delningen.** Målet ur det odelade fältet (`LyftHel`) tog bort förlusten på träningsdagarna; kör den på hela valideringen (16 dygn, cirka 80 min), och pröva `Fel` och `LyftFel` med samma mål, eftersom det var avtagandet som fällde `Fel`. Kombinera sedan med inflödet från rapport 3 (`Inflode25`), som är det som faktiskt tar tillbaka ytan och volymen.
 2. **Bättre styrning än platskartans fel.** Felet bör bara räknas där det är stabilt över flera utgåvor (platskartan över längre tid än en timme) eller där det samvarierar med lyftet, så att tillväxt i rörliga celler inte låses fast.
 3. **Slumpsökning** över (smax, lyft, tau) med successiv halvering på träningsdagarna; varje bakgrundskörning måste få `timeout` upp till 2 h, annars stoppas den efter 10 min.
 4. En orografisk förstärkning i stället för en stillastående andel: den rörliga delen gånger en faktor som beror på lyftet (seeder-feeder), lärd med minsta kvadrat på träningsdagarna mot platskartans fel.
