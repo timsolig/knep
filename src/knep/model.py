@@ -200,7 +200,8 @@ class Chain:
     def __init__(self, ext_model: Path | None = None, prob_steps: int | None = None, motion_gap: int = 3,
                  motion_frames: int = 3, target: str = "advected", motion_step: int = 4,
                  match: bool = True, location: bool = True, interp: str = "linear", sharpen: float = 0.0,
-                 blend: float = 1.0, ramp: tuple[float, float] | None = None, inflow: float = 0.0):
+                 blend: float = 1.0, ramp: tuple[float, float] | None = None, inflow: float = 0.0,
+                 stay: tuple[float, float, float, float] | None = None, terrain: np.ndarray | None = None):
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
         self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
@@ -216,13 +217,39 @@ class Chain:
         # inflow > 0: rutorna utanför täckningen fylls från randen (fill_outside, avtagande med
         # inflow pixlar), så att regn som kommer in över randen finns i prognosen och i målet
         self.inflow = inflow
+        # stay = (smax, lyft, fel, tau): en andel s per pixel av analysen står still i stället för att
+        # flyttas, s = smax (1 - exp(-(lyft * max(u·∇h, 0) + fel * max(platskartan, 0)))), där u·∇h är
+        # lyftet i m per 5 min (rörelsen gånger höjdgradienten ur terrain, m på kedjans rutnät) och
+        # platskartan senaste timmens fel i dB; den stillastående delen avtar som exp(-ledtid / tau min).
+        # None (drift) flyttar allt.
+        self.stay, self.terrain = stay, terrain
+
+    def stay_fraction(self, motion: np.ndarray, corr: np.ndarray) -> np.ndarray | None:
+        if self.stay is None:
+            return None
+        smax, k_lift, k_err, _ = self.stay
+        x = k_err * np.maximum(corr, 0.0)
+        if self.terrain is not None and k_lift:
+            gy, gx = np.gradient(gaussian_filter(self.terrain.astype(np.float32), 1.0))
+            x = x + k_lift * np.maximum(motion[0] * gx + motion[1] * gy, 0.0)
+        return (smax * (1.0 - np.exp(-x))).astype(np.float32)
 
     def prepared(self, analysis: np.ndarray) -> np.ndarray:
         """Analysen som flyttas: NaN blir 0, eller med inflow fylls utsidan från randen."""
         return fill_outside(analysis, self.inflow)
 
-    def project(self, a: np.ndarray, motion: np.ndarray, steps):
-        """Analysen a (utan NaN) flyttad: (prognosen, målet för matchningen), (steg, H, W) vardera."""
+    def project(self, a: np.ndarray, motion: np.ndarray, steps, stay: np.ndarray | None = None):
+        """Analysen a (utan NaN) flyttad: (prognosen, målet för matchningen), (steg, H, W) vardera.
+
+        stay: andelen per pixel som står still (stay_fraction); bara resten flyttas."""
+        if stay is None:
+            return self._project(a, motion, steps)
+        still = (stay * a).astype(np.float32)
+        raw, tgt = self._project((a - still).astype(np.float32), motion, steps)
+        d = np.exp(-5.0 * np.arange(1, len(raw) + 1) / self.stay[3]).astype(np.float32)[:, None, None]
+        return raw + d * still, tgt + d * still
+
+    def _project(self, a, motion, steps):
         fields, orders = [a, a], [{"linear": 1, "nearest": 0, "cubic": 3}[self.interp], 0]
         if self.interp == "cubic":
             from scipy.ndimage import maximum_filter
@@ -257,12 +284,12 @@ class Chain:
         # bilinjärt för prognosen, och analysens värden flyttade med närmaste granne som mål för
         # matchningen: samma värden, men bara de som är kvar i området
         a = self.prepared(analysis)
-        raw, tgt = self.project(a, motion, steps)
+        corr = location_map(state, now, analysis.shape) if self.location else np.zeros(analysis.shape, np.float32)
+        raw, tgt = self.project(a, motion, steps, self.stay_fraction(motion, corr))
         raw[:, ~np.isfinite(analysis)] = np.nan  # utanför täckningen deltar inte i matchningen
         tgt[:, ~np.isfinite(analysis)] = np.nan
         if self.target != "advected":
             tgt = [analysis] * steps
-        corr = location_map(state, now, analysis.shape) if self.location else np.zeros(analysis.shape, np.float32)
         rain = np.empty(raw.shape, np.float32)
         matched30 = None
         for k in range(steps):

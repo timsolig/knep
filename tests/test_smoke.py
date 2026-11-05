@@ -155,6 +155,25 @@ def test_fill_outside_and_inflow():
     assert np.nanmin(base[-1][:, 10:13]) == 0.0 and np.nanmin(inn[-1][:, 10:13]) > 3.0
 
 
+def test_chain_stay_keeps_terrain_rain():
+    """Med stay står en andel still där vinden blåser uppför; utan terräng och fel flyttas allt."""
+    obs = np.zeros((7, 20, 40), np.float32)
+    obs[:, 8:12, 18:22] = 8.0
+    motion = np.zeros((2, 20, 40))
+    motion[0] = 1.0
+    terrain = np.tile(np.arange(40, dtype=np.float32) * 50.0, (20, 1))  # stiger åt höger, med vinden
+    base = model.Chain(match=False, location=False).run(obs, T0, 6, motion=motion).rain
+    flat = model.Chain(match=False, location=False, stay=(0.8, 1.0, 0.0, 1e9),
+                       terrain=np.zeros_like(terrain)).run(obs, T0, 6, motion=motion).rain
+    np.testing.assert_allclose(flat, base, atol=1e-5)
+    hill = model.Chain(match=False, location=False, stay=(0.8, 1.0, 0.0, 1e9), terrain=terrain)
+    s = hill.stay_fraction(motion, np.zeros((20, 40), np.float32))
+    assert 0.79 < s[10, 20] <= 0.8
+    out = hill.run(obs, T0, 6, motion=motion).rain
+    assert out[-1][10, 20] > 6.0 and base[-1][10, 20] == 0.0
+    np.testing.assert_allclose(np.nansum(out[-1]), np.nansum(base[-1]), rtol=1e-3)  # volymen kvar
+
+
 def test_location_map_learns_a_stationary_bias():
     """En plats där radarn alltid ser 3 dB mer än prognosen ska få en positiv korrektion."""
     state = model.State()

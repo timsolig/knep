@@ -19,7 +19,11 @@ SHOWN = [1, 4, 8, 12, 20]
 
 
 def main():
-    mode, ref, systems = sys.argv[1], sys.argv[2], sys.argv[3:]
+    args = sys.argv[1:]
+    stem = "konservering"
+    if args and args[0].startswith("--namn="):  # uppgift 4: annan tabellfil
+        stem = args.pop(0).split("=", 1)[1]
+    mode, ref, systems = args[0], args[1], args[2:]
     days = D.mode_days(mode)
     rd = D.load(mode, ref, days)
     days = [d for d in days if rd[d]["issues"] > 0]
@@ -49,7 +53,7 @@ def main():
         out.append("")
     out += ["## Domarna", ""] + [f"- `{n}`: {v} ({', '.join(w[:6])})" for n, v, w in verdicts] + [""]
     md = "\n".join(out)
-    (D.RESULTS / f"konservering_{mode}.md").write_text(md + "\n")
+    (D.RESULTS / f"{stem}_{mode}.md").write_text(md + "\n")
     print(md)
 
 
