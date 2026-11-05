@@ -58,7 +58,35 @@ Observera att rampen 180 till 240 min är vald så att den inte kostar något vi
 
 ## Valideringen
 
-(fylls i)
+`NarmastRamp3` i `validering_gles` (16 dygn, 125 utgåvor, 2 km) mot `kedja`, 78 min med 2 processer (40,8 s per prognos med konkurrens från driften). Tabellen ligger i `experiments/projektion/resultat/konservering_validering_gles.md`.
+
+**Domen: inte bättre.** Ingen cell är sämre på domens ledtider (15 min till 5 h), men ingen konserveringscell är heller säkert bättre. Till 3 h är prognosen identisk med kedjan (skillnaden 0,000 överallt, utom hoppen som påverkas av den tidigare utgåvans 3 till 5 h).
+
+Skillnaden mot kedjan vid 4 och 5 h med 95 %-intervall (negativt är bättre):
+
+| mått | kedjan, 5 h | 4 h | 5 h |
+|---|---|---|---|
+| \|log kvot\| q99,9 | +0,04 | +0,039 (−0,044, +0,051) | −0,042 (−0,051, +0,052) |
+| \|log kvot\| blockmax median | −0,06 | −0,030 (−0,056, −0,005) | −0,050 (−0,057, +0,025) |
+| \|log kvot\| blockmax q90 | −0,08 | −0,031 (−0,059, +0,037) | −0,063 (−0,068, +0,058) |
+| \|log kvot\| yta ≥ 5 mm/h | −0,26 | +0,011 (+0,003, +0,025) | +0,014 (+0,005, +0,030) |
+| \|log kvot\| yta ≥ 20 mm/h | −0,13 | +0,044 (−0,030, +0,102) | +0,049 (−0,068, +0,103) |
+| \|log kvot\| volym | −0,30 | 0,000 | 0,000 |
+| FSS 5 mm/h 10 km | 0,084 | −0,002 (−0,002, −0,001) * | −0,001 (−0,002, 0,000) |
+| CSI 5 mm/h | 0,027 | +0,0003 (säkert sämre, men under 0,001) ! | 0,000 |
+| FSS 1 mm/h 30 km (spärr) | 0,370 | −0,002 * | −0,003 * |
+| \|log kvot\| effekt 4 till 8 km (spärr) | −1,07 | −0,498 * | −0,544 * |
+
+Hoppen (spärren, mot utgåvan 3 h före, så att den tidigare utgåvans 3 h 15 min till 5 h ingår): −0,000 *, −0,003 * och −0,003 * vid 15 min, 1 h och 2 h.
+
+Vad valideringen säger:
+
+- **Formen** vid 4 och 5 h blir nästan halverad i felet (effekten 4 till 8 km −0,53 i stället för −1,07 vid 5 h), med smalt intervall, och FSS 1 mm/h blir något bättre. Hoppen mellan utgåvorna blir något mindre. Det är det säkra resultatet.
+- **Topparna per block** (blockmaxets median och 90-percentil) kommer 0,03 till 0,06 närmare radarn efter 4 h, men intervallet täcker 0 vid 5 h. 99,9-percentilen är bättre vid 5 h och sämre vid 4 h, med breda intervall. Konserveringen av toppvärdena är alltså inte säkert bättre.
+- **Ytan över 5 mm/h** blir något sämre (0,011 och 0,014 längre från radarn, intervallet över 0 men under domens tolerans 0,01 vid den nedre gränsen, så det räknas inte som sämre). Närmaste granne behåller topparna men tappar lite av den måttliga ytan, eftersom rutor dupliceras och tappas i deformationen i stället för att smetas ut.
+- **Vid 4 h**, som domaren räknar men inte tar med i domen, är CSI 5 mm/h säkert sämre med 0,0003. Hade 4 h varit med i domen hade varianten fått "inte bättre" även av det skälet. Rampen valdes på träningsdagarna för att undvika kostnaden vid 3 h; att 4 h inte ingår i domen var inte skälet, men det ska sägas.
+
+Slutsatsen: den skarpa flytten löser formen, men den förlust av extremer som är kvar i kedjan (ytan och volymen vid långa ledtider, −0,26 och −0,30 vid 5 h) går inte att få tillbaka med flytten eller matchningen. Den är inflödet över randen och nybildning, som rapport 2 visade, och det kedjan inte har något att sätta där.
 
 ## Ablationerna
 
@@ -82,8 +110,17 @@ Prognosen tar 4,54 s per utgåva på 4 km för `NarmastRamp3` mot 4,28 s för ke
 - `experiments/projektion/kons_sammanfatt.py` (ny): tabellerna `resultat/konservering_<läge>.md`.
 - Data: `/data/projektion/domare/snabb/konservering_*`, `/data/projektion/domare/validering_gles/konservering_NarmastRamp3`, loggarna `/data/projektion/logg/3-*.log`.
 
+## Det som inte hanns med eller är svagt
+
+- Urvalet gjordes på 6 träningsdagar på 4 km; steget med finalisterna på 2 km på fler träningsdagar hoppades över för att hinna med valideringen (ett uppvärmt system tar cirka 80 min i `validering_gles`). Med 6 dygn är intervallen för konserveringen breda, så valet bygger på riktningen och på att inga cellerna var sämre.
+- Bara en finalist kördes på valideringen. Ablationen `Narmast` (närmaste granne på alla ledtider) och `Narmast05` finns bara på träningsdagarna.
+- De prövningar som uppdraget föreslår men som inte gjordes: matchningsmålet lärt per ledtid (rapport 2 visade att radarns eget lagrangeska avtagande inte går att mäta på träningsdagarna, så ett lärt mål skulle i medel ligga nära den flyttade analysens; det som saknas är inflödet), konservering per objekt, skaluppdelning med återställd varians och rörelsefält med flera bilder. MEPS-blandningen, där rapport 2 fann den största förlusten av toppar efter 1 h, finns inte som system i domaren.
+- Rampen har två parametrar valda för hand i tre steg (60–180, 30–120 avbruten, 180–240), inte med slumpsökning.
+
 ## Nästa steg
 
-(fylls i)
+1. **Bedöm den sömlösa prognosen med domaren.** Den största förlusten av toppar och form ligger i MEPS-blandningen (rapport 2: ytan ≥ 20 mm/h −0,63 vid 1 h, effekten 4 till 8 km −2,5 vid 5 h). Det kräver ett system `somlos` i domaren (med `seamless.blend` och MEPS-rättningen som i `forlust.py`) och en baslinje för det. Pröva sedan att lägga kedjans små skalor ovanpå det blandade fältet, eller matcha det blandade fältet mot kedjans fördelning för topparna. Här borde närmaste granne efter 3 h hjälpa ännu mer, eftersom formen i blandningen tappas just efter 2 h.
+2. **Inflödet över randen**: fyll rutorna vars avgångspunkt ligger utanför täckningen med MEPS eller OPERA i stället för 0. Matchningen mot hela analysen (`Analys`) visar att det inte går att ta tillbaka volymen genom att omfördela värdena inom fältet.
+3. Om `NarmastRamp3` ska vidare: kör `Narmast` och `NarmastRamp` på valideringen som ablationer, och den på `validering` (varje timme) för hoppen med 1 h mellan utgåvorna. Det är en liten ändring i drift (`Chain(interp="nearest", ramp=(180, 240))`), men den slår inte baslinjen enligt domen, så den ska inte in.
 
 Status: delvis
