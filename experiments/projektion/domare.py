@@ -100,6 +100,9 @@ def _chain_hours(day: str) -> list[int]:
 LÄGEN = {
     "validering": dict(days=_val_days, res=2, hours=_chain_hours, ref="kedja"),
     "validering_gles": dict(days=_val_days, res=2, hours=lambda d: [h for h in _chain_hours(d) if h % 3 == 0], ref="kedja"),
+    # som validering_gles utan 2019 (MEPS låg då på ett äldre rutnät och finns inte i /data/meps), för somlos
+    "validering_meps": dict(days=lambda: [d for d in _val_days() if not d.startswith("2019")], res=2,
+                            hours=lambda d: [h for h in _chain_hours(d) if h % 3 == 0], ref="kedja"),
     "traning": dict(days=training_days, res=2, hours=lambda d: list(range(0, 24, 3)), ref="kedja_om"),
     "snabb": dict(days=lambda: FAST_DAYS, res=4, hours=lambda d: list(range(0, 24, 3)), ref="kedja_om"),
 }
