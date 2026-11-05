@@ -215,7 +215,9 @@ class Somlos(D.System):
             self.last = h
             h += timedelta(hours=1)
 
-    def forecast(self, t, ctx):
+    def inputs(self, t, ctx):
+        """Kedjan och den rättade MEPS per kvart, eller (kedjan, None) utan MEPS, eller None.
+        Rättningen beror inte på blandningens val, så den delas av alla varianter."""
         chain = load_chain(ctx, t)
         if chain is None:
             return None
@@ -225,15 +227,82 @@ class Somlos(D.System):
         self._assimilate(t, ctx, p)
         got = self._on(nwp.available(t, CYCLE), ctx)
         if got is None or self.st.qm is None:
-            return chain
+            return chain, None
         run, on = got
-        out = np.empty_like(chain)
+        mc = []
         for k in range(NQ):
             lead = 15 * (k + 1) - 7.5
             mq = seamless.meps_at(on, run.run, t + (k + 1) * D.Q - timedelta(minutes=5))
-            out[k] = blend_v(chain[k], seamless.corrected(mq, lead, self.st, p), lead, p, self.var)
-        self.meps_used += 1
-        return out
+            mc.append(seamless.corrected(mq, lead, self.st, p))
+        return chain, mc
+
+    def mix(self, chain, mc, res, var=None):
+        var = var or self.var
+        if mc is None:
+            return chain
+        p = var.params(res)
+        return np.stack([blend_v(chain[k], mc[k], 15 * (k + 1) - 7.5, p, var) for k in range(NQ)])
+
+    def forecast(self, t, ctx):
+        got = self.inputs(t, ctx)
+        if got is None:
+            return None
+        self.meps_used += got[1] is not None
+        return self.mix(*got, ctx.res)
+
+
+def run_day_multi(mode: str, day: str, vars_: list[Var]) -> None:
+    """domare.run_day för flera varianter i samma pass över dygnet: radarn, kedjan, MEPS och
+    rättningen läses och räknas en gång, bara blandningen och måtten per variant. Summorna blir
+    desamma som med domare.run_day för varje variant (kontrollerat för basen på 2023-07-12 i läget snabb)."""
+    cfg = D.LÄGEN[mode]
+    res = cfg["res"]
+    paths = [D.OUT / mode / ("somlos_" + v.tag()) / f"{day}.npz" for v in vars_]
+    todo = [(v, p) for v, p in zip(vars_, paths) if not p.exists()]
+    if not todo:
+        return
+    sysm = Somlos()
+    sysm.reset()
+    ctx = D.Ctx(day, res)
+    accs = [D.Acc(res) for _ in todo]
+    prevs = [None] * len(todo)
+    d0 = datetime.fromisoformat(day).replace(tzinfo=UTC)
+    issues = [d0 + timedelta(hours=h) for h in cfg["hours"](day)]
+    started, n = time.monotonic(), 0
+    for t in issues:
+        ctx.forget(t - timedelta(hours=2))
+        analysis = ctx.frame(t)
+        if analysis is None:
+            continue
+        got = sysm.inputs(t, ctx)
+        if got is None:
+            continue
+        cov = np.isfinite(analysis)
+        obs = [ctx.quarter(t + k * D.Q) for k in D.LEADS]
+        for j, (v, _) in enumerate(todo):
+            fc = sysm.mix(*got, res, v)
+            fc = np.stack([render.decode_values(render.encode_values(x)) for x in fc])
+            prev = prevs[j]
+            for i, k in enumerate(D.LEADS):
+                o = obs[i]
+                if o is None:
+                    continue
+                m = cov & np.isfinite(o)
+                old = None
+                if prev is not None and t - prev[0] <= timedelta(hours=3):
+                    jj = k + int((t - prev[0]) / D.Q)
+                    old = prev[1][jj - 1] if jj <= NQ else None
+                accs[j].add(i, fc[k - 1], o, m, old)
+            prevs[j] = (t, fc)
+        n += 1
+    sec = time.monotonic() - started
+    for (v, p), acc in zip(todo, accs):
+        result = acc.d | {"issues": np.array(n), "seconds": np.array(sec / len(todo)), "forecast_seconds": np.array(0.0)}
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp.npz")
+        np.savez_compressed(tmp, **result)
+        tmp.replace(p)
+    print(f"{mode} {day}: {len(todo)} varianter, {n} utgåvor på {sec:.0f} s", flush=True)
 
 
 def variant_system(var: Var) -> Somlos:
@@ -274,23 +343,27 @@ def objective(sc: dict, base: dict) -> tuple[float, dict]:
     return kons + pen, {"kons": kons, "straff": pen}
 
 
-def run_variant(var: Var, days: list[str], procs: int = 2) -> str:
-    name = "somlos_" + var.tag()
+def run_variants(vars_: list[Var], days: list[str], procs: int = 1) -> None:
     from multiprocessing import get_context
 
-    jobs = [(var, d, name) for d in days]
-    with get_context("fork").Pool(procs, maxtasksperchild=4) as pool:
-        list(pool.imap_unordered(_var_job, jobs))
-    return name
-
-
-def _var_job(args):
-    var, day, name = args
-    path = SÖK / name / f"{day}.npz"
-    if path.exists():
+    jobs = [("snabb", d, vars_) for d in days]
+    if procs <= 1:
+        for j in jobs:
+            run_day_multi(*j)
         return
-    D.SYSTEMS[name] = lambda var=var: Somlos(var)
-    D.run_day("snabb", day, name)
+    with get_context("fork").Pool(procs, maxtasksperchild=1) as pool:
+        list(pool.starmap(run_day_multi, jobs))
+
+
+def perturb(v: Var, rng) -> Var:
+    """En granne till v: ett av de satta valen ändrat med en faktor 0,7 eller 1,4 (vikter inom 0..1)."""
+    keys = [k for k, x in asdict(v).items() if x != getattr(Var(), k) and isinstance(x, float)] or ["t50_small"]
+    k = str(rng.choice(keys))
+    x = getattr(v, k) if getattr(v, k) is not None else 60.0
+    x = x * float(rng.choice([0.7, 1.4]))
+    if k in ("top_w", "fine_lam"):
+        x = min(x, 1.0)
+    return replace(v, **{k: round(x, 3)})
 
 
 def sample(rng) -> Var:
@@ -314,28 +387,31 @@ def search(n: int, seed: int, procs: int, log: Path) -> None:
     rng = np.random.default_rng(seed)
     hand = [Var(), Var(t50_q=300.0), Var(top_w=1.0, top_thr=5.0), Var(top_w=0.5, top_thr=5.0),
             Var(fine_lam=0.5, fine_km=8.0), Var(t50_fine=240.0, fine_km=8.0), Var(t50_small=120.0, t50_large=240.0)]
+    days = D.FAST_DAYS
     cands = list(dict.fromkeys(hand + [sample(rng) for _ in range(n)]))
-    days_all = D.FAST_DAYS
-    rounds = [(days_all[:3], None), (days_all, 6)]
     results = {}
-    for r, (days, keep) in enumerate(rounds):
-        if keep is not None:
-            ranked = sorted(cands[1:], key=lambda v: results[v][0])
-            cands = [Var()] + ranked[:keep]
-        base_name = run_variant(Var(), days, procs)
-        base = D.scores(D.load("snabb", base_name, days), days)
-        for v in cands:
-            s = time.monotonic()
-            name = run_variant(v, days, procs)
-            sc = D.scores(D.load("snabb", name, days), days)
-            results[v] = objective(sc, base)
+
+    def score(round_, vs):
+        s = time.monotonic()
+        run_variants(vs, days, procs)
+        base = D.scores(D.load("snabb", "somlos_bas", days), days)
+        for v in vs:
+            results[v] = objective(D.scores(D.load("snabb", "somlos_" + v.tag(), days), days), base)
             with log.open("a") as fh:
-                fh.write(json.dumps({"runda": r, "dygn": len(days), "var": v.tag(), "mål": results[v][0],
-                                     **results[v][1], "s": round(time.monotonic() - s)}) + "\n")
-            print(f"runda {r} {v.tag()}: {results[v][0]:.4f} {results[v][1]} ({time.monotonic() - s:.0f} s)", flush=True)
-    best = sorted(cands[1:], key=lambda v: results[v][0])
+                fh.write(json.dumps({"runda": round_, "dygn": len(days), "var": v.tag(), "mål": results[v][0],
+                                     **results[v][1]}) + "\n")
+            print(f"runda {round_} {v.tag()}: {results[v][0]:.4f} {results[v][1]}", flush=True)
+        print(f"runda {round_}: {len(vs)} varianter på {time.monotonic() - s:.0f} s", flush=True)
+
+    # runda 0: alla kandidaterna; runda 1: grannar till de tre bästa (successiv förfining i stället
+    # för halvering, eftersom indata delas och en variant kostar bara blandningen och måtten)
+    score(0, cands)
+    top = sorted(cands[1:], key=lambda v: results[v][0])[:3]
+    nb = [v for v in dict.fromkeys(perturb(t, rng) for t in top for _ in range(3)) if v not in results]
+    score(1, [Var()] + nb)
+    best = sorted([v for v in results if v != Var()], key=lambda v: results[v][0])
     with log.open("a") as fh:
-        fh.write(json.dumps({"bäst": [v.tag() for v in best]}) + "\n")
+        fh.write(json.dumps({"bäst": [v.tag() for v in best[:5]], "bas": results[Var()][0]}) + "\n")
 
 
 # ---------- körtiden på hela rutnätet ----------
