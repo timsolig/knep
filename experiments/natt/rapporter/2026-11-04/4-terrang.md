@@ -5,7 +5,7 @@
 - Höjdmodellen (Copernicus GLO-90) är hämtad direkt från de öppna COG-filerna och skalad till radarns rutnät: `/data/projektion/hojd_2km.npz`, 887 x 471 rutor på 2 km, 1 MB, högst 2129 m. Inga hela rutor sparades.
 - Kedjan har ett nytt val `stay`: en andel av analysen per pixel står still och resten flyttas, med andelen styrd av lyftet (rörelsen gånger höjdgradienten) och av platskartans fel. Standardvärdet (`None`) ger exakt driftens kedja.
 - På träningsdagarna (snabb, 6 dygn, 4 km) ger andelen styrd av **lyftet** små, säkra vinster i FSS och CSI och inga sämre celler, men ingen säkert bättre konservering. Andelen styrd av **platskartans fel** blir sämre (volymen, ytan ≥ 5 mm/h, blockmaxet och FSS efter 2 h), eftersom den stillastående delen avtar utan att ersättas.
-- Finalisten `Lyft` på valideringen: se nedan. Driften ändras inte.
+- Finalisten `Lyft` på valideringen (6 av 16 dygn, för tidens skull): **inte bättre**. Träffen vid 1 h blir något bättre (FSS, CSI, formen, hoppen), men ytan ≥ 5 och 10 mm/h och volymen blir säkert sämre efter 2 till 3 h. Orsaken är att den stillastående delen avtar utan att ersättas. Driften ändras inte.
 
 ## Utgångsläget
 
@@ -47,7 +47,32 @@ Det träningsdagarna visar:
 
 ## Valideringen
 
-VALIDERING
+`Lyft` i `validering_gles` (2 km) mot `kedja`, men bara på **6 av de 16 dygnen** (vart tredje i listan, valda innan något resultat fanns: 2019-03-08, 2020-05-10, 2021-01-20, 2021-10-20, 2024-06-28, 2025-07-29), eftersom hela valideringen (cirka 80 min) inte fick plats i tiden. 23 min med 2 processer, 20,5 s per utgåva. Tabellen: `experiments/projektion/resultat/terrang_validering_gles.md`. Testdelen lästes inte.
+
+**Domen: inte bättre.** Skillnad mot kedjan (negativt är bättre):
+
+| mått | 15 min | 1 h | 2 h | 3 h | 5 h |
+|---|---|---|---|---|---|
+| \|log kvot\| yta ≥ 5 mm/h | +0,001 | +0,009 | +0,022! | +0,027! | +0,033! |
+| \|log kvot\| yta ≥ 10 mm/h | −0,001 | +0,017 | +0,024 | +0,029! | +0,030! |
+| \|log kvot\| volym | −0,001 | −0,001 | +0,007 | +0,013! | +0,017! |
+| \|log kvot\| q99 | −0,002 | +0,011 | +0,014 | +0,015 | +0,011 |
+| blockmax q90 | +0,004 | +0,037 | +0,043 | +0,024 | +0,021 |
+| FSS 5 mm/h 10 km | 0,000 | −0,002* | −0,001 | −0,001 | +0,001 |
+| CSI 5 mm/h | +0,001 | −0,001* | 0,000 | 0,000 | 0,000 |
+| SEDI 10 mm/h | +0,001! | 0,000 | 0,000 | −0,001 | −0,001 |
+| FSS 1 mm/h 30 km (spärr) | 0,000 | −0,002* | −0,002 | 0,000 | +0,001 |
+| CSI 1 mm/h (spärr) | 0,000 | −0,001* | −0,001 | 0,000 | +0,000! |
+| form 4–8 km (spärr) | +0,008 | −0,061* | −0,046 | −0,024 | +0,002 |
+| hopp (spärr) | −0,002* | −0,002* | −0,001 | | |
+
+Vad valideringen säger:
+
+- **Konserveringen blir sämre, inte bättre.** Ytan ≥ 5 och 10 mm/h och volymen kommer säkert längre från radarn efter 2 till 3 h (0,01 till 0,03 i |log kvot|), och toppvärdena (q99, blockmaxet) blir inte bättre. Det är avtagandet av den stillastående delen (tau 120 min): det regn som låses fast i terrängen försvinner med ledtiden i stället för att ersättas av det som flyttas in, och matchningens mål, som delas på samma sätt, tar inte tillbaka det. På träningsdagarna syntes samma riktning men inte säkert.
+- **Träffen den första timmen blir något bättre**: FSS 5 mm/h, CSI 5 mm/h, FSS och CSI 1 mm/h vid 1 h säkert bättre med 0,001 till 0,002, formen 4 till 8 km vid 1 h −0,06 och hoppen mindre. Det stämmer med tanken: där vinden blåser uppför står regnet kvar, och det är rätt de första timmarna.
+- SEDI 10 mm/h vid 15 min och CSI 1 mm/h vid 5 h är säkert sämre men med 0,001 och mindre.
+
+Slutsatsen: delningen efter lyftet hjälper träffen den första timmen men kostar ytan och volymen längre fram, så som den är byggd (avtagande stillastående del) håller den inte kvar extremerna. Med 6 dygn är intervallen breda och resultatet ska läsas som riktning.
 
 ## Filer
 
