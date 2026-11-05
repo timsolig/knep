@@ -171,7 +171,7 @@ Tabellen i `resultat/konservering_validering_gles.md`. `Inflode25`, 57 min med 2
 
 **Var överskottet kommer ifrån.** Per dygn (ytan ≥ 10 mm/h vid 15 min) överskattar kedjan redan själv på 13 av 16 dygn, till exempel 3035 rutor mot radarns 2457 (2020-11-21) och 933 mot 544 (2025-01-06), och inflödet lägger till ungefär i proportion. Där kedjan underskattar för att regn kommer in (2021-05-17 ≥ 5 mm/h, 2021-10-20, 2024-06-28 ≥ 5 mm/h) kommer inflödet närmare radarn. På träningsdagarna samma mönster: 2021-05-11, ytan ≥ 20 mm/h vid 15 min, kedjan 433, inflödet 542, radarn 549. Kedjans överskott tidigt kommer från platskartan: i `kedja_utan_platskarta` (rapport 1) är ytan ≥ 10 mm/h +0,06 vid 15 min i stället för +0,13. Inflödet är alltså rätt i sak, men det lägger till regn ovanpå en förstärkning som redan är för stor, och |log kvot| straffar det.
 
-INFLODE75_VALIDERING
+**`Inflode75` på valideringen** (70 min): samma dom och samma tre celler (ytan ≥ 10 mm/h +0,019 vid 15 min). Mer av det som Inflode25 ger: volymen −0,046*, −0,066* och −0,105* vid 2, 3 och 5 h (kedjan −0,30 vid 5 h blir −0,19), ytan ≥ 5 mm/h −0,104* och −0,152* vid 3 och 5 h, FSS 5 mm/h 10 km −0,015* vid 2 h, CSI 5 mm/h bättre till 3 h, spärrarna bättre. Men q99,9 blir större med ledtiden (+0,134 vid 3 h, +0,323 vid 5 h, inte säkert), medan SEDI och FSS vid 10 mm/h ändå blir bättre. Längre L ger mer volym och träff men toppar som är för höga längre fram, som på träningsdagarna; L mellan 25 och 75 km är rimligt, och valet bör göras om när överskottet tidigt är borta.
 
 ## Nästa steg
 
