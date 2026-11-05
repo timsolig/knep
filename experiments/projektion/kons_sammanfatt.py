@@ -25,10 +25,14 @@ def main():
         stem = args.pop(0).split("=", 1)[1]
     mode, ref, systems = args[0], args[1], args[2:]
     days = D.mode_days(mode)
+    if stem != "konservering":  # uppgift 4: bara de dygn som alla systemen har (delmängd av läget)
+        days = [d for d in days if all((D.OUT / mode / s.replace(":", "_") / f"{d}.npz").exists()
+                                       for s in [ref] + systems)]
     rd = D.load(mode, ref, days)
     days = [d for d in days if rd[d]["issues"] > 0]
     idx = [D.LEADS.index(k) for k in SHOWN]
-    out = [f"# Uppgift 3, läge {mode}, mot `{ref}`", "",
+    task = "Uppgift 3" if stem == "konservering" else f"Uppgift 4 ({stem})"
+    out = [f"# {task}, läge {mode}, mot `{ref}`", "",
            f"{len(days)} dygn. Varje cell: systemets värde (log kvot mot radarn för kons och form, annars poäng) "
            "och skillnaden mot baslinjen, negativt är bättre; `*` intervallet (95 %, bootstrap över dygnen) helt på "
            "den bättre sidan, `!` helt på den sämre.", ""]
