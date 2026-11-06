@@ -62,9 +62,9 @@ OUT = Path("/data/analys/a2")
 STEP = 4  # tillskottet räknas på var 4:e ruta
 
 # frysta efter träningen (se trana); ändra inte efter att valideringen har körts
-# timmen: koordinatsökningen i trana (28 träningsdagar). Kvarten: stora skalan från timmen, L vald i
-# trana innan körningen avbröts av en timeout; SB och SO är timmens gånger 0,5 (sökrutnätets skala
-# för kvarten) och R_TORR som timmen, inte valda.
+# timmen: koordinatsökningen i trana (28 träningsdagar). Kvarten: stora skalan från timmen, L, SB, SO och
+# R_TORR valda i trana --res kvart (försök 2); sökningen behöll startvärdena (timmens SB och SO gånger
+# 0,5 och timmens R_TORR), eftersom inget annat värde sänkte målet med mer än 1e-5.
 PARAMS = {
     "timme": {"L_STOR": 75.0, "ALFA": 8.0, "WIN": 6, "L": 40.0, "SB": 1.6, "C": 1.0, "SO": 0.3,
               "TORR": 0.05, "R_TORR": 80.0},

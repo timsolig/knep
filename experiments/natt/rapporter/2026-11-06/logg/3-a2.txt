@@ -35,3 +35,9 @@ A2 finns nu i `experiments/analys/a2.py` och är bedömd med domaren på de 16 v
 - **Mätarna kontrolleras inte** mot sina grannar, så ett fel i en mätare sprids nu upp till cirka 40 km. Det behövs innan A2 blir facit.
 
 Ny data är 266 MB under `/data/analys/a2/`, och det mesta är A1:s sparade fält, så att A2 kan köras om utan att A1 räknas igen. Inget i `src/`, `deploy/`, `models/` eller domaren ändrades. Loggfilen `logg/3-a2.txt` ligger kvar ocommittad, som den var när jag började.
+===== 2026-11-06T21:19:25Z försök 2 =====
+Jag väntar på händelser från träningen.
+
+Träningen har startat (utgångsläget: MAE 0,0554, kvot 0,876). Jag väntar på resten.
+
+Jag väntar fortfarande på kvartens träning.
