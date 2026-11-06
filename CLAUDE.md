@@ -46,7 +46,7 @@ Tim-KNEP bygger bara på observationer: radarn och regnmätarna, och på sikt sa
 
 ## Miljö
 
-Claude Code körs direkt på Pi:n. Repot ligger i `~/knep` och radararkivet i `~/radar-arkiv`; experimenten och nattkörningen använder de gamla sökvägarna `/work` och `/data`, som ska vara symlänkar dit. Driften går i containern från `deploy/compose.yaml` och följer `main` av sig själv (en sammanslagning är i drift inom fem minuter), så ändringar går via grenar och pull requests, aldrig direkt mot driften. Rör aldrig driftens container eller volymer.
+Claude Code körs direkt på Pi:n. Repot ligger i `~/knep` och radararkivet i `~/radar-arkiv`; experimenten och bakgrunden (`experiments/bakgrund/`) använder de gamla sökvägarna `/work` och `/data`, som ska vara symlänkar dit. Driften går i containern från `deploy/compose.yaml` och följer `main` av sig själv (en sammanslagning är i drift inom fem minuter), så ändringar går via grenar och pull requests, aldrig direkt mot driften. Rör aldrig driftens container eller volymer.
 
 ## Pull requests
 
