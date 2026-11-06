@@ -660,6 +660,11 @@ def cmd_kor(a) -> None:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(json.dumps(res))
             print(day_s, s, f"{time.time() - t:.0f} s", "mätare", len(dag.timme), len(dag.kvart), flush=True)
+            del sysm
+        # släpp dagens bilder innan nästa dag läses (annars ligger två dagar i minnet samtidigt)
+        del rd, dag, a0
+        import gc
+        gc.collect()
 
 
 def load_results(namn: str, part: str) -> dict[str, dict]:
