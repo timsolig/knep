@@ -41,3 +41,4 @@ Uppgiften var redan klar när den här påminnelsen kom, så jag har inte gjort 
 - **Sammanställningen:** `karta.py` kördes på alla 44 dagar och skrev `kartor.npz`, `tabell.json` och `bild/`. Allt under `/data/analys/artefakter/` tar 231 MB, och /data har 6,1 GB ledigt.
 - **Rapporten:** den ligger i `experiments/natt/rapporter/2026-11-06/1-artefakter.md` med `Status: delvis`, eftersom solstrålar, anaprop och satellitens molnmask saknas.
 - **Committen:** f68e871 är committad efter att `uv run pytest` gått igenom med 138 godkända.
+===== 2026-11-06T15:38:25Z försök 2 =====

@@ -2,6 +2,8 @@
 
 Före uppgiften fanns bara provet av behörigheterna (`prov.md`), så ingen tidigare uppgift var halvfärdig.
 
+Rapporten skrevs i två försök. Försök 1 gjorde inventeringen per ruta och dag (avsnitten från "Vad jag gjorde" till "Förslag till filtret"). Försök 2 lade till testet bild för bild för solstrålar, fasta ekrar och anaprop, som saknades. Det står i avsnittet "Försök 2" längre ned, och förslaget till filtret har kompletterats där.
+
 ## Vad jag gjorde
 
 Jag räknade per ruta på radarns rutnät (887 × 471 rutor, 2 km) för de 28 träningsdagarna och de 16 valideringsdagarna, 44 dagar och 288 bilder per dag. Testdagarna lästes aldrig: `days()` i skriptet tar bara träningen och delen `validering` och kontrollerar att ingen testdag kommer med. Mätarna i `p7.npz` filtreras på dagens timmar direkt när filen läses.
@@ -64,7 +66,7 @@ Det som syns:
 - **Vindkraft**: de flesta av de värsta rutorna ligger i vindkraftsområden i Jämtland, Västernorrland och Västerbotten (seosd, seoer) och vid Markbygden (65,40 / 20,65). De har högre textur och tidsvariation (d5 upp till 10 dB, flip 0,12) än fast klotter vid radarn (d5 cirka 3). Det stämmer med att rotorerna blinkar. Men den **typiska** vindkraftsrutan är ren: över alla 1 972 verksrutor är medianöverskottet 0,001 och `f_torr` 0,053, ungefär som ringen 4 till 10 km runt dem. Bara en del parker syns, troligen de som ligger i strålen nära en radar. En mask på alla verk vore alltså fel.
 - **Närklotter** vid radarplatserna (sella, sevax, sekaa, seoer) står mest still av alla typer (`f_still` 0,3 till 0,4) och har låg tidsvariation.
 - **Ekrar** som återkommer, på alla dagar ihop med z > 6: 32 på träningsdagarna och 63 på valideringsdagarna, varav 29 finns i båda. De starkaste är noand 118°, nohfj 49 till 51°, sebaa 84 till 85° och 132°, seoer 336 till 339° (19 toppar, flest av alla radarer), seatv 269° och 285° och seang 32°. Per dag finns 904 toppar, och flest har noand (118° och 140° på 2019-03-08 och 2019-03-17) och norsa (102 till 120° på 2021-01-20).
-- **Solstrålar**: av ekrarna per dag ligger 82 av 904 (9 %) inom ±8° från solens azimut vid upp- eller nedgång. Det är vad slumpen ger (32°/360° = 9 %), så **daglig ekofrekvens räcker inte för att se solen**. Solstrålar varar några bilder och behöver hittas bild för bild. Det hann jag inte göra.
+- **Solstrålar**: av ekrarna per dag ligger 82 av 904 (9 %) inom ±8° från solens azimut vid upp- eller nedgång. Det är vad slumpen ger (32°/360° = 9 %), så **daglig ekofrekvens räcker inte för att se solen**. Solstrålar varar några bilder och behöver hittas bild för bild. Det gjordes i försök 2 (se nedan), och där syns de tydligt.
 - **Havsklotter** syns inte tydligt i de här dagarna. Kandidaterna över havet (343 rutor) har medianöverskott 0,006 och `euler_lagr` 1,12, och rör sig alltså med vädret. Det är mest verkligt regn och snöbyar nära kusten som har blivit kandidater genom `f_torr`. `f_torr` är svagt där, eftersom bara kustmätarna når ut 25 km. Anaprop, som kommer med inversioner, syns inte heller som en egen grupp i dygnsfrekvenserna.
 
 ## Jämförelse med höjdmodellen
@@ -120,12 +122,86 @@ Totalt står 1 087 av 2 874 kandidater kvar. Den låga andelen för "övrigt" vi
    - Behåll ekot om omgivningen inom 20 till 40 km har regn och vinden går mot sluttningen (lyftet ur rörelsen och GLO-90).
    - Det billiga är fönster med `uniform_filter`, rörelsefältet som redan räknas, och gradienten ur höjdmodellen.
 3. **Vindkraft**: använd inte förteckningen över verk som mask. Använd den som förhandssannolikhet tillsammans med blinkandet (`flip`, `d5`), eftersom bara en del parker syns.
-4. **Ekrar**: rätta de 29 ekrarna som återkommer, som azimutsektorer per radar, genom att jämföra med grannsektorerna. Solstrålar och tillfälliga ekrar behöver en test bild för bild: en smal azimut med eko som sträcker sig radiellt och följer solens azimut. Det byggdes inte här.
+4. **Ekrar**: rätta de 29 ekrarna som återkommer, som azimutsektorer per radar, genom att jämföra med grannsektorerna. Solstrålar och tillfälliga ekrar behöver en test bild för bild: en smal azimut med eko som sträcker sig radiellt och följer solens azimut. Den byggdes i försök 2; se punkt 6 och 7 nedan.
 5. Domaren ska avgöra. Terrängens mått, mätare över 400 m och på lovartsidan, är de som kan bli sämre om filtret tar orografin.
+
+## Försök 2: bild för bild (solstrålar, fasta ekrar, anaprop)
+
+### Vad jag gjorde
+
+`experiments/analys/bild.py dag` läser alla 288 bilder på var och en av de 44 dagarna (samma urval som ovan, `days()` med kontrollen mot testdagarna). Det tog cirka 2,5 min per dag med två processer. Utdata per dag ligger i `/data/analys/artefakter/bild_dag/<dag>.json`, 65 MB. `bild.py sammanstall` (koden i `bild_sammanstall.py`) skriver `/data/analys/artefakter/bild_tabell.json`. `bild_prov.py` är provkörningen som användes för att ställa in ekertestet.
+
+- **Ekrar per bild**: för varje radar i `composite.RADARS` räknas andelen eko (R ≥ 0,1 mm/h) i strålar om 1° på 40 till 200 km avstånd, i fyra band om 40 km. En stråle räknas som eker om andelen eko är minst 0,4, om minst tre av de fyra banden har minst 0,25 (strålen är radiellt lång) och om medianen av strålarna 3 till 10° åt sidan är högst 0,1 (strålen är smal). Azimuten är rättad för meridiankonvergensen på rutnätet (EPSG:25833). Solens azimut och höjd räknas för bildens tid och radarns plats med NOAA:s förenklade formler.
+- **Prickar per bild**: per radar inom 150 km räknas eko som är isolerade (under 3 % eko inom 42 km) och kantiga (texturen |dBZ − grannarnas medel| ≥ 8 dB). De räknas också utanför de kända klotterrutorna (`kandidat` på träningsdagarna och vindkraftsrutorna i `kartor.npz`, utvidgade en ruta). Det görs isolerade (`prickar_nya`) och kantiga oavsett isolering (`kantigt_nytt`), och var för sig under timmar då mätarna inom 25 km (p7) är torra.
+
+Första provkörningen krävde andel ≥ 0,5 och ≥ 0,3 i alla fyra banden. Det gav 0 ekrar på 2019-03-08, eftersom en stråle om 1° bara täcker 9 till 33 rutor per band på 2 km-rutnätet. Därför sänktes trösklarna innan hela körningen startades.
+
+### Solstrålar: tydliga, och bara när solen står vid horisonten
+
+Totalt hittades 8 041 ekrar per bild. Andelen som ligger inom ±3° från solens azimut, per solhöjd:
+
+| solhöjd | ekrar | nära solen | andel |
+|---|---|---|---|
+| under −5° | 2 754 | 44 | 1,6 % |
+| −5 till 0° | 606 | 123 | **20 %** |
+| 0 till 5° | 910 | 235 | **26 %** |
+| 5 till 10° | 678 | 9 | 1,3 % |
+| 10 till 20° | 1 164 | 26 | 2,2 % |
+| 20 till 30° | 777 | 16 | 2,1 % |
+| över 30° | 1 152 | 7 | 0,6 % |
+
+Slumpen ger 7/360 = 1,9 %. Som kontroll räknades samma ekrar mot solens azimut förskjuten 20 till 40°, och det ger 1,4 %. **Solstrålarna finns alltså, och nästan bara när solen står mellan cirka −1 och +1°.** Då är var fjärde eker solen. Försök 1 såg dem inte, eftersom de varar 10 till 70 minuter och försvinner i dygnsfrekvensen.
+
+22 händelser följer solen i minst tre bilder i rad: strålen flyttar sig med solens azimut, och solhöjden ligger hela tiden mellan −0,7 och +0,8°. Några exempel:
+
+| radar | tid (UTC) | bilder | strålens azimut | solens azimut | del |
+|---|---|---|---|---|---|
+| sekrn | 2023-07-12 21:30 till 22:40 | 14 | 344 till 359° | 343 till 359° | träning |
+| sekrn | 2023-07-12 22:55 till 23:50 | 12 | 2 till 15° | 3 till 16° | träning |
+| sekrn | 2024-07-13 21:20 till 22:05 | 9 | 341 till 352° | 341 till 351° | validering |
+| sekrn | 2024-07-13 23:25 till 23:55 | 7 | 9 till 17° | 10 till 17° | validering |
+| sevax | 2019-03-17 15:15 till 15:40 | 6 | 243 till 247° | 243 till 248° | validering |
+| seoer | 2022-12-20 08:40 till 09:00 | 5 | 150 till 155° | 152 till 156° | träning |
+| sehem | 2024-07-13 02:15 till 02:25 | 3 | 45 till 48° | 46 till 48° | validering |
+| sella | 2023-01-04 09:00 till 09:15 | 4 | 156 till 160° | 158 till 161° | träning |
+
+Kiruna (sekrn) dominerar med 11 av de 22 händelserna. Vid midnattssolen står solen vid horisonten i timmar och vandrar genom norr. Strålarna är starka: andelen eko längs strålen är 0,7 till 0,94. Sevax 2019-03-17 hade solen på 11 till 14° och är undantaget. Den och seatv 2020-10-07, med solen på 23°, kan vara slump eller en högre elevation i kompositen.
+
+### Fasta ekrar som återkommer bild för bild
+
+Fasta ekrar är samma radar och azimut (±1°) på minst tre dagar. De starkaste:
+
+| radar | azimut | dagar av 44 | träning / validering | bilder |
+|---|---|---|---|---|
+| sebaa | 134° | **34** | 23 / 11 | 712 |
+| sebaa | 86 till 89° | 20 | 14 / 6 | 520 + 111 |
+| seosd | 295 till 298° | 12 | 9 / 3 | 133 + 74 |
+| seosd | 218 till 221° | 10 | 8 / 2 | 23 + 27 |
+| sekaa | 193 till 203° | 8 | 4 / 4 | 30 + 23 |
+| sehem | 120° och 134° | 7 och 7 | 2 / 5 och 5 / 2 | 215 och 203 |
+| seoer | 338° | 6 | 5 / 1 | 16 |
+
+Sebaa 134° och 85° stämmer med försök 1:s ekrar ur dygnsfrekvensen (132 till 133° och 84 till 85°), och seoer 338° stämmer med 336 till 339°. Sebaa 134° finns på tre av fyra dagar och är därmed den enskilt vanligaste artefakten i inventeringen. Sebaa har flest ekrar per bild (1 541), följt av sehem (991) och sekaa (800). Ekrarna från noand och nohfj, som syntes i dygnsfrekvensen, kommer knappt med här, eftersom bara en liten del av deras strålar ligger inne i rutnätet (nohfj har 24 ekrar). Många av de 8 041 ekrarna är regnband som råkar ligga radiellt. Det syns på att de inte återkommer.
+
+### Anaprop: syns inte i de här dagarna
+
+- **Isolerade kantiga prickar utanför de kända klotterrutorna** (`prickar_nya`): 18 timmar ligger långt över radarns vanliga nivå (minst 20 per bild och 8 MAD över medianen). 13 av dem är 2023-01-04 vid sekrn och sella i januarimörker, med prickar spridda över hela dygnet. Andelen av prickarna som ligger vid torra mätare är 0,27 till 0,48, mot 0,27 för alla prickar. Det talar inte tydligt för klotter. Det kan vara lätt snö i kall luft eller anaprop under en inversion; det går inte att avgöra utan mätare (de saknas där) eller satellit.
+- **Kantiga ekon vid torra mätare** (`torr_kantigt_nytt`): 303 timmar ligger över radarns nivå (236 på träningsdagarna och 67 på valideringsdagarna). Fördelningen över lokal soltid är 0 till 3: 18, 3 till 6: 11, 6 till 9: 21, 9 till 12: 39, **12 till 15: 87, 15 till 18: 64**, 18 till 21: 38 och 21 till 24: 25. Dagarna är 2020-10-07, 2024-07-28, 2020-08-29 och 2020-07-24, alltså skurdagar. Medlet per bild har samma topp på sommaren: 22 kantiga torra ekon per bild kl. 12 till 15 mot 9 på natten. Anaprop borde ha sin topp på natten och morgonen, under inversioner. **Det här är alltså mest konvektiva skurar som mätarna inom 25 km inte har fångat**, och inte anaprop.
+
+Det är en viktig varning för filtret och domaren. Att mätarna är torra inom 25 km är ett svagt tecken på klotter för små skurceller på sommaren. Kännetecknet `f_torr` fungerar för fast klotter, eftersom det räknas över många dagar, men som test i en enskild bild skulle det ta bort riktiga skurar. Det måste kombineras med rörelsen (skurar rör sig, klotter står still) eller begränsas till rutor där kartan redan säger klotter.
+
+Över alla bilder är 0,2 % av ekona isolerade och kantiga. 58 % av dem ligger utanför de kända klotterrutorna, och 30 % av alla prickar ligger vid torra mätare, mot 6 % av allt eko.
+
+### Tillägg till förslaget för filtret i uppgift 4
+
+6. **Solstrålar** är billiga att ta bort i varje cykel. Gör testet bara när solen står mellan −1,5 och +1,5° vid en radar (det är någon timme om dagen, och flera timmar vid midnattssolen i norr). Ta bort strålen inom ±3° från solens azimut om den är smal och lång (eko längs strålen mot torrt åt sidorna, samma test som i `bild.py`). Det ger nästan inga falska larm: på andra solhöjder är andelen nära solen på slumpnivån.
+7. **Fasta ekrar** (sebaa 134° och 86 till 89°, seosd 295 till 298° och 218 till 221°, sekaa 193 till 203°, sehem 120° och 134°, seoer 338°): en lista per radar som räknas på träningsdagarna. Ta bort ekot i sektorn bara när testet för en smal och lång stråle slår till i bilden, och inte i allmänhet, eftersom det regnar i sektorn också.
+8. **Anaprop** kan inte motivera något filter på de här dagarna. Ett test som tar bort kantiga ekon vid torra mätare tar framför allt bort sommarens skurar. Ska anaprop sökas, behövs nätter med inversioner (klara sommarnätter och vinternätter) och satellitens molnmask.
 
 ## Det som inte blev gjort
 
-- Satellitens molnmask hämtades inte. Testen bild för bild för solstrålar och anaprop finns inte.
+- Satellitens molnmask hämtades inte. Körningen fick inte gå ut på nätet (curl mot EUMETSAT:s WMS nekades av behörighetsinställningarna), så det gick inte att se om EUMETSAT:s öppna produkter kan läsas utan konto. Det gör att varken prickarna 2023-01-04 eller de torra skurarna kan avgöras mot molnen.
+- Ett test för anaprop med rörelsen per bild (står ekot still?) byggdes inte; försök 2 räknade bara textur, isolering och torra mätare per bild.
 - Mätarnas torrhet bygger bara på p7 inom 25 km, och i fjällen och vid havet saknas mätare ofta. Där kan `f_torr` inte räknas.
 - Typningen är en tumregel med fasta trösklar för att visa var och vad. Den är inte ett filter och är inte bedömd av domaren, som byggs i uppgift 2.
 
@@ -133,6 +209,18 @@ Totalt står 1 087 av 2 874 kandidater kvar. Den låga andelen för "övrigt" vi
 
 - `experiments/analys/artefakter.py` (ny): räkningen per dag.
 - `experiments/analys/karta.py` (ny): sammanställningen, typningen, ekrarna och bilderna.
-- Den här rapporten. Inget i `src/` ändrades, och `uv run pytest` gav 138 godkända.
+- `experiments/analys/bild.py` (ny i försök 2): ekrar och prickar bild för bild.
+- `experiments/analys/bild_sammanstall.py` (ny i försök 2): solen, de återkommande ekrarna och skurarna.
+- `experiments/analys/bild_prov.py` (ny i försök 2): provkörningen av ekertestet.
+- Den här rapporten. Inget i `src/` ändrades, och `uv run pytest` gav 138 godkända (även efter försök 2).
 
-Status: delvis
+Allt under `/data/analys/artefakter/` tar cirka 300 MB, under gränsen på 1 GB, och /data har 5,9 GB ledigt.
+
+## Nästa steg
+
+- Uppgift 4: bygg filtret av klotterkartan (punkt 1 och 2), soltestet (punkt 6) och de fasta ekrarna (punkt 7), och låt domaren avgöra med terrängens mått.
+- Hämta satellitens molnmask när nätet får användas, och sök anaprop på klara nätter.
+
+Inventeringen som uppgiften beställde är gjord: kartorna per ruta, ekrarna, solstrålarna, havet, vindkraften, jämförelsen med höjdmodellen och förslaget till filtret. Satellitens molnmask saknas eftersom nätet var spärrat, och anaprop kunde inte påvisas i de här dagarna.
+
+Status: klar
