@@ -14,3 +14,5 @@ deploy/.env
 # nattkörningen, se experiments/natt/README.md
 natt.log
 STOPP
+# bakgrunden: planerarens förslag, loopen läser och tar bort den
+experiments/bakgrund/nasta.md

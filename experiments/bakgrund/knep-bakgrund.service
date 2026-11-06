@@ -1,0 +1,15 @@
+[Unit]
+Description=knep: bakgrunden (Claude Code arbetar dygnet runt, se experiments/bakgrund/README.md)
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=PATH=@PATH@
+ExecStart=%h/.local/share/knep-bakgrund/loop.sh
+Restart=always
+RestartSec=120
+KillSignal=SIGINT
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

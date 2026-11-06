@@ -1,4 +1,6 @@
-# Bakgrundskörningen
+# Bakgrundskörningen med fast kö (ersatt)
+
+Ersatt av loopen i `experiments/bakgrund/`, som planerar själv och går dygnet runt. Rapporterna härifrån ligger kvar och journalen i `experiments/bakgrund/JOURNAL.md` pekar på dem.
 
 Claude Code arbetar igenom `ko.txt` utan att någon svarar på frågor, när som helst på dygnet. Varje uppgift är en egen session (`claude -p`) som läser `uppdrag.md`, gör uppgiften, skriver en rapport och committar. Allt sker i ett eget arbetsträd, `~/natt`, på grenen `natt/<datum>`. Utvecklingsklonen i `~/knep` och driften påverkas inte. (Katalogen och grenarna heter fortfarande `natt`.)
 
