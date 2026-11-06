@@ -22,7 +22,9 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 from data import DATA, load_days, radar_path  # noqa: E402
-from knep import model, radar, render  # noqa: E402
+from knep import render  # noqa: E402
+from knep.analys import radar  # noqa: E402
+from knep.prognos import model  # noqa: E402
 
 OUT = DATA / "sverige" / "kedja"
 STEPS = 60          # 5 h i 5-minuterssteg

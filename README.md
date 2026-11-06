@@ -75,11 +75,11 @@ Tim-KNEP utgår från samma radaranalys som är facit, så mot radarn gynnas Tim
 
 ## Radarbortfall
 
-Kompositen (`src/knep/composite.py`) fyller pixlar som brukar ha data men saknar data nu: först med OPERA-kompositen om `--fallback` är satt, sedan med förra analysen flyttad med rörelsefältet. Kvaliteten för flyttade pixlar avtar med tiden och efter 90 min släpps de. Sidan visar vilka svenska radarer som saknas. För en egen komposit av enskilda radarvolymer finns `sources.volume_composite`, som hämtar ODIM-volymer från EUMETNET:s öppna radardata.
+Kompositen (`src/knep/analys/composite.py`) fyller pixlar som brukar ha data men saknar data nu: först med OPERA-kompositen om `--fallback` är satt, sedan med förra analysen flyttad med rörelsefältet. Kvaliteten för flyttade pixlar avtar med tiden och efter 90 min släpps de. Sidan visar vilka svenska radarer som saknas. För en egen komposit av enskilda radarvolymer finns `sources.volume_composite`, som hämtar ODIM-volymer från EUMETNET:s öppna radardata.
 
 ## Volymkorrektion mot regnmätarna
 
-Radarns årsvolym rättas mot SMHI:s automatiska stationer (parameter 7, timsumma). Metoden följer BALTEX-justeringen (Michelson m.fl. 2000, SMHI RMK 90) men som klimatologi, i `src/knep/bias.py`:
+Radarns årsvolym rättas mot SMHI:s automatiska stationer (parameter 7, timsumma). Metoden följer BALTEX-justeringen (Michelson m.fl. 2000, SMHI RMK 90) men som klimatologi, i `src/knep/analys/bias.py`:
 
 - **Nivå**: log K = a + b·h + c·h² per månad, där h är höjden på den lägsta radarstrålen, plus en restkarta med Barnes-viktning för det som inte beror på höjden (blockering, klotterfilter). Faktorn beror inte på intensiteten, så den kan inte trycka ned toppar för att få summan rätt.
 - **Svans**: efter nivån jämförs timkvantilerna 99 till 99,95 % för mätare och radar, och radarns svans rättas med R·(R/5)^γ över 5 mm/h.

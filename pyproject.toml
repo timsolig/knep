@@ -18,7 +18,7 @@ dependencies = [
 [project.scripts]
 knep = "knep.cli:main"
 knep-case = "knep.cases:main"
-knep-bias = "knep.bias:main"
+knep-bias = "knep.analys.bias:main"
 knep-models = "knep.models:main"
 
 [dependency-groups]

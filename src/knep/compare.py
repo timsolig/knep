@@ -25,7 +25,7 @@ from rasterio.crs import CRS
 from rasterio.transform import Affine
 
 from . import render, verify
-from .radar import Grid
+from .analys.radar import Grid
 
 log = logging.getLogger("knep")
 

@@ -8,7 +8,7 @@ from pyproj import Transformer
 from rasterio.transform import Affine
 
 from knep import compare
-from knep.radar import Grid
+from knep.analys.radar import Grid
 
 T0 = datetime(2026, 10, 29, 19, 10, tzinfo=UTC)
 

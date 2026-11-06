@@ -3,7 +3,7 @@
 import numpy as np
 from pysteps.extrapolation.semilagrangian import extrapolate
 
-from knep import advect
+from knep.prognos import advect
 
 
 def _case():

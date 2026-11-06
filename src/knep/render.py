@@ -23,7 +23,7 @@ from PIL import Image
 from rasterio.transform import array_bounds
 from rasterio.warp import Resampling, calculate_default_transform, reproject, transform_bounds
 
-from .radar import Grid
+from .analys.radar import Grid
 
 WEB = "EPSG:3857"
 MODEL_NAME = "Tim-KNEP"  # namnet på sidan
