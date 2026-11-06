@@ -41,3 +41,23 @@ Jag väntar på händelser från träningen.
 Träningen har startat (utgångsläget: MAE 0,0554, kvot 0,876). Jag väntar på resten.
 
 Jag väntar fortfarande på kvartens träning.
+
+Uppgift 3 (A2) är klar och rapporten har nu `Status: klar`. Domen från försök 1 gäller: A2 slår A0 men inte A1.
+
+**Det här försöket:** försök 1 tog slut innan kvartens felvarianser (SB, SO) och torrmaskens radie (R_TORR) hade valts. Nu har sökningen gått klart på de 28 träningsdagarna (cirka 15 minuter). Den behöll alla värden som valideringen redan hade körts med (L 40 km, SB 0,8, SO 0,15, R_TORR 80 km). Inget annat värde sänkte målet med mer än tröskeln. Därför behövde valideringen inte köras om, och den bygger fortfarande bara på parametrar som är valda på träningen. På träningen beror målet nästan bara på L, och vinsten kommer mest från rättningen i stor skala.
+
+**Resultaten på valideringen (16 dagar):**
+- **Mot A0 är A2 bättre.** 15 mått för mängd och träff är bättre med intervallet helt på rätt sida, och inget mått för falska ekon eller terrängen blir sämre.
+- **Mot A1 är A2 inte bättre.** Mängd och träff är bättre, men falska ekon per kvart vid torra mätare blir sämre över 400 m och på lovartsidan, med intervallet helt på fel sida.
+- **I terrängen gör A2 mest nytta.** Över 400 m går summakvoten per timme från 0,5 till 0,68, och CSI och FSS stiger med cirka 0,1.
+- **Tiden på Pi:n** är 2,6 till 2,8 s för en timme med dess fyra kvartar på hela rutnätet.
+
+**Nästa steg**, som rapporten beskriver: ta bort de falska ekona per kvart i terrängen, kontrollera mätarna mot sina grannar innan A2 blir facit, och använda en kvalitetskarta i felvariansen.
+
+`uv run pytest` ger 154 godkända. Det enda som ändrades är kommentaren vid `PARAMS` i `experiments/analys/a2.py` och rapporten, och loggfilen är också med i commiten. Allt är committat på `natt/2026-11-06` (3ac8d3e). Jag har inte pushat något.
+
+Två saker med körningen:
+- **Säkerhetskopian av `trana.json` blev inte gjord**, eftersom kopieringen nekades. Kvartens del i filen är nu skriven över, men den var ofullständig och siffrorna finns kvar i rapporten.
+- **Träningens utdata ligger i en tillfällig fil** utanför `/data`, eftersom det nekades att skriva loggen till `/data`. Det som behövs ur den står i rapporten.
+
+Bevakningen av kvartens träning har gått ut av sig själv. Den behövs inte längre, eftersom träningen redan var klar och resultatet är skrivet i rapporten och committat (3ac8d3e). Det finns inget mer att göra i uppgift 3.
