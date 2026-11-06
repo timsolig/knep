@@ -94,11 +94,11 @@ Radarns årsvolym rättas mot SMHI:s automatiska stationer (parameter 7, timsumm
 - **Volymslutning**: nivån per månad justeras sist så att nätets summa stämmer med svanstermen på plats.
 - **Veckofaktor**: en faktor för hela nätet de senaste sju dygnen, krympt mot 1 och räknad bara på timmar under 10 mm, så att ett enskilt skyfall inte styr nästa veckas nivå.
 
-Kartan är en tränad modell som alla andra: den skattas ur par av radar och mätare, släpps som en version och låses i `models/models.json`. Den skattas bäst en gång ur arkivet, i utvecklingscontainern där arkivet ligger i `/data`:
+Kartan är en tränad modell som alla andra: den skattas ur par av radar och mätare, släpps som en version och låses i `models/models.json`. Den skattas bäst en gång ur arkivet. `--download` hämtar varje bild från SMHI:s arkiv, läser den vid stationerna och kastar den, med högst `--takt` anrop per sekund (SMHI tillåter 40 per 10 s från en adress, och driften behöver en del av dem); `--archive` läser i stället en katalog med kompositer:
 
 ```sh
 uv run knep-bias gauges --archive                                      # mätarnas timvärden, cirka 170 stationer
-uv run knep-bias radar --archive /data --start 2023-01-01 --end 2025-12-31
+uv run knep-bias radar --download --takt 3 --start 2023-01-01 --end 2025-12-31   # cirka 2 min per dygn
 uv run knep-bias fit --start 2023-01-01 --end 2025-12-31 --grid <en kompositfil.tif> --cv
 ```
 
@@ -134,12 +134,14 @@ Workflowet `test` bygger driftens bild på arm64 för varje pull request och ins
 
 ## Utvecklingsmiljö med Claude Code
 
-`dev/` innehåller en container med Claude Code, GitHub CLI och uv. Den monterar `~/knep` som `/work` och `~/radar-arkiv` som `/data`. Driften ovan är en egen container som följer `main`; `KNEP_BRANCH` i dess `.env` låter den följa en gren i stället.
+Claude Code körs direkt på Pi:n, med repot i `~/knep` och radararkivet i `~/radar-arkiv`. Experimenten och bakgrundskörningen (`experiments/natt/`) använder sökvägarna `/work` och `/data`, som är symlänkar dit:
 
 ```sh
-cd ~/knep/dev && docker compose up -d --build
-docker exec -it knep-dev bash
+sudo ln -s ~/knep /work
+sudo ln -s ~/radar-arkiv /data
 ```
+
+Ändringar går via grenar och pull requests, som Claude öppnar och slår ihop själv när `pytest` och `docker` har gått igenom (se `CLAUDE.md`). Driften ovan är en egen container som följer `main`; `KNEP_BRANCH` i dess `.env` låter den följa en gren i stället.
 
 ## Utveckla
 
