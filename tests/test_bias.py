@@ -127,3 +127,50 @@ def test_backfill_keeps_day_in_memory(tmp_path):
     G, R, T = store.pairs(date(2024, 7, 1), date(2024, 7, 2), st.ids)
     i0, i1 = T.index(datetime(2024, 7, 2, 0, tzinfo=UTC)), T.index(datetime(2024, 7, 2, 1, tzinfo=UTC))
     assert abs(R[i0, 0] - 3.0) < 1e-4 and abs(R[i1, 0] - 3.0) < 1e-4
+
+
+class _Svar:
+    def __init__(self, status, content=b"", headers=None):
+        self.status_code, self.content, self.headers = status, content, headers or {}
+
+
+class _Session:
+    """Svarar med en lista av statuskoder i tur och ordning och minns anropen."""
+
+    def __init__(self, koder):
+        self.koder, self.anrop = list(koder), []
+
+    def get(self, url, timeout=None):
+        self.anrop.append(url)
+        kod = self.koder.pop(0)
+        return _Svar(kod, b"tif" if kod == 200 else b"", {"Retry-After": "7"} if kod == 429 else {})
+
+
+def test_takt_haller_avstand():
+    klocka = [0.0]
+    sov = []
+
+    def sleep(s):
+        sov.append(s)
+        klocka[0] += s
+
+    takt = bias.Takt(4.0, clock=lambda: klocka[0], sleep=sleep)
+    for _ in range(5):
+        takt.wait()
+    assert np.isclose(klocka[0], 1.0) and len(sov) == 4  # fem anrop på 4 per sekund tar 1 s
+
+
+def test_fetch_archive_forsoker_igen_vid_429(tmp_path):
+    sov = []
+    t = datetime(2024, 7, 1, 12, 0, tzinfo=UTC)
+    session = _Session([429, 429, 200])
+    path, hur = bias.fetch_archive(t, tmp_path, session, bias.Takt(0), sleep=sov.append)
+    assert hur == "ok" and path.read_bytes() == b"tif"
+    assert len(session.anrop) == 3 and sov[0] == 7.0  # Retry-After följs
+
+
+def test_fetch_archive_saknas_och_ger_upp(tmp_path):
+    t = datetime(2024, 7, 1, 12, 0, tzinfo=UTC)
+    assert bias.fetch_archive(t, tmp_path, _Session([404]), bias.Takt(0), sleep=lambda s: None) == (None, "saknas")
+    path, hur = bias.fetch_archive(t, tmp_path, _Session([429] * 3), bias.Takt(0), tries=3, sleep=lambda s: None)
+    assert (path, hur) == (None, "fel")

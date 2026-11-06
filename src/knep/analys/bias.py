@@ -36,6 +36,7 @@ import calendar
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -647,6 +648,59 @@ def load_week(root: Path):
 
 # ---- kommandorad -------------------------------------------------------------
 
+
+class Takt:
+    """Högst `per_s` anrop per sekund. SMHI:s öppna data tillåter 40 anrop per 10 s från en adress,
+    och driften hämtar från samma adress, så bakåtfyllnaden håller sig en bit under."""
+
+    def __init__(self, per_s: float, clock=time.monotonic, sleep=time.sleep):
+        self.dt = 1.0 / per_s if per_s > 0 else 0.0
+        self.clock, self.sleep, self.next = clock, sleep, 0.0
+
+    def wait(self):
+        now = self.clock()
+        if now < self.next:
+            self.sleep(self.next - now)
+            now = self.next
+        self.next = now + self.dt
+
+
+def fetch_archive(t: datetime, folder: Path, session, takt: Takt, tries: int = 6, sleep=time.sleep):
+    """En komposit ur SMHI:s arkiv med takt och omförsök. Returnerar (sökväg eller None, utfall),
+    där utfallet är "ok", "saknas" (404: bilden finns inte i arkivet) eller "fel"."""
+    import requests
+
+    from . import radar
+
+    path = folder / f"{t:%Y%m%d%H%M}.tif"
+    wait = 5.0
+    for _ in range(tries):
+        takt.wait()
+        try:
+            r = session.get(radar.url_for(t), timeout=30)
+        except requests.RequestException:
+            sleep(wait)
+            wait = min(wait * 2, 120.0)
+            continue
+        if r.status_code == 200:
+            tmp = path.with_suffix(".part")
+            tmp.write_bytes(r.content)
+            tmp.replace(path)
+            return path, "ok"
+        if r.status_code == 404:
+            return None, "saknas"
+        if r.status_code == 429 or r.status_code >= 500:
+            try:
+                wait = max(wait, float(r.headers.get("Retry-After", 0)))
+            except ValueError:
+                pass
+            sleep(wait)
+            wait = min(wait * 2, 120.0)
+            continue
+        return None, "fel"
+    return None, "fel"
+
+
 def _grid_from_tif(path: Path) -> composite.TargetGrid:
     import rasterio
 
@@ -668,6 +722,7 @@ def main(argv=None) -> int:
     r = sub.add_parser("radar", help="räkna radarns timsummor vid stationerna ur ett arkiv av SMHI-kompositer")
     r.add_argument("--archive", type=Path, help="katalog med radar_ÅÅMMDDTTMM.tif eller ÅÅÅÅMMDDTTMM.tif")
     r.add_argument("--download", action="store_true", help="hämta från SMHI i stället")
+    r.add_argument("--takt", type=float, default=2.0, help="anrop per sekund mot SMHI vid --download")
     r.add_argument("--start", type=date.fromisoformat, required=True)
     r.add_argument("--end", type=date.fromisoformat, required=True)
     f = sub.add_parser("fit", help="skatta kartan och skriv models/bias.npz")
@@ -704,6 +759,8 @@ def main(argv=None) -> int:
         t = datetime(a.start.year, a.start.month, a.start.day, tzinfo=UTC)
         end = datetime(a.end.year, a.end.month, a.end.day, tzinfo=UTC) + timedelta(days=1)
         grid = None
+        takt = Takt(a.takt)
+        utfall = {"ok": 0, "saknas": 0, "fel": 0}
         while t < end:
             path = None
             if a.archive:
@@ -714,10 +771,8 @@ def main(argv=None) -> int:
             elif a.download:
                 tifs = a.store / "tif"
                 tifs.mkdir(exist_ok=True)
-                try:
-                    path = radar.fetch(t, tifs, session)
-                except requests.RequestException:
-                    path = None
+                path, hur = fetch_archive(t, tifs, session, takt)
+                utfall[hur] += 1
             if path is not None:
                 rain, _ = radar.read_rain(path)
                 grid = grid or _grid_from_tif(path)
@@ -726,7 +781,12 @@ def main(argv=None) -> int:
                     path.unlink()
             t += radar.STEP
             if t.minute == 0 and t.hour == 0:
-                log.info("radar %s klar", (t - timedelta(days=1)).date())
+                if a.download:
+                    log.info("radar %s klar: %d bilder, %d saknas i arkivet, %d misslyckades",
+                             (t - timedelta(days=1)).date(), utfall["ok"], utfall["saknas"], utfall["fel"])
+                    utfall = dict.fromkeys(utfall, 0)
+                else:
+                    log.info("radar %s klar", (t - timedelta(days=1)).date())
         store.flush()
         return 0
 
