@@ -244,6 +244,7 @@
 <div id="map" hidden></div>
 <nav id="tabs" role="tablist" aria-label="Vy">
   <button role="tab" id="tab-live" aria-selected="true">Prognos</button>
+  <button role="tab" id="tab-analys" aria-selected="false">Analys</button>
   <button role="tab" id="tab-cases" aria-selected="false">Händelser</button>
   <button role="tab" id="tab-verif" aria-selected="false">Verifiering</button>
 </nav>
@@ -454,6 +455,12 @@
     <p>Klicka i en karta för staplar i punkten: radarn, modellerna och närmaste regnmätare bredvid varandra för varje tidssteg.
        Under muspekaren visar varje karta sitt värde. <b>Mätare</b> ritar SMHI:s regnmätare med samma färgskala; de kommer ungefär en timme efter radarn.
        <b>Regnyta i kartutsnittet</b> visar hur mycket regn varje modell har inom det du ser.</p>
+    <h4><span class="sw" style="background:#0a7d8c"></span>Analys</h4>
+    <p>Fliken <b>Analys</b> visar nederbörden de senaste tolv timmarna i tre steg bredvid varandra. <b>A0</b> är radarbilderna som de är:
+       en bild var femte minut, och varje bild får gälla de fem minuterna före den, så en skur som rör sig snabbt blir ett pärlband i kvarts- och timsummorna.
+       <b>A1</b> fyller i tiden mellan bilderna minut för minut längs regnets rörelse, så att spåret hänger ihop. <b>A2</b> rättas mot regnmätarna
+       och blir klar först när mätarna har kommit, 1 till 2,5 timmar efter timmen; den byggs fortfarande.
+       Slå på <b>Mätare</b> för att jämföra stegen med vad som faktiskt kom ner.</p>
     <h4><span class="sw" style="background:var(--met)"></span>Verifiering</h4>
     <p>Fliken <b>Verifiering</b> visar hur modellerna har träffat de senaste 7 eller 30 dygnen, mot radarn och mot SMHI:s regnmätare:
        ETS, FAR, MCC, FSS och fler mått per ledtid och dygn, med osäkerheten och skillnaden mot Tim-KNEP. Där står också vilka rutor och mätare som är facit.</p>
@@ -527,6 +534,16 @@ const KNOWN = {
   snow: { name: 'SNOW', color: 'var(--snow)', what: 'median' },
 };
 const EXTRA_COLORS = ['#8250df', '#bf3989', '#0a7d8c', '#7d4e00'];
+// Fliken Analys: analysens nivåer som kartor. A0 är analysen som den är (radaranalysen i history),
+// A1 bilderna interpolerade längs rörelsen (analys/a1.py) och A2 rättad mot regnmätarna; A1 och A2
+// ligger under levels i manifestet, med samma listor som history.
+const LEVEL_KEYS = ['a0', 'a1', 'a2'];
+const LEVEL_INFO = {
+  a0: { name: 'A0 radar', color: '#57606a', what: 'radarbilderna som de är, varje bild gäller fem minuter' },
+  a1: { name: 'A1 längs rörelsen', color: '#0a7d8c', what: 'interpolerad minut för minut längs rörelsen' },
+  a2: { name: 'A2 mot mätarna', color: '#8250df', what: 'rättad mot regnmätarna' },
+};
+const isLevel = k => LEVEL_KEYS.includes(k);
 const MEPS = [[49.75632, -18.17334], [75.23955, 54.29416]];  // kartorna avgränsas till MEPS-området, där SNOW finns
 const NORDEN = [[55.0, 6.0], [69.5, 30.0]];  // det som ska synas från början
 const LEVELS = [0.1, 0.5, 1, 2, 4, 8, 16, 32];  // som render.LEVELS: klass k är minst LEVELS[k - 1] mm/h
@@ -535,13 +552,21 @@ const ALPHAS = [170, 200, 215, 225, 235, 240, 245, 250];  // klassernas alfa i P
 const live = { manifest: null, res: store.get('res', '5'), idx: 0, layer: 'rain', bg: store.get('bg', true), contour: store.get('contour', true),
                issue: null, issueList: null, resLatest: null, verify: null,
                obs: store.get('obs', false), hidden: new Set(store.get('hidden', [])), panes: new Map(), gauges: null,
-               values: null, point: null, view: null, area: null, areaThr: 3, hover: null };
+               values: null, point: null, view: null, area: null, areaThr: 3, hover: null, analys: false };
 
 const listFor = (m, r) => (r === '5' ? m.frames : r === '15' ? m.frames15 : m.frames60) || [];
 const listOf = (e, r) => (r === '5' ? e.frames : r === '15' ? e.frames15 : e.frames60) || [];
 // Senaste utgåvan: manifestets rutor. En tidigare utgåva (manifestets runs, sparade av runs.py)
 // finns per timme, och facit är radarns timsumma ur hist/ för samma timme.
-const framesFor = (m, r) => live.issue ? live.issueList : listFor(m, r);
+const framesFor = (m, r) => live.analys ? levelFrames(m, r) : live.issue ? live.issueList : listFor(m, r);
+const levelList = (m, key, r) => listOf((key === 'a0' ? m.history : m.levels?.[key]) || {}, r);
+function levelFrames(m, r) {  // tiderna där någon nivå har en bild, äldst först
+  const by = new Map();
+  for (const k of LEVEL_KEYS) for (const f of levelList(m, k, r)) {
+    if (!by.has(f.time)) by.set(f.time, { time: f.time, start: f.start, kind: 'obs', hist: true, level: true });
+  }
+  return [...by.values()].sort((a, b) => new Date(a.time) - new Date(b.time));
+}
 const radarHour = (m, time) => (m.history?.frames60 || []).find(h => h.time === time) || null;
 const issueFrames = (m, run) => (run.models.ours?.frames60 || []).map(f => ({ ...f, kind: 'fc', issue: true, radar: radarHour(m, f.time) }));
 const earlierRuns = m => (m.runs || []).filter(r => +new Date(r.issued) < +new Date(m.analysis));
@@ -554,12 +579,14 @@ function modelKeys(m) {
   return ['ours', ...new Set(['met', 'snow', ...extra])];
 }
 function modelInfo(key) {
+  if (isLevel(key)) return LEVEL_INFO[key];
   const e = live.manifest?.compare?.[key];
   const k = KNOWN[key] || {};
   const i = [...live.panes.keys()].indexOf(key);
   return { name: e?.name || k.name || key, color: e?.color || k.color || EXTRA_COLORS[Math.max(0, i - 3) % EXTRA_COLORS.length], what: k.what || e?.what || '' };
 }
-const visiblePanes = () => [...live.panes.values()].filter(p => !live.hidden.has(p.key));
+// Prognos visar modellerna och Analys nivåerna; kartorna för den andra fliken ligger dolda
+const visiblePanes = () => [...live.panes.values()].filter(p => isLevel(p.key) === live.analys && !live.hidden.has(p.key));
 
 function makePane(key) {
   const el = document.createElement('div');
@@ -601,7 +628,7 @@ function layoutMosaic() {
     if (s > side + 1) { side = s; best = c; }
   }
   $('mosaic').style.gridTemplateColumns = `repeat(${best}, minmax(0, 1fr))`;
-  for (const p of live.panes.values()) p.el.hidden = live.hidden.has(p.key);
+  for (const p of live.panes.values()) p.el.hidden = !vis.includes(p);
   vis.forEach(p => p.map.invalidateSize());
 }
 
@@ -628,7 +655,7 @@ function fitMosaic(initial) {
 }
 
 function modelChips() {
-  $('model-chips').innerHTML = [...live.panes.keys()].map(k => {
+  $('model-chips').innerHTML = [...live.panes.keys()].filter(k => isLevel(k) === live.analys).map(k => {
     const info = modelInfo(k);
     return `<button data-key="${k}" style="--c:${info.color}" aria-pressed="${!live.hidden.has(k)}">${info.name}</button>`;
   }).join('');
@@ -663,6 +690,7 @@ function parseHash() {
   if (['5', '15', '60'].includes(q.get('upp'))) out.res = q.get('upp');
   if (q.get('tid')) out.time = q.get('tid');
   if (q.get('utg')) out.issue = q.get('utg');
+  if (q.get('vy') === 'analys') out.analys = true;
   return out;
 }
 const want = parseHash();
@@ -679,6 +707,7 @@ function saveHash(now) {
     const f = live.manifest && framesFor(live.manifest, live.res)[live.idx];
     if (f) q.set('tid', f.time);
     if (live.issue) q.set('utg', live.issue.issued);
+    if (live.analys) q.set('vy', 'analys');
     if (live.point) q.set('punkt', `${live.point.ll.lat.toFixed(3)},${live.point.ll.lng.toFixed(3)}`);
     history.replaceState(null, '', '#' + q.toString().replace(/%2C/g, ',').replace(/%3A/g, ':'));
   };
@@ -689,6 +718,7 @@ function saveHash(now) {
 // vilken bild en karta visar för en tid i tidslisten (f ur framesFor)
 function srcFor(p, f, layer = live.layer) {
   const m = live.manifest, r = live.res;
+  if (f.level) return levelSrc(p, f);
   if (f.issue) {
     const e = live.issue.models[p.key];
     if (!e) return { missing: 'fanns inte med i utgåvan' };
@@ -720,6 +750,13 @@ function srcFor(p, f, layer = live.layer) {
   const text = hourly || r === '60' ? `${info.what ? info.what + ' ' : ''}${clock.format(new Date(x.start || t - 3600000))} till ${clock.format(new Date(x.time))}`
     : [run, e.resolution_km ? `${num(e.resolution_km)} km` : ''].filter(Boolean).join(', ');
   return { file: x.file, bounds: e.bounds, text: age > 60 && !text.includes('gammal') ? `${text}, ${ago(age)} gammal` : text || run, hourly, stale: age > 60 };
+}
+function levelSrc(p, f) {
+  const m = live.manifest, x = levelList(m, p.key, live.res).find(y => y.time === f.time);
+  if (x) return { file: x.file, bounds: m.bounds, hist: true, text: LEVEL_INFO[p.key].what };
+  if (p.key === 'a2') return { missing: m.levels?.a2 ? 'inte klar än, mätarna kommer 1 till 2,5 h efter timmen' : 'byggs, rättningen mot mätarna finns inte än' };
+  if (p.key === 'a1' && !m.levels?.a1) return { missing: 'finns inte i den här analysen' };
+  return { missing: 'saknas för tiden' };
 }
 const urlFor = src => `${DATA}${src.file}${src.hist ? '' : `?v=${encodeURIComponent(live.manifest.analysis)}`}`;
 
@@ -766,7 +803,11 @@ function liveShow(i) {
   const split = live.issue ? list.map(x => !!x.radar).lastIndexOf(true) + 0.5 : list.map(x => x.kind).lastIndexOf('obs');
   $('slider').style.setProperty('--split', `${list.length > 1 ? Math.max(0, split) / (list.length - 1) * 100 : 0}%`);
   $('time').textContent = (day.format(new Date(f.time)) !== day.format(new Date()) ? dayTime : clock).format(new Date(f.time));
-  if (live.issue) {
+  if (live.analys) {
+    const back = Math.round((+new Date(list.at(-1).time) - t) / MIN);
+    $('kind').textContent = live.res === '5' ? (back ? `Analys ${ago(back)} före den senaste` : 'Senaste analysen')
+      : `Analys, summa ${clock.format(new Date(f.start))} till ${clock.format(new Date(f.time))}`;
+  } else if (live.issue) {
     const lead = Math.round((t - new Date(live.issue.issued)) / 3600000);
     $('kind').textContent = `Utgåva ${clock.format(new Date(live.issue.issued))}, +${lead} h: ${clock.format(new Date(f.start))} till ${clock.format(new Date(f.time))}${f.radar ? '' : ', ingen radar än'}`;
   } else if (live.res === '5') {
@@ -793,7 +834,7 @@ function liveShow(i) {
   contourShow(f);
   gaugesDraw(f);
   legendDraw(f, future);
-  $('live-layers').hidden = live.res !== '5' || !m.frames.some(x => x.p10);
+  $('live-layers').hidden = live.analys || live.res !== '5' || !m.frames.some(x => x.p10);
   if (live.point) pointDraw();
   areaDraw();
   verifyDraw();
@@ -821,7 +862,7 @@ function legendDraw(f, future) {
 }
 
 function liveRes(r) {
-  if (live.issue && r !== '60') return;  // tidigare utgåvor finns bara per timme
+  if (live.issue && !live.analys && r !== '60') return;  // tidigare utgåvor finns bara per timme
   const m = live.manifest;
   const cur = m ? framesFor(m, live.res)[live.idx] : null;
   live.res = r;
@@ -885,7 +926,8 @@ async function liveLoad() {
   let added = false;
   for (const k of modelKeys(m)) if (!live.panes.has(k)) { makePane(k); added = true; }
   // gamla bilder bort, utom de bakåt som fortfarande finns (de byter aldrig namn)
-  const histFiles = new Set(['frames', 'frames15', 'frames60'].flatMap(k => (m.history?.[k] || []).map(f => urlFor({ file: f.file, hist: true }))));
+  const hists = [m.history, ...Object.values(m.levels || {}).filter(v => v && typeof v === 'object')];
+  const histFiles = new Set(hists.flatMap(h => ['frames', 'frames15', 'frames60'].flatMap(k => (h?.[k] || []).map(f => urlFor({ file: f.file, hist: true })))));
   for (const p of live.panes.values()) {
     for (const [url, o] of p.overlays) if (!histFiles.has(url)) { o.remove(); p.overlays.delete(url); }
     p.shown = null;
@@ -902,6 +944,7 @@ async function liveLoad() {
   const list = framesFor(m, live.res);
   const lastOf = l => l.map(f => f.kind).lastIndexOf('obs');
   let i = live.res === '5' ? lastOf(list) + (old && keep ? live.idx - lastOf(oldList) : 0) : list.findIndex(f => f.kind !== 'obs');
+  if (live.analys && live.res !== '5') i = list.length - 1;  // analysen har bara bilder bakåt
   if (live.res !== '5' && keep && old) i = closestIndex(list, new Date(keep.time));
   if (!old && want.time) { const j = list.findIndex(f => f.time === want.time); if (j >= 0) i = j; }  // tiden ur länken, om den finns kvar
   issueOptions();
@@ -925,7 +968,7 @@ function issueOptions() {
   sel.innerHTML = `<option value="">Senaste utgåvan ${clock.format(new Date(m.analysis))}</option>`
     + runs.map(r => `<option value="${r.issued}">Utgåva ${clock.format(new Date(r.issued))}, ${ago(Math.round((new Date(m.analysis) - new Date(r.issued)) / MIN))} sedan</option>`).join('');
   sel.value = live.issue?.issued || '';
-  sel.hidden = !runs.length;
+  sel.hidden = !runs.length || live.analys;
 }
 function issueMode() {
   const on = !!live.issue;
@@ -1814,7 +1857,7 @@ function liveNow() {
   if (!m) return;
   if (live.issue) { setIssue(null); return; }
   const list = framesFor(m, live.res);
-  const i = live.res === '5' ? list.map(f => f.kind).lastIndexOf('obs') : list.findIndex(f => f.kind !== 'obs');
+  const i = live.analys ? list.length - 1 : live.res === '5' ? list.map(f => f.kind).lastIndexOf('obs') : list.findIndex(f => f.kind !== 'obs');
   liveShow(Math.max(0, i));
 }
 $('now-btn').addEventListener('click', liveNow);
@@ -2112,10 +2155,38 @@ $('verif-obs').querySelectorAll('button').forEach(b => b.addEventListener('click
 $('verif-metric').addEventListener('change', e => { vf.metric = e.target.value; store.set('vmetric', vf.metric); verifDraw(); });
 
 /* ---------- flikar ---------- */
+// Prognos och Analys är samma vy med olika kartor (live.analys); bytet görs i liveTab
+function liveTab(analys) {
+  if (analys && live.issue) setIssue(null);
+  const m = live.manifest, cur = m && live.analys !== analys ? framesFor(m, live.res)[live.idx] : null;
+  live.analys = analys;
+  document.body.classList.toggle('analys-mode', analys);
+  if (analys) for (const k of LEVEL_KEYS) if (!live.panes.has(k)) makePane(k).map.on('locationfound', located);
+  $('issue').hidden = analys || !(m && earlierRuns(m).length);
+  $('bg-toggle').hidden = analys || !!live.issue;
+  $('side-head').querySelector('h1').textContent = analys ? 'Nederbördsanalys' : 'Nederbördsprognos';
+  modelChips();
+  layoutMosaic();
+  const v = live.view;
+  if (v) visiblePanes().forEach(p => p.map.setView(v.center, v.zoom, { animate: false }));
+  if (!m) return;
+  const list = framesFor(m, live.res);
+  if (!list.length) return;
+  let i = analys ? list.length - 1 : live.res === '5' ? list.map(f => f.kind).lastIndexOf('obs') : list.findIndex(f => f.kind !== 'obs');
+  if (cur) i = closestIndex(list, new Date(cur.time));  // samma tid i den andra fliken, om den finns där
+  preload(Math.max(0, i));
+  liveShow(Math.max(0, i));
+  if (live.point) pointDraw();
+  areaSoon();
+}
+
 let mode = 'live';
 function setMode(m) {
+  const analys = m === 'analys';
+  if (analys) m = 'live';
   mode = m;
-  $('tab-live').setAttribute('aria-selected', m === 'live');
+  $('tab-live').setAttribute('aria-selected', m === 'live' && !analys);
+  $('tab-analys').setAttribute('aria-selected', analys);
   $('tab-cases').setAttribute('aria-selected', m === 'cases');
   $('tab-verif').setAttribute('aria-selected', m === 'verif');
   $('liveview').hidden = m !== 'live';
@@ -2131,8 +2202,7 @@ function setMode(m) {
   } else if (m === 'live') {
     caseClear();
     cases.current = null;
-    layoutMosaic();
-    liveShow(live.idx);
+    liveTab(analys);
     saveHash(true);
   } else {
     map.invalidateSize();
@@ -2140,6 +2210,7 @@ function setMode(m) {
   }
 }
 $('tab-live').addEventListener('click', () => setMode('live'));
+$('tab-analys').addEventListener('click', () => setMode('analys'));
 $('tab-cases').addEventListener('click', () => setMode('cases'));
 $('tab-verif').addEventListener('click', () => setMode('verif'));
 
@@ -2152,7 +2223,7 @@ function located(e) {
 }
 
 // förklaringen: visas första gången, och med ? uppe till höger
-const INTRO = 2;  // höj när förklaringen ändras, så att den visas igen
+const INTRO = 3;  // höj när förklaringen ändras, så att den visas igen
 function introOpen() { try { $('intro').showModal(); } catch (e) { $('intro').setAttribute('open', ''); } }
 $('help').addEventListener('click', introOpen);
 $('intro-close').addEventListener('click', () => { $('intro').close(); store.set('intro', INTRO); });
@@ -2174,6 +2245,7 @@ let resizeTimer = 0;
 addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { placeFloats(); layoutMosaic(); if (live.point) pointDraw(); areaDraw(); if (mode === 'verif') verifDraw(); }, 120); });
 if (location.hash.startsWith('#handelser')) setMode('cases');
 if (location.hash.startsWith('#verifiering')) setMode('verif');
+if (want.analys) setMode('analys');
 </script>
 </body>
 </html>
