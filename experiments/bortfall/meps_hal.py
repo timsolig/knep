@@ -1,9 +1,9 @@
 """MEPS i hålet: MEPS rättad mot radarn utanför hålet, och blandningar med den flyttade analysen.
 
     uv run python experiments/bortfall/meps_hal.py sok --processer 2 --logg /data/bortfall/logg/meps_sok.log
-    uv run python experiments/bortfall/domare.py kor meps_hal:Meps meps_hal:Blandning --processer 2
+    uv run python experiments/bortfall/bortfallsdomare.py kor meps_hal:Meps meps_hal:Blandning --processer 2
 
-Systemen (för domaren, se domare.py)
+Systemen (för domaren, se bortfallsdomare.py)
 ------------------------------------
 - `Meps`: hålet fylls med MEPS rättad mot radarn utanför hålet, som i knep.seamless: läget med
   optiskt flöde och mängden med kvantilavbildning, båda skattade på senaste radartimmen (medel av
@@ -47,7 +47,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
-import domare  # noqa: E402
+import bortfallsdomare as domare  # noqa: E402
 from knep.analys import composite  # noqa: E402
 from knep.prognos import seamless  # noqa: E402
 

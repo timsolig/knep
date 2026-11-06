@@ -122,8 +122,8 @@ Inga ändringar i `src/knep/` eller i domaren. `uv run pytest`: 97 passerade.
 
 ```sh
 uv run python experiments/bortfall/meps_hal.py sok --processer 2 --logg /data/bortfall/logg/meps_sok.log
-uv run python experiments/bortfall/domare.py kor meps_hal:Blandning meps_hal:Meps meps_hal:Flytt --processer 2 --logg /data/bortfall/logg/meps_validering.log
-uv run python experiments/bortfall/domare.py tabell fylld hal meps_hal:Flytt meps_hal:Meps meps_hal:Blandning --mot fylld
+uv run python experiments/bortfall/bortfallsdomare.py kor meps_hal:Blandning meps_hal:Meps meps_hal:Flytt --processer 2 --logg /data/bortfall/logg/meps_validering.log
+uv run python experiments/bortfall/bortfallsdomare.py tabell fylld hal meps_hal:Flytt meps_hal:Meps meps_hal:Blandning --mot fylld
 ```
 
 Status: klar

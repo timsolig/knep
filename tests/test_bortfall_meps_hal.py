@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "experiments" / "bortfall"))
-dm = pytest.importorskip("domare")
+dm = pytest.importorskip("bortfallsdomare")
 mh = pytest.importorskip("meps_hal")
 
 T0 = datetime(2024, 8, 9, 12, 0, tzinfo=UTC)

@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "experiments" / "bortfall"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-dm = pytest.importorskip("domare")
+dm = pytest.importorskip("bortfallsdomare")
 il = pytest.importorskip("inlard")
 pytest.importorskip("sklearn")
 

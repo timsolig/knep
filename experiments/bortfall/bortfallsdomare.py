@@ -1,8 +1,8 @@
 """Domaren: kör ett utfyllnadssystem på bortfallsfallen och jämför det med radarn och baslinjen.
 
-    uv run python experiments/bortfall/domare.py kor fylld hal utjamnad --del validering --processer 2
-    uv run python experiments/bortfall/domare.py kor fylld --fall 3            provkörning på tre fall
-    uv run python experiments/bortfall/domare.py tabell fylld hal utjamnad --mot fylld
+    uv run python experiments/bortfall/bortfallsdomare.py kor fylld hal utjamnad --del validering --processer 2
+    uv run python experiments/bortfall/bortfallsdomare.py kor fylld --fall 3            provkörning på tre fall
+    uv run python experiments/bortfall/bortfallsdomare.py tabell fylld hal utjamnad --mot fylld
 
 Domaren är den enda som avgör om ett system är bättre. Ändra inte måtten för att ett system ska
 se bättre ut; behöver de rättas, skriv det i rapporten och kör om baslinjerna.

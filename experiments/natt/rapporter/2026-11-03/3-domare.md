@@ -3,12 +3,12 @@
 ## Vad jag gjorde
 
 1. Läste rapport 1 och 2. Båda är klara (Status: klar) och lämnade inget halvfärdigt som domaren behöver; fallen (128 validering, 223 träning) och mätarna p7 och p14 finns.
-2. Skrev `experiments/bortfall/domare.py` (systemens gränssnitt, baslinjerna, måtten, körningen, bootstrap och tabellen) och `tests/test_bortfall_domare.py` (20 tester på syntetiska data).
+2. Skrev `experiments/bortfall/bortfallsdomare.py` (systemens gränssnitt, baslinjerna, måtten, körningen, bootstrap och tabellen) och `tests/test_bortfall_domare.py` (20 tester på syntetiska data).
 3. Provkörde på tre fall, körde sedan facit och de tre baslinjerna på alla 128 valideringsfall i bakgrunden med två processer.
 
 ## Hur domaren fungerar
 
-Allt står också i docstringen överst i `domare.py`.
+Allt står också i docstringen överst i `bortfallsdomare.py`.
 
 **Gränssnittet.** Ett system är en klass med `start(indata)` och `steg(k, indata)`, som returnerar analysen i mm/h för hela utsnittet. Domaren matar systemet bild för bild, så att det bara ser det som hade funnits i realtid:
 
@@ -92,7 +92,7 @@ Valideringen: 128 fall på 16 dagar. Körtid med två processer: fylld 25 min, u
 
 I klassen 90 till 360 min är fylld och utjämnad exakt lika med hål i radarfälten (intervallen [0; 0] förkortade till 0), eftersom `fill_gaps` släpper pixlarna efter 90 min. Mätarkolumnerna skiljer sig ändå något, eftersom en timsumma som slutar vid ålder 95 till 150 min också täcker bilder som var utfyllda.
 
-Tabellen kommer ur `uv run python experiments/bortfall/domare.py tabell fylld hal utjamnad facit --mot fylld`; summorna per fall ligger i `experiments/bortfall/resultat/validering/{fylld,hal,utjamnad,facit}.json`.
+Tabellen kommer ur `uv run python experiments/bortfall/bortfallsdomare.py tabell fylld hal utjamnad facit --mot fylld`; summorna per fall ligger i `experiments/bortfall/resultat/validering/{fylld,hal,utjamnad,facit}.json`.
 
 ## Vad siffrorna säger
 
@@ -113,7 +113,7 @@ Tabellen kommer ur `uv run python experiments/bortfall/domare.py tabell fylld ha
 
 ## Filer
 
-- `experiments/bortfall/domare.py` (nytt)
+- `experiments/bortfall/bortfallsdomare.py` (nytt)
 - `tests/test_bortfall_domare.py` (nytt, 21 tester)
 - `experiments/bortfall/resultat/validering/{facit,fylld,hal,utjamnad}.json` (nya, summorna per fall och klass)
 - `experiments/natt/rapporter/2026-11-03/3-domare.md`
@@ -125,8 +125,8 @@ Inga ändringar i `src/knep/`. `uv run pytest`: 89 passerade.
 Uppgift 4 (MEPS i hålet) och 5 (inlärd blandning) skriver ett system som en klass med `start` och `steg` i `experiments/bortfall/` och kör
 
 ```sh
-uv run python experiments/bortfall/domare.py kor min_modul:MinKlass --processer 2 --logg /data/bortfall/logg/<namn>.log
-uv run python experiments/bortfall/domare.py tabell fylld hal min_modul:MinKlass --mot fylld
+uv run python experiments/bortfall/bortfallsdomare.py kor min_modul:MinKlass --processer 2 --logg /data/bortfall/logg/<namn>.log
+uv run python experiments/bortfall/bortfallsdomare.py tabell fylld hal min_modul:MinKlass --mot fylld
 ```
 
 Baslinjerna behöver inte köras om så länge domaren inte ändras. Träna och välj parametrar på `--del traning` (fallen finns), och kör valideringen först när systemet är fryst. Det mesta finns att vinna efter 90 min, där driften inte har något alls, och i volymen för 30 till 90 min.
