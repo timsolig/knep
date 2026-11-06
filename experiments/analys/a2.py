@@ -49,11 +49,14 @@ OUT = Path("/data/analys/a2")
 STEP = 4  # tillskottet räknas på var 4:e ruta
 
 # frysta efter träningen (se trana); ändra inte efter att valideringen har körts
+# timmen: koordinatsökningen i trana (28 träningsdagar). Kvarten: stora skalan från timmen, L vald i
+# trana innan körningen avbröts av en timeout; SB och SO är timmens gånger 0,5 (sökrutnätets skala
+# för kvarten) och R_TORR som timmen, inte valda.
 PARAMS = {
-    "timme": {"L_STOR": 150.0, "ALFA": 2.0, "WIN": 3, "L": 30.0, "SB": 0.4, "C": 1.0, "SO": 0.3,
-              "TORR": 0.05, "R_TORR": 30.0},
-    "kvart": {"L_STOR": 150.0, "ALFA": 2.0, "WIN": 3, "L": 30.0, "SB": 0.25, "C": 1.0, "SO": 0.2,
-              "TORR": 0.0125, "R_TORR": 30.0},
+    "timme": {"L_STOR": 75.0, "ALFA": 8.0, "WIN": 6, "L": 40.0, "SB": 1.6, "C": 1.0, "SO": 0.3,
+              "TORR": 0.05, "R_TORR": 80.0},
+    "kvart": {"L_STOR": 75.0, "ALFA": 8.0, "WIN": 6, "L": 40.0, "SB": 0.8, "C": 1.0, "SO": 0.15,
+              "TORR": 0.0125, "R_TORR": 80.0},
 }
 KMAX = 4.0
 
