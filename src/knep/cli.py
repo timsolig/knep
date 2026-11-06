@@ -5,7 +5,7 @@
    models/bias.npz finns. I realtid samlas radarns värden vid mätarna, och en gång per dygn räknas
    veckofaktorn och en kandidat till ny karta.
 2. Prognosen (knep.prognos): kedjan i model.Chain, med sannolikheter för kraftig nederbörd om
-   models/extremes.pkl finns, och MEPS rättad mot radarn inblandad efter de första timmarna.
+   models/extremes.pkl finns. Bara radarn: ingen vädermodell blandas in.
 3. Produkterna: MET Norges nowcast och SMHI:s SNOW till mosaiken (compare.py), regnmätarna
    (gauges.py), tidigare utgåvor (runs.py), verifieringen 7 och 30 dygn bakåt (verify.py) och
    kartorna med manifestet (render.py).
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="knep", description=__doc__)
     p.add_argument("--out", type=Path, default=Path("out/data"), help="katalog för PNG-rutor och manifest")
     p.add_argument("--cache", type=Path, default=Path("cache"), help="katalog för hämtade radarbilder och tillstånd")
-    p.add_argument("--hours", type=float, default=5.0, help="prognoslängd i timmar; efter de första timmarna blandas MEPS in (seamless.py)")
+    p.add_argument("--hours", type=float, default=5.0, help="prognoslängd i timmar, kedjan hela vägen")
     p.add_argument("--history", type=int, default=12, help="antal radarbilder bakåt (minst 7 för rörelsen, 12 ger en hel timme på kartan)")
     p.add_argument("--time", type=_parse_time, help="analystid i UTC (ISO 8601); standard är senaste bilden")
     p.add_argument("--wait", type=int, default=120, help="sekunder att vänta på en ny radarbild")
@@ -76,8 +76,6 @@ def main(argv: list[str] | None = None) -> int:
                    help="timmar med tidigare utgåvor (timsummor varje timme, runs/), 0 stänger av")
     p.add_argument("--no-gauges", action="store_true", help="hämta inte regnmätarna till sidan (gauges.json)")
     p.add_argument("--no-verify", action="store_true", help="ingen verifiering mot radarn och mätarna (verif.json)")
-    p.add_argument("--no-seamless", action="store_true", help="bara kedjan, utan MEPS rättad mot radarn (seamless.py)")
-    p.add_argument("--seamless", action="store_true", help=argparse.SUPPRESS)  # standard sedan 5 h; finns kvar för äldre skript
     args = p.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -100,8 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     steps = round(args.hours * 60 / 5)
     p = prognos.kor(a, state_dir, steps, model_path=args.model, prob_hours=args.prob_hours,
-                    reference=args.reference, seamless=not args.no_seamless and args.hours > 2 and not args.time,
-                    meps_cache=args.cache / "meps", session=session)
+                    reference=args.reference)
     grid, fc, prob = a.grid, p.rain, p.prob
     extra = a.extra | p.extra
 

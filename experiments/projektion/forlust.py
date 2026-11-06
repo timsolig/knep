@@ -52,7 +52,9 @@ import domare as D  # noqa: E402
 sys.path.insert(0, str(HERE.parent / "sverige"))
 from data import radar_path  # noqa: E402
 from knep.analys import radar  # noqa: E402
-from knep.prognos import advect, model, seamless  # noqa: E402
+from knep.prognos import advect, model  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "meps"))  # MEPS finns bara i experimenten, inte i Tim-KNEP
+import seamless  # noqa: E402
 
 OUT = D.ROOT / "forlust"
 TIMMAR = [3, 11, 17]                 # tre utgåvor per dygn ryms i nattens tid (cirka 40 s styck)

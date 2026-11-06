@@ -24,7 +24,7 @@ Koden är delad i två produkter och det som bygger sidan av dem. `cli.py` kör 
 **Prognosen** (`src/knep/prognos/`): 0 till 5 h framåt ur analysen. `prognos.kor(analys, ...)` ger en `Prognos`. Rörelsefältet i `cache/state/motion.npy` är det enda som går tillbaka till analysen (utfyllnaden vid bortfall i nästa cykel).
 
 - `src/knep/prognos/model.py` modellen. `Chain.run(obs, tid, steg, tillstånd)` är kedjan (rörelse, extrapolering, fördelningsmatchning, platskarta, sannolikheter för kraftig nederbörd); `nowcast(obs, steps)` är referensen. Tillståndet (senaste timmens analyser och 30-minutersprognoser) sparas i `cache/state/`
-- `src/knep/prognos/seamless.py` och `nwp.py` MEPS rättad mot radarn och blandad med kedjan, så att prognosen räcker 5 h (standard; `--no-seamless` stänger av). Bara i realtid, eftersom MEPS bara finns för senaste körningen. Sannolikheterna för kraftig nederbörd gäller de första 2 h (`--prob-hours`), som extremmodellen är kalibrerad för
+- Kedjan går hela vägen till 5 h (`--hours`), utan vädermodell. Sannolikheterna för kraftig nederbörd gäller de första 2 h (`--prob-hours`), som extremmodellen är kalibrerad för. MEPS rättad mot radarn och blandad med kedjan (den sömlösa modellen) finns bara som experiment i `experiments/meps/` (`seamless.py`, `nwp.py`), där de äldre experimenten fortfarande använder den
 - `src/knep/prognos/extremes.py` särdrag och sannolikheter som delas av drift och träning; modellen ligger i `models/extremes.pkl`
 
 **Produkter, verifiering och drift**:
@@ -42,7 +42,7 @@ Koden är delad i två produkter och det som bygger sidan av dem. `cli.py` kör 
 
 ## Mål
 
-pysteps är bara referens, och modellen behöver inte likna KNEP, MET Norge eller annan radarextrapolering. Metoden är fri så länge den slår referenserna i verifieringen och går att köra på Pi:n. Det som särskilt ska lösas är terrängen: nederbörd som är bunden till topografin ska inte advekteras bort. Fältens form är lika viktig som punktvisa mått, och prognoser för samma tid från på varandra följande körningar ska inte hoppa. Indata är öppna data (radar, satellit, observationer, en öppen höjdmodell).
+Tim-KNEP bygger bara på observationer: radarn och regnmätarna, och på sikt satellit i analysen. Ingen vädermodell (MEPS eller annan) blandas in i analysen eller prognosen; MEPS finns bara som jämförelse (SNOW) och i experimenten. pysteps är bara referens, och modellen behöver inte likna KNEP, MET Norge eller annan radarextrapolering. Metoden är fri så länge den slår referenserna i verifieringen och går att köra på Pi:n. Det som särskilt ska lösas är terrängen: nederbörd som är bunden till topografin ska inte advekteras bort. Fältens form är lika viktig som punktvisa mått, och prognoser för samma tid från på varandra följande körningar ska inte hoppa. Indata är öppna data (radar, satellit, observationer, en öppen höjdmodell).
 
 ## Miljö
 

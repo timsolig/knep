@@ -1,6 +1,6 @@
 # Svenska fall 0 till 5 h: kedjan, MEPS och den sömlösa modellen
 
-Syftet är att förlänga prognosen till 5 h och mäta det mot radarn på svenska dagar. Kedjan, som slår KNEP-proxyn de första timmarna (`experiments/README.md`), förlängs och blandas med MEPS, som rättas mot radarn löpande (`src/knep/seamless.py`).
+Syftet är att förlänga prognosen till 5 h och mäta det mot radarn på svenska dagar. Kedjan, som slår KNEP-proxyn de första timmarna (`experiments/README.md`), förlängs och blandas med MEPS, som rättas mot radarn löpande (`experiments/meps/seamless.py`; Tim-KNEP i drift blandar inte in MEPS).
 
 ## Data
 

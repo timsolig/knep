@@ -27,7 +27,7 @@ import cv2
 import numpy as np
 
 
-from . import advect
+from knep.prognos import advect
 
 
 def gaussian_filter(x, sigma):
@@ -237,7 +237,7 @@ def run_operational(meps_dir, state_path, session, grid, now, obs: np.ndarray, f
     """
     from datetime import timedelta
 
-    from . import nwp
+    import nwp
 
     p = p or Params()
     meps_dir.mkdir(parents=True, exist_ok=True)

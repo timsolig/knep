@@ -1,8 +1,12 @@
 """Den sömlösa modellen på syntetiska fält (inget nätverk)."""
 
+import sys
+from pathlib import Path
+
 import numpy as np
 
-from knep.prognos import seamless
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import seamless  # noqa: E402
 
 H, W = 200, 160
 
@@ -83,7 +87,7 @@ def test_run_operational_blends_and_keeps_state(tmp_path, monkeypatch):
     from rasterio.crs import CRS
     from rasterio.transform import from_origin
 
-    from knep.prognos import nwp
+    import nwp
     from knep.analys.radar import Grid
 
     grid = Grid(CRS.from_epsg(3006), from_origin(400000, 6800000, 2000, 2000), (H, W))

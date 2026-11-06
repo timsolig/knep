@@ -31,7 +31,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from data import CYCLE, DATA, load_days, meps_path, radar_path  # noqa: E402
 from knep import render  # noqa: E402
 from knep.analys import radar  # noqa: E402
-from knep.prognos import nwp  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "meps"))  # MEPS finns bara i experimenten, inte i Tim-KNEP
+import nwp  # noqa: E402
 
 Q = timedelta(minutes=15)
 NQ = 20                                   # kvartar till 5 h
@@ -105,7 +106,7 @@ def meps_quarters(meps: Meps, t: datetime, grid, interpolate: bool = False, lag:
 
     Utan interpolate gäller timsumman hela timmen; med interpolate tas intensiteten mitt i
     kvarten, interpolerad mellan timmarnas mitt (seamless.meps_at)."""
-    from knep.prognos import seamless
+    import seamless
 
     got = meps.on(nwp.available(t, CYCLE) - lag * timedelta(hours=CYCLE), grid)
     if got is None:
