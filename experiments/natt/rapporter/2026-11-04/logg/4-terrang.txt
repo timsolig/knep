@@ -1,0 +1,28 @@
+===== 2026-11-05T04:04:54Z försök 1 =====
+Uppgift 4 är klar inom tiden, med status `delvis`. Delningen i en stillastående och en rörlig del slog inte baslinjen, så driften ändras inte.
+
+**Utgångsläget:** uppgift 3 hade ingen vinnare, så detta bygger direkt på kedjan i drift.
+
+**Vad som gjordes:**
+- **Höjdmodellen:** Copernicus GLO-90 lästes direkt från nätet och skalades till radarns rutnät på 2 km. Resultatet är 1 MB i `/data/projektion/hojd_2km.npz`, och inga hela rutor sparades. `/data` har 3,0 GB ledigt.
+- **Nytt val i kedjan:** `Chain(stay=..., terrain=...)` i `src/knep/model.py` låter en andel per pixel stå still. Andelen styrs av lyftet (rörelsen gånger höjdgradienten) och av platskartans fel. Standardvärdet ger exakt kedjan i drift. Det finns test för det, och `pytest` gick igenom (79 test).
+- **Varianterna:** finns i `experiments/projektion/terrang.py`.
+
+**Resultat (negativt är bättre):**
+
+| variant | träningsdagarna (6 dygn, 4 km) | valideringen (6 av 16 dygn, 2 km) |
+|---|---|---|
+| `Lyft` | inte bättre, ingen sämre cell, små vinster i FSS och CSI | inte bättre: ytan över 5 och 10 mm/h och volymen blir säkert sämre efter 2 till 3 h (+0,01 till +0,03); träffen vid 1 h något bättre |
+| `Fel` | sämre i volym, yta, blockmax och FSS efter 2 h | inte körd |
+| `LyftHel` | inte bättre: förlusten av volym är borta och träffen kvar, men konserveringen blir inte bättre och FSS 10 mm/h på 10 km vid 30 min blir sämre | inte körd |
+
+**Orsaken:** den stillastående delen avtar med ledtiden utan att ersättas. `LyftHel` rättar det genom att matchningen använder det odelade fältet som mål. Men kedjans matchning återställer redan fördelningen, så det som tappas på långa ledtider är inflödet över randen (som i rapport 3), inte terrängen.
+
+**Det som gick snett:**
+- Sökningen stoppades efter 10 minuter av tidsgränsen för bakgrundskommandon. Det kostade cirka 10 minuter, så tre av de planerade varianterna och kontrollkörningen `Noll` hanns inte med.
+- Valideringen kördes bara på 6 av de 16 dygnen (vart tredje dygn, valda i förväg), eftersom hela valideringen tar cirka 80 minuter. Intervallen är därför breda.
+- Parametrarna sattes för hand efter storleksordningen, inte med slumpsökning.
+
+**Nästa steg:** kör `LyftHel` på hela valideringen, pröva felstyrningen med samma mål och kombinera med inflödet från uppgift 3 (`Inflode25`).
+
+Testdelen lästes inte. Rapporten ligger i `experiments/natt/rapporter/2026-11-04/4-terrang.md` och slutar med `Status: delvis`. Fyra commits är gjorda på `natt/2026-11-04`, ingenting är pushat. Loggfilen `logg/4-terrang.txt` lämnades ocommittad som den var från början.

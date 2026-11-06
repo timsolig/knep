@@ -5,6 +5,8 @@
 #   experiments/natt/kor.sh                kör till 07:00 svensk tid
 #   experiments/natt/kor.sh --till 05:30   sluta starta nya uppgifter 05:30
 #   experiments/natt/kor.sh --fran 3       börja med uppgift 3
+#
+# ko.txt: nr|kort namn|högst minuter|uppgift. Den sista uppgiften får alltid RESERV sekunder före --till.
 #   experiments/natt/kor.sh --prov         bara ett kort prov av behörigheterna
 #
 # Stoppa efter pågående uppgift: touch ~/natt/STOPP. Stoppa direkt: tmux kill-session -t natt.
@@ -26,6 +28,7 @@ KALLA=$(cd "$(dirname "$0")/../.." && pwd)          # utcheckningen som skriptet
 NATT=${NATT_DIR:-$HOME/natt}                         # arbetsträdet för natten, utanför /work
 UPPGIFT_MAX=${UPPGIFT_MAX:-10800}                    # sekunder per uppgift, högst
 VANTA_GRANS=${VANTA_GRANS:-1200}                     # sekunder att vänta när användningsgränsen är nådd
+RESERV=${RESERV:-2700}                               # sekunder som hålls undan till den sista uppgiften i kön
 DATUM=$(TZ=Europe/Stockholm date +%F)
 GREN=${NATT_GREN:-natt/$DATUM}
 
@@ -88,8 +91,9 @@ Svara sedan med en kort sammanfattning." "$f" 600
 fi
 
 klar() { [ -f "$1" ] && grep -qiE '^Status: *klar' "$1"; }
+SIST=$(grep -vE '^(#|$)' experiments/natt/ko.txt | tail -n 1 | cut -d'|' -f1)
 
-while IFS='|' read -r nr namn uppgift; do
+while IFS='|' read -r nr namn minuter uppgift; do
   case $nr in ''|\#*) continue ;; esac
   [ "$nr" -lt "$FRAN" ] && continue
   rapport=$RAPPORTER/$nr-$namn.md
@@ -99,7 +103,11 @@ while IFS='|' read -r nr namn uppgift; do
     [ -f STOPP ] && { logg "STOPP hittad, slutar"; exit 0; }
     kvar=$(( slut - $(date +%s) ))
     [ "$kvar" -lt 900 ] && { logg "mindre än 15 min kvar till $TILL, startar inget nytt"; exit 0; }
-    tid=$(( kvar < UPPGIFT_MAX ? kvar : UPPGIFT_MAX ))
+    # de andra uppgifterna lämnar RESERV åt den sista, så att den alltid hinner
+    [ "$nr" != "$SIST" ] && kvar=$(( kvar - RESERV ))
+    [ "$kvar" -lt 900 ] && { logg "uppgift $nr ($namn): för lite tid kvar före reserven, går vidare"; break; }
+    max=$(( ${minuter:-0} > 0 ? minuter * 60 : UPPGIFT_MAX ))
+    tid=$(( kvar < max ? kvar : max ))
     forsok=$((forsok + 1))
     f=$RAPPORTER/logg/$nr-$namn.txt
     logg "uppgift $nr ($namn), försök $forsok, högst $((tid / 60)) min"

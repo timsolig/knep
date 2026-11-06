@@ -2,7 +2,7 @@
 
     uv run python experiments/bortfall/inlard.py extrahera --processer 2      särdrag ur träningsfallen
     uv run python experiments/bortfall/inlard.py trana                        två modeller
-    uv run python experiments/bortfall/domare.py kor inlard:Inlard --processer 2
+    uv run python experiments/bortfall/bortfallsdomare.py kor inlard:Inlard --processer 2
 
 Systemet `Inlard`
 -----------------
@@ -44,7 +44,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
-import domare  # noqa: E402
+import bortfallsdomare as domare  # noqa: E402
 from meps_hal import Flytt, Rattning  # noqa: E402
 
 MODELLER = Path("/data/bortfall/modeller")

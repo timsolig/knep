@@ -41,10 +41,12 @@ def displacements(velocity: np.ndarray, steps: int | list[float]):
         yield mx, my, (mx < 0) | (mx > w - 1) | (my < 0) | (my > h - 1)
 
 
+_INTERP = {0: cv2.INTER_NEAREST, 1: cv2.INTER_LINEAR, 3: cv2.INTER_CUBIC}
+
+
 def warp(field: np.ndarray, mx: np.ndarray, my: np.ndarray, outside: np.ndarray, order: int = 1, outval=np.nan) -> np.ndarray:
     """Fältet i punkterna (mx, my); outval där punkten ligger utanför rutnätet."""
-    out = cv2.remap(field, mx, my, cv2.INTER_LINEAR if order else cv2.INTER_NEAREST,
-                    borderMode=cv2.BORDER_CONSTANT, borderValue=0.0)
+    out = cv2.remap(field, mx, my, _INTERP[order], borderMode=cv2.BORDER_CONSTANT, borderValue=0.0)
     out[outside] = outval
     return out
 
@@ -52,7 +54,8 @@ def warp(field: np.ndarray, mx: np.ndarray, my: np.ndarray, outside: np.ndarray,
 def extrapolate(fields, velocity: np.ndarray, steps, orders=1, outval=np.nan):
     """Flytta ett eller flera fält med samma rörelse: (steg, H, W) per fält.
 
-    fields: ett fält (H, W) eller en lista; orders: 1 bilinjärt, 0 närmaste granne, per fält.
+    fields: ett fält (H, W) eller en lista; orders: 1 bilinjärt, 0 närmaste granne, 3 bikubiskt
+    (utan gränser, kan ge värden utanför grannarnas), per fält.
     """
     single = isinstance(fields, np.ndarray)
     fields = [np.asarray(f, np.float32) for f in ([fields] if single else fields)]

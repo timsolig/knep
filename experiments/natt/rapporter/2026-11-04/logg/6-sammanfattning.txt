@@ -1,0 +1,26 @@
+===== 2026-11-05T05:10:03Z försök 1 =====
+Inget system slog driftens kedja i domaren i natt, så rekommendationen är att driften lämnas som den är. Sammanfattningen ligger i `experiments/natt/rapporter/2026-11-04/6-sammanfattning.md` och slutar med `Status: klar`. Uppdraget nämnde också `sammanfattning.md`, men jag skrev bara `6-sammanfattning.md` som uppgiftsraden anger.
+
+**Uppgift 5 (sömlös till 5 h) kördes aldrig.** Det finns varken rapport eller logg för den. Därför har domaren inte bedömt MEPS-blandningen, och ingen har mätt hela cykelns körtid på Pi:n. Jag gjorde inte uppgiften i efterhand: den beräknas ta cirka 2 h och sammanfattningen hade 40 min.
+
+**Var extremerna tappas (från rapport 2):**
+1. **MEPS-blandningen från 1 h** tar flest toppar och mest form: ytan över 20 mm/h faller med −0,63 i log kvot vid 1 h, och formen i bandet 4 till 8 km med −2,5 vid 5 h.
+2. **Regn som kommer in över randen** är kedjans egen förlust av yta och volym, och den växer med ledtiden: ytan över 5 mm/h −0,30 och volymen −0,26 vid 5 h.
+3. **Den bilinjära flytten** tar formen och blockmaxet redan vid 15 min, och förlusten ökar inte sedan.
+
+**Tabellen:** Jag skrev `experiments/projektion/sammanfatt.py`, som räknar alla system mot kedjan på valideringen med 95 %-intervall (1000 bootstrapdragningar) ur domarens sparade summor. Ingen prognos räknades om. Hela tabellen ligger i `experiments/projektion/resultat/sammanfattning.md`, och rapporten har ett urval för konserveringen, träffen och spärrarna. Domarna stämmer med det rapport 1, 3 och 4 kom fram till: alla blev "inte bättre".
+
+**Värt att driva vidare:**
+- **`Inflode25`** är nattens enda system med säkert bättre konservering: volymen och ytan över 5 mm/h vid 5 h kommer närmare radarn, och CSI och spärrarna blir också bättre. Den fälls bara av för mycket yta över 10 och 20 mm/h de första 30 min, ovanpå ett överskott som kedjans platskarta redan har där.
+- **`NarmastRamp3`** halverar formfelet vid 5 h utan någon sämre cell på domens ledtider. Ingen konservering blir dock säkert bättre.
+
+**Körtiden:** Kedjan tar cirka 20 s per utgåva för hela Sverige på 2 km. Varianterna ligger på samma nivå, utom `NarmastRamp3` som mätte 41 s. Varför den mätningen blev så hög är inte utrett.
+
+**Testdelen:** Jag körde ingenting på den. Rapporten har de exakta stegen för den dag en kandidat har gått igenom domen på valideringen:
+1. Lägg till ett läge `test` i domaren. Den stoppar testdagarna med avsikt i dag.
+2. Kör `experiments/sverige/kedja.py --part test` om driftens kedja saknas för testdagarna.
+3. Kör `domare.py kör` och `domare.py tabell` för `kedja` och `konservering:Inflode25`.
+
+Nattens behörigheter nekar `--part test`, så de stegen behöver en människa köra.
+
+`uv run pytest` gick igenom (79 tester) och allt är committat. Det enda som är kvar är loggfilen `logg/6-sammanfattning.txt`, som körskriptet skriver och committar själv efteråt. Inget är pushat.

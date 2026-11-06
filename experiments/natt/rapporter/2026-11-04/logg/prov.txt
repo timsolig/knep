@@ -1,0 +1,9 @@
+Behörigheterna betedde sig som provet förväntade:
+
+1. **Python:** `knep` gick att importera, med `python ok 3.12.16`.
+2. **`df -h /data`:** gick att köra. Disken har 3,5G ledigt (88 % använt).
+3. **`git push`:** nekades. Jag försökte inte på något annat sätt.
+4. **`deploy/prov.txt`:** nekades, och filen skapades inte.
+5. **Rapporten:** ligger i `experiments/natt/rapporter/2026-11-04/prov.md`.
+
+Disken på `/data` är ganska full, så det kan bli trångt om nattkörningen skriver mycket.

@@ -1,0 +1,32 @@
+===== 2026-11-04T21:47:41Z försök 1 =====
+Uppgift 2 är klar, med status `klar`. Jag körde kedjan steg för steg på alla 28 träningsdygn, med tre utgåvor per dygn (84 utgåvor, 2 km), och mätte varje mellanled mot radarn med domarens mått och bootstrapintervall över dygnen. Valideringen och testdelen lästes inte. En kontroll visar att diagnosens sista kedjesteg är identiskt med kedjan som den körs (största skillnad 0,0 mm/h). `uv run pytest` gick igenom (76 tester), och allt är committat på `natt/2026-11-04`.
+
+Var extremerna försvinner, i ordning efter storlek (log kvot mot radarn, negativt betyder förlust):
+
+1. **Blandningen med MEPS, från 1 h.** Den tar bort mest av topparna och formen:
+   - ytan över 20 mm/h: −0,63 vid 1 h och −1,1 vid 2 h
+   - 99,9-percentilen: −0,31 vid 1 h och −0,5 efter 2 h
+   - största värdet i block om 30 km (90-percentilen): −0,77 vid 5 h
+   - formen i bandet 4 till 8 km: −2,5 vid 5 h
+
+   Samtidigt lägger den till volym (+0,32 vid 5 h) och ger den bättre träffen efter 2 h.
+2. **Regn som kommer in över randen och som ingen extrapolering har.** Förlusten växer med ledtiden: ytan över 5 mm/h −0,07 vid 1 h, −0,17 vid 2 h och −0,30 vid 5 h, volymen −0,26 vid 5 h. Det förklarar hela kedjans tapp av volym och yta. Om matchningen görs mot hela analysens fördelning (valet `target="analysis"`, som redan finns) kompenseras ungefär hälften, utan sämre FSS på träningsdagarna.
+3. **Den bilinjära flytten, lika stor från 15 min.** Formen i bandet 4 till 8 km −0,58 och blockmaxet −0,14. Fördelningsmatchningen tar tillbaka percentilerna och ytan, men bara 60 % av blockmaxet och 10 % av formen.
+4. **Utjämning inom kvarten.** Även flytt med närmaste granne ligger cirka 0,1 under radarn i blockmax. Felet ökar inte med ledtiden, så det är inget verkligt avtagande.
+5. **Radarns eget avtagande i lagrangeska koordinater går inte att mäta.** Alla intervall täcker 0, så cellerna som dör ersätts i medel av nya.
+6. **Små eller inga bidrag:** rörelsefältets deformation (högst cirka 2 % av ytan), platskartan (lägger till lite) och extremmodellen (ändrar inte fältet alls, bara sannolikheterna).
+
+Det här är svagt i underlaget:
+- Med tre utgåvor per dygn blir intervallen breda för ytan över 20 mm/h och efter 2 h.
+- Rättningen av MEPS görs en gång per utgåva, inte var 5:e minut som i drift.
+- Formen räknades bara för en del av stegen och står som saknad för resten.
+
+För nästa uppgift föreslår jag att först pröva den sömlösa blandningen. Fördelningen och de små skalorna kan i stället följa kedjan, med FSS och CSI efter 2 h som spärr. Därefter kan inflödet över randen och den bilinjära utjämningen tas om hand.
+
+Ny data i natt är cirka 12 MB under `/data/projektion/`, och 3,3 GB är fortfarande ledigt. Inga ändringar gjordes i `src/knep/`.
+
+Filer:
+- `experiments/natt/rapporter/2026-11-04/2-forlust.md`: rapporten
+- `experiments/projektion/forlust.py`: körningen och tabellen
+- `experiments/projektion/forlust_kontroll.py`: kontrollen mot kedjan
+- `experiments/projektion/resultat/forlust.md`: hela tabellen med intervall

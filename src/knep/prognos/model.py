@@ -62,14 +62,34 @@ def nowcast(obs: np.ndarray, steps: int) -> np.ndarray:
     return forecast
 
 
-def cdf_match(f, target):
-    """Ger f målfältets värdefördelning men behåller f:s rangordning (nollor ordnas efter grannskapet)."""
+def fill_outside(analysis: np.ndarray, decay: float = 0.0, smooth: float = 2.0) -> np.ndarray:
+    """Analysen utan NaN. Med decay > 0 (pixlar) fylls rutorna utanför täckningen med det utjämnade
+    värdet vid närmaste täckta ruta, avtagande som exp(-avståndet / decay), så att regnet vid randen
+    kan flyttas in i området i stället för nollor. decay = 0 ger nollor (drift)."""
+    ok = np.isfinite(analysis)
+    a = np.where(ok, analysis, 0.0).astype(np.float32)
+    if decay <= 0 or ok.all() or not ok.any():
+        return a
+    from scipy.ndimage import distance_transform_edt
+    g = gaussian_filter(a, smooth) / np.maximum(gaussian_filter(ok.astype(np.float32), smooth), 1e-6)
+    d, (iy, ix) = distance_transform_edt(~ok, return_indices=True)
+    return np.where(ok, a, g[iy, ix] * np.exp(-d / decay)).astype(np.float32)
+
+
+def cdf_match(f, target, sharpen: float = 0.0, sigma: float = 1.5):
+    """Ger f målfältets värdefördelning men behåller f:s rangordning (nollor ordnas efter grannskapet).
+
+    sharpen > 0 rangordnar efter ett skärpt fält, f + sharpen (f - G_sigma f), så att toppen i ett
+    utsmetat område hamnar på färre rutor; värdena kommer fortfarande bara ur målet."""
     ok = np.isfinite(f)
     tv = np.sort(target[np.isfinite(target)])
     n = int(ok.sum())
     if n == 0 or tv.size == 0:
         return f
-    key = f[ok] + 1e-3 * gaussian_filter(np.nan_to_num(f), 2.0)[ok]
+    z = np.nan_to_num(f)
+    key = f[ok] + 1e-3 * gaussian_filter(z, 2.0)[ok]
+    if sharpen:
+        key = key + sharpen * (z - gaussian_filter(z, sigma))[ok]
     order = np.argsort(key, kind="stable")
     q = (np.arange(n) + 0.5) / n
     vals = np.empty(n, np.float32)
@@ -178,30 +198,105 @@ def dense_motion(xy: np.ndarray, uv: np.ndarray, shape, step: int = 1) -> np.nda
 
 class Chain:
     def __init__(self, ext_model: Path | None = None, prob_steps: int | None = None, motion_gap: int = 3,
-                 motion_frames: int = 3, target: str = "advected", motion_step: int = 4):
+                 motion_frames: int = 3, target: str = "advected", motion_step: int = 4,
+                 match: bool = True, location: bool = True, interp: str = "linear", sharpen: float = 0.0,
+                 blend: float = 1.0, ramp: tuple[float, float] | None = None, inflow: float = 0.0,
+                 stay: tuple[float, float, float, float] | None = None, terrain: np.ndarray | None = None):
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
         self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
         self.target = target  # "analysis" eller "advected": fördelningen följer med fältet ut ur området
+        self.match, self.location = match, location  # av för ablationer; i drift alltid på
+        # flytten: "linear" (drift), "nearest", eller "cubic" (bikubiskt, klippt till [0, största
+        # värdet bland avgångspunktens grannar], så att inga nya toppar uppstår)
+        # blend < 1 blandar den flytten med den bilinjära: blend * interp + (1 - blend) * bilinjärt;
+        # ramp = (t0, t1) i minuter ledtid låter vikten växa från 0 (bilinjärt) vid t0 till blend vid t1
+        if interp not in ("linear", "nearest", "cubic"):
+            raise ValueError(interp)
+        self.interp, self.sharpen, self.blend, self.ramp = interp, sharpen, blend, ramp
+        # inflow > 0: rutorna utanför täckningen fylls från randen (fill_outside, avtagande med
+        # inflow pixlar), så att regn som kommer in över randen finns i prognosen och i målet
+        self.inflow = inflow
+        # stay = (smax, lyft, fel, tau): en andel s per pixel av analysen står still i stället för att
+        # flyttas, s = smax (1 - exp(-(lyft * max(u·∇h, 0) + fel * max(platskartan, 0)))), där u·∇h är
+        # lyftet i m per 5 min (rörelsen gånger höjdgradienten ur terrain, m på kedjans rutnät) och
+        # platskartan senaste timmens fel i dB; den stillastående delen avtar som exp(-ledtid / tau min).
+        # None (drift) flyttar allt.
+        self.stay, self.terrain = stay, terrain
+        self.stay_target = "split"  # "whole": matchningens mål är det odelade fältet (bara platsen ändras)
 
-    def run(self, obs: np.ndarray, now: datetime, steps: int, state: State | None = None) -> Result:
-        """obs: (T, H, W) mm/h, 5 min mellan bilderna, äldst först, senaste = analysen vid now."""
+    def stay_fraction(self, motion: np.ndarray, corr: np.ndarray) -> np.ndarray | None:
+        if self.stay is None:
+            return None
+        smax, k_lift, k_err, _ = self.stay
+        x = k_err * np.maximum(corr, 0.0)
+        if self.terrain is not None and k_lift:
+            gy, gx = np.gradient(gaussian_filter(self.terrain.astype(np.float32), 1.0))
+            x = x + k_lift * np.maximum(motion[0] * gx + motion[1] * gy, 0.0)
+        return (smax * (1.0 - np.exp(-x))).astype(np.float32)
+
+    def prepared(self, analysis: np.ndarray) -> np.ndarray:
+        """Analysen som flyttas: NaN blir 0, eller med inflow fylls utsidan från randen."""
+        return fill_outside(analysis, self.inflow)
+
+    def project(self, a: np.ndarray, motion: np.ndarray, steps, stay: np.ndarray | None = None):
+        """Analysen a (utan NaN) flyttad: (prognosen, målet för matchningen), (steg, H, W) vardera.
+
+        stay: andelen per pixel som står still (stay_fraction); bara resten flyttas."""
+        if stay is None:
+            return self._project(a, motion, steps)
+        still = (stay * a).astype(np.float32)
+        raw, tgt = self._project((a - still).astype(np.float32), motion, steps)
+        d = np.exp(-5.0 * np.arange(1, len(raw) + 1) / self.stay[3]).astype(np.float32)[:, None, None]
+        if self.stay_target == "whole":  # målet är hela analysen flyttad som i kedjan: bara platsen ändras
+            return raw + d * still, self._project(a, motion, steps)[1]
+        return raw + d * still, tgt + d * still
+
+    def _project(self, a, motion, steps):
+        fields, orders = [a, a], [{"linear": 1, "nearest": 0, "cubic": 3}[self.interp], 0]
+        if self.interp == "cubic":
+            from scipy.ndimage import maximum_filter
+            fields, orders = fields + [maximum_filter(a, 3)], orders + [0]
+        mix = self.interp != "linear" and (self.blend < 1 or self.ramp is not None)
+        if mix:
+            fields, orders = fields + [a], orders + [1]
+        out = advect.extrapolate(fields, motion, steps, orders=orders)
+        raw, tgt = out[0], out[1]
+        if self.interp == "cubic":
+            raw = np.clip(raw, 0.0, out[2])
+        if mix:
+            w = np.full(len(raw), self.blend, np.float32)
+            if self.ramp is not None:  # vikten växer linjärt från 0 vid ramp[0] till blend vid ramp[1] min
+                t = 5.0 * np.arange(1, len(raw) + 1)
+                w *= np.clip((t - self.ramp[0]) / max(self.ramp[1] - self.ramp[0], 1e-9), 0, 1).astype(np.float32)
+            raw = w[:, None, None] * raw + (1 - w[:, None, None]) * out[-1]
+        return raw, tgt
+
+    def matched(self, raw: np.ndarray, tgt: np.ndarray) -> np.ndarray:
+        return cdf_match(raw, tgt, self.sharpen) if self.match else raw
+
+    def run(self, obs: np.ndarray, now: datetime, steps: int, state: State | None = None,
+            motion: np.ndarray | None = None) -> Result:
+        """obs: (T, H, W) mm/h, 5 min mellan bilderna, äldst först, senaste = analysen vid now.
+
+        motion: ett förberäknat rörelsefält (motion_field med kedjans inställningar), annars räknas det här."""
         state = state if state is not None else State()
-        motion = motion_field(obs, self.motion_gap, self.motion_frames, self.motion_step)
+        if motion is None:
+            motion = motion_field(obs, self.motion_gap, self.motion_frames, self.motion_step)
         analysis = obs[-1]
         # bilinjärt för prognosen, och analysens värden flyttade med närmaste granne som mål för
         # matchningen: samma värden, men bara de som är kvar i området
-        a = np.nan_to_num(analysis)
-        raw, tgt = advect.extrapolate([a, a], motion, steps, orders=[1, 0])
+        a = self.prepared(analysis)
+        corr = location_map(state, now, analysis.shape) if self.location else np.zeros(analysis.shape, np.float32)
+        raw, tgt = self.project(a, motion, steps, self.stay_fraction(motion, corr))
         raw[:, ~np.isfinite(analysis)] = np.nan  # utanför täckningen deltar inte i matchningen
         tgt[:, ~np.isfinite(analysis)] = np.nan
         if self.target != "advected":
             tgt = [analysis] * steps
-        corr = location_map(state, now, analysis.shape)
         rain = np.empty(raw.shape, np.float32)
         matched30 = None
         for k in range(steps):
-            m = cdf_match(raw[k], tgt[k])
+            m = self.matched(raw[k], tgt[k])
             if k == 5:
                 matched30 = m
             rain[k] = m * 10 ** (corr * min(1.0, (k + 1) / 6) / 10)
