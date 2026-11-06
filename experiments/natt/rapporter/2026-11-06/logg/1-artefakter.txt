@@ -1,0 +1,43 @@
+===== 2026-11-06T14:12:06Z försök 1 =====
+Inventeringen körs i bakgrunden (44 dagar, två processer). Jag fortsätter när den är klar eller när påminnelsen kl. 14:52 kommer.
+
+Körningen pågår; 20 av 44 dagar är klara.
+
+Det är 37 av 44 dagar klara, så det återstår ungefär tio minuter.
+
+Jag har inventerat radarns artefakter på 44 dagar: 28 träningsdagar och 16 valideringsdagar, inga testdagar. Rapporten ligger i `experiments/natt/rapporter/2026-11-06/1-artefakter.md` med `Status: delvis`, eftersom solstrålar, anaprop och satellitens molnmask inte blev gjorda. Allt är committat på grenen (f68e871), och `uv run pytest` gick igenom med 138 godkända tester.
+
+**Resultat:**
+- **Det värsta klottret är tydligt** och kommer tillbaka på valideringsdagarna. Rutorna har eko i 45 till 77 % av bilderna, mot 17 % i medel. De har eko i 30 till 57 % av timmarna då alla mätare inom 25 km är torra, mot 5 % i medel. De står still fast allt annat rör sig, är isolerade och har 3 till 10 gånger högre textur. De har eko på 20 till 42 av de 44 dagarna, alltså i alla väderlägen.
+- **Vindkraft**: de flesta av de värsta rutorna ligger i vindkraftsområden i Jämtland, Västernorrland och Västerbotten och vid Markbygden. De blinkar mer än klottret vid radarerna. Men den typiska vindkraftsrutan är ren, så en mask på alla verk vore fel; bara en del parker syns.
+- **Ekrar**: 29 ekrar kommer tillbaka både på tränings- och valideringsdagarna. De starkaste är från noand, nohfj, sebaa, seoer och seatv.
+- **Solstrålar** syns inte i den dagliga ekofrekvensen. Andelen ekrar i solens riktning är 9 %, vilket är vad slumpen ger. De behöver hittas bild för bild, och det hann jag inte bygga.
+- **Havsklotter** syns inte tydligt i de här dagarna. Rutorna över havet som flaggades rör sig med vädret och är mest verkligt regn nära kusten.
+
+**Terrängen:** Att ekot står still skiljer inte orografin från klottret, eftersom även nederbörd som hänger på fjällen står still mot rörelsefältet. Det som skiljer är att orografin nästan aldrig har eko när mätarna är torra. Den är heller inte isolerad, har vanlig textur och kommer 70 % oftare när vinden går mot sluttningen.
+
+**Förslag till filtret i uppgift 4:**
+- En sannolikhetskarta för klotter som räknas en gång, inte en mask. Den bygger på eko vid torra mätare, isolering, textur och blinkande.
+- En kontroll i varje cykel, bara på rutor där kartan säger klotter. Den tar bort isolerade ekon, eller ekon som står still när omgivningen är torr. Den behåller ekot när det regnar omkring och vinden går mot sluttningen.
+- Sektorer per radar för ekrarna som återkommer.
+
+**Begränsningar:**
+- Indelningen i typer är en tumregel med fasta trösklar som visar var och vad. Den är inte bedömd av domaren, som byggs i uppgift 2.
+- Klassen "fast klotter på land" är bred; bara 325 av 813 rutor finns kvar på valideringsdagarna.
+- Där det saknas mätare inom 25 km, ofta i fjällen och vid havet, går det inte att räkna eko vid torra mätare.
+- Vindkraftverken kommer från OpenStreetMap (5 605 verk via Overpass), eftersom jag inte hittade någon direkt nedladdning från Länsstyrelsens Vindbrukskollen ([OSM-wikin om importen](https://wiki.openstreetmap.org/wiki/Import/Catalogue/Vindbrukskollen_import_Sweden), [Länsstyrelsens öppna data](https://www.lansstyrelsen.se/dalarna/om-oss/vara-tjanster/oppna-data.html)).
+
+Inget under `src/` ändrades. Det som är nytt i repot är rapporten och de två skripten under `experiments/analys/`: `artefakter.py` (räkningen per dag) och `karta.py` (sammanställningen).
+
+Kartorna ligger under `/data/analys/artefakter/` och tar 231 MB, och det är 6,1 GB ledigt på /data:
+- `kartor.npz`
+- `tabell.json`
+- `bild/*.png`
+- `dag/`
+
+Uppgiften var redan klar när den här påminnelsen kom, så jag har inte gjort något nytt. Det här står fast sedan förra gången:
+
+- **Körningarna:** alla 44 dagar finns i `/data/analys/artefakter/dag/` och båda bakgrundskörningarna slutade utan fel.
+- **Sammanställningen:** `karta.py` kördes på alla 44 dagar och skrev `kartor.npz`, `tabell.json` och `bild/`. Allt under `/data/analys/artefakter/` tar 231 MB, och /data har 6,1 GB ledigt.
+- **Rapporten:** den ligger i `experiments/natt/rapporter/2026-11-06/1-artefakter.md` med `Status: delvis`, eftersom solstrålar, anaprop och satellitens molnmask saknas.
+- **Committen:** f68e871 är committad efter att `uv run pytest` gått igenom med 138 godkända.
