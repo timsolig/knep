@@ -80,3 +80,27 @@ Väntar på de två sista.
 Väntar på sista dagen.
 
 Väntar på den andra halvan.
+
+Uppgift 4 är gjord men gav inget filter som godkänns. Rapporten ligger i `experiments/natt/rapporter/2026-11-06/4-filter.md` med `Status: delvis`, och allt är committat på `natt/2026-11-06`. `uv run pytest` gav 162 godkända.
+
+**Filtret** (`experiments/analys/filter.py`) har tre delar:
+- **Klotterkarta:** räknas en gång, bara på träningsdagarna. En ruta är misstänkt om den har eko vid torra mätare oftare än omgivningen på flera dagar, eller både har eko oftare än omgivningen och hög textur eller isolering. Kartan har 2 122 rutor. Hur ofta en ruta är våt räknas inte in, och inte heller hur stilla ekot står, eftersom båda är höga i fjällen.
+- **Kontroll bild för bild:** eko på en misstänkt ruta tas bara bort när omgivningen inom 42 km nästan saknar eko. Regn som hänger ihop med annat regn, som det orografiska, står kvar.
+- **Ekrar:** smala och långa strålar tas bort nära solens riktning när solen står vid horisonten, och i 28 fasta strålar som återkommer på minst 5 träningsdagar.
+
+**Valet på träningen** gjordes bland fyra varianter på 13 av de 28 träningsdagarna; alla 28 hade tagit för lång tid. Regeln skrevs innan träningen kördes och valde **F0, bara ekrarna och solen**, eftersom den var den enda som inte blev sämre i något terrängmått.
+
+**Valideringen (16 dagar) mot A0:**
+- **F0** blev varken bättre eller sämre. Den ändrar praktiskt taget ingenting.
+- **F1** (kartan, kontrollen och ekrarna) kördes bara som upplysning och användes inte för valet:
+  - Rutorna med eko i mer än hälften av de torra timmarna minskar från 36,6 till 24,1 per dag, med intervallet helt på den bättre sidan.
+  - Över 400 m blir falska ekon vid torra mätare färre (0,009 till 0,007), och MAE och CSI blir bättre.
+  - På lovartsidan är alla mått oförändrade.
+  - Summakvoten över 400 m blir sämre (0,524 till 0,508), och därför räknas F1 inte som bättre.
+- Det som försvinner över 400 m är eko vid mätare som visar 0 eller nästan 0 mm. Kvoten för timmar över 1 mm är exakt densamma. Felet ligger i måttet: när analysen redan är för torr (kvot 0,5) räknas varje överskott som en vinst. Jag ändrade inte domaren. Ett förslag till en bättre kvot står under Nästa steg i rapporten.
+
+**I `src/`:** valet skulle bara läggas dit om filtret höll, och det gjorde det inte. Jag kopplade först in det med standard av och tog sedan bort inkopplingen, så `__init__.py` och `cli.py` är som på `main`. Men `src/knep/analys/klotter.py` och `tests/test_klotter.py` ligger kvar oanvända och är committade, eftersom körningen inte fick radera filer. Ta bort de två filerna om de inte ska vara med; inget annat beror på dem.
+
+Inget i domaren, `deploy/`, `models/` eller `.github/` ändrades, och inget pushades.
+
+Den här aviseringen betyder bara att bevakningen av valideringen har löpt ut. Valideringen var redan klar och allt är committat, så det finns inget mer att göra.
