@@ -1,12 +1,14 @@
-"""En prognoscykel: hämta radar, bygg kompositen, prognostisera, rendera.
+"""En cykel: analysen, prognosen och produkterna till sidan.
 
-Kompositen fyller radarbortfall med OPERA-kompositen (om --fallback) och annars med
-förra analysen flyttad med rörelsen. Analysen volymkorrigeras mot regnmätarna om
-models/bias.npz finns (se bias.py); radarns timsummor vid mätarna samlas varje cykel, och
-en gång per dygn räknas veckofaktorn och en kandidat till ny karta. Modellen är kedjan i model.Chain, med sannolikheter
-för kraftig nederbörd om models/extremes.pkl finns.
-
-Till mosaiken på sidan hämtas också MET Norges nowcast och SMHI:s SNOW som kartor (compare.py).
+1. Analysen (knep.analys): SMHI:s komposit med reserver vid radarbortfall (OPERA om --fallback,
+   radarvolymer, förra analysen flyttad med rörelsen) och volymkorrektion mot regnmätarna om
+   models/bias.npz finns. I realtid samlas radarns värden vid mätarna, och en gång per dygn räknas
+   veckofaktorn och en kandidat till ny karta.
+2. Prognosen (knep.prognos): kedjan i model.Chain, med sannolikheter för kraftig nederbörd om
+   models/extremes.pkl finns, och MEPS rättad mot radarn inblandad efter de första timmarna.
+3. Produkterna: MET Norges nowcast och SMHI:s SNOW till mosaiken (compare.py), regnmätarna
+   (gauges.py), tidigare utgåvor (runs.py), verifieringen 7 och 30 dygn bakåt (verify.py) och
+   kartorna med manifestet (render.py).
 
 Avslutar med kod 75 när det inte finns någon ny radarbild att räkna på.
 """
@@ -20,10 +22,10 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-import numpy as np
 import requests
 
-from . import bias, compare, composite, gauges, model, models, radar, render, runs
+from . import analys, compare, models, prognos, render, runs, verify
+from .analys import gauges, radar
 
 NO_NEW_DATA = 75
 log = logging.getLogger("knep")
@@ -52,69 +54,6 @@ def _wait_for_new(session: requests.Session, previous: datetime | None, wait: in
         time.sleep(15)
 
 
-def _target(grid: radar.Grid) -> composite.TargetGrid:
-    return composite.TargetGrid(grid.transform.c, grid.transform.f, grid.transform.a, grid.shape)
-
-
-def _analyses(times, cache, state_dir, session, fallback):
-    """Analyser för times (äldst först): sparade om de redan byggts, annars SMHI plus reserv och utfyllnad."""
-    out, grid, sources, missing = [], None, None, []
-    gap = composite.GapState.load(state_dir / "gaps.npz")
-    motion_path = state_dir / "motion.npy"
-    motion = np.load(motion_path) if motion_path.exists() else None
-    for t in times:
-        saved = state_dir / f"analys_{t:%Y%m%d%H%M}.npz"
-        try:
-            rain, g = radar.read_rain(radar.fetch(t, cache, session))
-            grid = g
-        except requests.RequestException as e:
-            log.warning("saknar SMHI-bild %s: %s", t, e)
-            rain = None
-        if saved.exists():
-            d = np.load(saved)
-            out.append(d["rain"])
-            sources = d["source"]
-            continue
-        if rain is None and gap is None:
-            continue
-        if rain is None:
-            rain = np.full(gap.analysis.shape, np.nan, np.float32)
-        src = np.where(np.isfinite(rain), composite.SOURCE_SMHI, composite.SOURCE_NONE).astype(np.uint8)
-        hole = ~np.isfinite(rain) & (gap.expected >= 0.5) if gap is not None else None
-        if fallback and hole is not None and hole.any() and grid is not None:
-            from . import sources as srcs
-            target = _target(grid)
-            path = srcs.fetch_opera(session, t, cache)
-            if path is not None:
-                try:
-                    rain, src = composite.layer(rain, src, srcs.read_opera(path, target), composite.SOURCE_OPERA)
-                except (OSError, KeyError, ValueError) as e:
-                    log.warning("kunde inte läsa OPERA %s: %s", t, e)
-            hole = ~np.isfinite(rain) & (gap.expected >= 0.5)
-            if hole.any():
-                # egen komposit av de närmaste radarerna som når hålet, med förlängd räckvidd
-                down = set(composite.missing_radars(rain, target, gap.expected))
-                sites = srcs.radars_covering(hole, target, 320.0, exclude=down)[:4]
-                vol, _, used = srcs.volume_composite(session, t, target, cache, sites, max_range_km=320.0)
-                if vol is not None:
-                    rain, src = composite.layer(rain, src, vol, composite.SOURCE_VOLUME)
-                    log.info("fyllde bortfall med volymer från %s", ", ".join(used))
-        if grid is not None:
-            missing = composite.missing_radars(rain, _target(grid), gap.expected if gap else np.ones(rain.shape, np.float32))
-        rain, src, _, gap = composite.fill_gaps(rain, src, gap, motion)
-        np.savez_compressed(saved, rain=rain.astype(np.float32), source=src)
-        out.append(rain)
-        sources = src
-    if gap is not None:
-        gap.save(state_dir / "gaps.npz")
-    return out, grid, sources, missing
-
-
-def _prune(directory: Path, pattern: str, keep: int) -> None:
-    for p in sorted(directory.glob(pattern))[:-keep]:
-        p.unlink()
-
-
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="knep", description=__doc__)
     p.add_argument("--out", type=Path, default=Path("out/data"), help="katalog för PNG-rutor och manifest")
@@ -136,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--runs", type=float, default=runs.HOURS,
                    help="timmar med tidigare utgåvor (timsummor varje timme, runs/), 0 stänger av")
     p.add_argument("--no-gauges", action="store_true", help="hämta inte regnmätarna till sidan (gauges.json)")
+    p.add_argument("--no-verify", action="store_true", help="ingen verifiering mot radarn och mätarna (verif.json)")
     p.add_argument("--no-seamless", action="store_true", help="bara kedjan, utan MEPS rättad mot radarn (seamless.py)")
     p.add_argument("--seamless", action="store_true", help=argparse.SUPPRESS)  # standard sedan 5 h; finns kvar för äldre skript
     args = p.parse_args(argv)
@@ -154,63 +94,24 @@ def main(argv: list[str] | None = None) -> int:
             log.info("ingen ny radarbild")
             return NO_NEW_DATA
 
-    times = [t0 - k * radar.STEP for k in range(args.history)][::-1]
-    fields, grid, sources, missing = _analyses(times, args.cache, state_dir, session, args.fallback)
-    if len(fields) < 2 or grid is None:
-        log.error("för få radarbilder bakåt från %s", t0)
+    a = analys.bygg(t0, args.history, args.cache, state_dir, session, fallback=args.fallback,
+                    bias_path=None if args.no_bias else args.bias, collect=not args.time)
+    if a is None:
         return 1
-    obs = np.stack(fields)
     steps = round(args.hours * 60 / 5)
-    extra = {}
-    if not args.no_bias:
-        if not args.time:  # insamlingen hämtar senaste timmens mätare, så bara i realtid
-            try:
-                bias.Operational(args.cache / "bias", args.bias).step(session, t0, obs[-1], sources, _target(grid))
-            except Exception as e:  # noqa: BLE001  insamlingen får aldrig stoppa prognosen
-                log.warning("volyminsamling: %s", e)
-        corr = bias.Correction.load(args.bias)
-        week = bias.load_week(args.cache / "bias")
-        if corr is not None and week is not None:
-            corr.mfb, corr.mfb_time = week
-        if corr is not None and corr.beam.shape == obs.shape[1:]:
-            k = corr.factor(t0)
-            obs = corr.apply(obs, t0)
-            cov = np.isfinite(obs[-1])
-            extra["volume_correction"] = {"median": round(float(np.median(k[cov])), 3) if cov.any() else 1.0,
-                                          "week": round(float(np.exp(corr.mfb)), 3), "tail_gamma": round(corr.gamma, 3)}
+    p = prognos.kor(a, state_dir, steps, model_path=args.model, prob_hours=args.prob_hours,
+                    reference=args.reference, seamless=not args.no_seamless and args.hours > 2 and not args.time,
+                    meps_cache=args.cache / "meps", session=session)
+    grid, fc, prob = a.grid, p.rain, p.prob
+    extra = a.extra | p.extra
 
-    started = time.monotonic()
-    prob = None
-    if args.reference:
-        fc = model.nowcast(obs, steps)
-    else:
-        chain = model.Chain(args.model if args.model.exists() else None, prob_steps=round(args.prob_hours * 12))
-        state = model.State.load(state_dir / "model.npz")
-        res = chain.run(obs, t0, steps, state)
-        state.save(state_dir / "model.npz")
-        np.save(state_dir / "motion.npy", res.motion.astype(np.float32))
-        fc, prob = res.rain, res.prob
-        if not args.no_seamless and args.hours > 2 and not args.time:  # MEPS finns bara för senaste körningen
-            from . import seamless
-            try:
-                fc, extra["seamless"] = seamless.run_operational(args.cache / "meps", state_dir / "seamless.npz", session,
-                                                                 grid, t0, obs, fc)
-            except (requests.RequestException, ValueError, KeyError, OSError) as e:  # utan MEPS: bara kedjan
-                log.warning("MEPS: %s", e)
-    log.info("prognos %s, %d steg på %.1f s", t0, steps, time.monotonic() - started)
-
-    frames = [(t, "obs", f) for t, f in zip(times[-len(fields):], obs)]
+    frames = [(t, "obs", f) for t, f in zip(a.times, a.rain)]
     n_prob = round(args.prob_hours * 12) if prob is not None else 0
     frames += [(t0 + (k + 1) * radar.STEP, "fc", f, prob[2, k] if k < n_prob else None) for k, f in enumerate(fc)]
-    share = {}
-    if sources is not None:
-        valid = sources != composite.SOURCE_NONE
-        for name, code in (("smhi", composite.SOURCE_SMHI), ("opera", composite.SOURCE_OPERA),
-                           ("volymer", composite.SOURCE_VOLUME), ("flyttad", composite.SOURCE_ADVECTED)):
-            share[name] = round(float((sources == code).sum() / max(valid.sum(), 1)), 4)
     if not args.time and not args.no_compare:  # källorna har bara senaste loppet
         started = time.monotonic()
-        extra["compare"] = compare.update(args.out, session, t0, args.hours)
+        store = None if args.no_verify else verify.source_dir(args.cache / "verif")
+        extra["compare"] = compare.update(args.out, session, t0, args.hours, store)
         log.info("jämförelsekällor på %.1f s", time.monotonic() - started)
     if not args.time and not args.no_gauges:  # SMHI ger alla stationer bara för senaste timmen
         try:
@@ -234,12 +135,20 @@ def main(argv: list[str] | None = None) -> int:
             extra["runs"] = runs.listing(args.out, t0, args.runs)
         except Exception as e:  # noqa: BLE001
             log.warning("utgåvor: %s", e)
-    rend.write(args.out, t0, frames, {"missing_radars": missing, "sources": share} | extra)
+    if not args.time and not args.no_verify:  # jämförelsekällorna och mätarna finns bara i realtid
+        started = time.monotonic()
+        try:  # verifieringen får aldrig stoppa prognosen
+            v = verify.cycle(args.cache / "verif", args.out, grid, t0, frames, lambda t: analys.source_of(state_dir, t))
+            if v:
+                extra["verification"] = v
+            log.info("verifiering på %.1f s", time.monotonic() - started)
+        except Exception as e:  # noqa: BLE001
+            log.warning("verifiering: %s", e)
+    rend.write(args.out, t0, frames, {"missing_radars": a.missing, "sources": a.share()} | extra)
     log.info("skrev %d rutor till %s", len(frames), args.out)
 
     if not args.keep_cache:
-        _prune(args.cache, "*.tif", args.history + 2)
-        _prune(state_dir, "analys_*.npz", args.history + 2)
+        analys.rensa(args.cache, state_dir, args.history + 2)
     return 0
 
 

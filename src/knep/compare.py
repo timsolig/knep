@@ -24,8 +24,8 @@ import requests
 from rasterio.crs import CRS
 from rasterio.transform import Affine
 
-from . import render
-from .radar import Grid
+from . import render, verify
+from .analys.radar import Grid
 
 log = logging.getLogger("knep")
 
@@ -106,11 +106,11 @@ def met_fetch(session: requests.Session, name: str, stride: int = MET_STRIDE):
     return times, v, grid
 
 
-def _write_met(out: Path, ref: datetime, times, fields, grid) -> dict:
+def _write_met(out: Path, ref: datetime, times, fields, grid, store: Path | None = None, now: datetime | None = None) -> dict:
     d = out / "met"
     d.mkdir(parents=True, exist_ok=True)
     rend = render.Renderer(grid)
-    names, entries = set(), {5: [], 15: [], 60: []}
+    names, entries, hours = set(), {5: [], 15: [], 60: []}, []
     frames = [(t, "fc", f) for t, f in zip(times, fields)]
     for i, (t, _, f) in enumerate(frames):
         name = f"{i:02d}.png"
@@ -123,6 +123,10 @@ def _write_met(out: Path, ref: datetime, times, fields, grid) -> dict:
             rend.png(f, d / name)
             names.add(name)
             entries[minutes].append({"time": _iso(end), "start": _iso(start), "file": f"met/{name}"})
+            if minutes == 60 and store is not None:
+                hours.append((end, f))
+    if store is not None:
+        verify.store_hours(store, f"met_{ref:%Y%m%dT%H%M}", _iso(ref), now or ref, hours, grid)
     for old in d.glob("*.png"):
         if old.name not in names:
             old.unlink()
@@ -130,15 +134,18 @@ def _write_met(out: Path, ref: datetime, times, fields, grid) -> dict:
             "frames": entries[5], "frames15": entries[15], "frames60": entries[60]}
 
 
-def met(out: Path, session: requests.Session, now: datetime) -> dict | None:
-    """MET Norges senaste lopp, ritat; det förra återanvänds om det är yngre än MET_EVERY."""
+def met(out: Path, session: requests.Session, now: datetime, store: Path | None = None) -> dict | None:
+    """MET Norges senaste lopp, ritat; det förra återanvänds om det är yngre än MET_EVERY.
+
+    store: katalogen där timsummorna sparas som tal till verifieringen (verify.py), eller None.
+    """
     index = out / "met" / "met.json"
     prev = json.loads(index.read_text()) if index.exists() else None
     name, ref = met_latest(session)
     if prev and (_parse(prev["reference"]) >= ref or ref - _parse(prev["reference"]) < MET_EVERY):
         return prev
     times, fields, grid = met_fetch(session, name)
-    entry = _write_met(out, ref, times, fields, grid)
+    entry = _write_met(out, ref, times, fields, grid, store, now)
     index.write_text(json.dumps(entry))
     log.info("MET Norge: lopp %s, %d steg", _iso(ref), len(times))
     return entry
@@ -170,7 +177,8 @@ def snow_field(session: requests.Session, end: datetime) -> tuple[np.ndarray, st
     return v.reshape(MEPS_SHAPE)[::-1].copy(), d.get("referenceTime", "")
 
 
-def snow(out: Path, session: requests.Session, now: datetime, hours: float = 2.0) -> dict | None:
+def snow(out: Path, session: requests.Session, now: datetime, hours: float = 2.0, store: Path | None = None) -> dict | None:
+    """SNOW:s timmar, ritade. store: som i met; en timme sparas bara när loppet är nytt."""
     d = out / "snow"
     d.mkdir(parents=True, exist_ok=True)
     rend = render.Renderer(MEPS)
@@ -180,6 +188,10 @@ def snow(out: Path, session: requests.Session, now: datetime, hours: float = 2.0
         if got is None:
             continue
         field, ref = got
+        if store is not None and ref:
+            key = f"snow_{end:%Y%m%dT%H}_{_parse(ref):%Y%m%dT%H%M}"
+            if not (store / f"{key}.npz").exists():
+                verify.store_hours(store, key, ref, now, [(end, field)], MEPS)
         name = f"h{end:%H}.png"
         rend.png(field, d / name)
         names.add(name)
@@ -192,12 +204,16 @@ def snow(out: Path, session: requests.Session, now: datetime, hours: float = 2.0
     return {"reference": ref, "bounds": rend.bounds, "frames60": entries}
 
 
-def update(out: Path, session: requests.Session, now: datetime, hours: float = 2.0) -> dict:
-    """Båda källorna för manifestet. En källa som fallerar saknas bara den här gången."""
+def update(out: Path, session: requests.Session, now: datetime, hours: float = 2.0, store: Path | None = None) -> dict:
+    """Båda källorna för manifestet. En källa som fallerar saknas bara den här gången.
+
+    store: katalogen för timsummorna till verifieringen (verify.source_dir), eller None.
+    """
     res = {"bounds": bounds()}
-    for key, fn in (("met", met), ("snow", lambda o, s, t: snow(o, s, t, hours))):
+    extra = (store,) if store is not None else ()
+    for key, fn in (("met", met), ("snow", lambda o, s, t, *st: snow(o, s, t, hours, *st))):
         try:
-            got = fn(out, session, now)
+            got = fn(out, session, now, *extra)
         except (requests.RequestException, ValueError, KeyError, IndexError) as e:
             log.warning("%s: %s", key, e)
             got = None

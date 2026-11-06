@@ -13,7 +13,7 @@ SMHI radar (GeoTIFF, var 5:e min)
   → GitHub Actions: web/ från main plus data → GitHub Pages
 ```
 
-Sidan har två flikar. **Prognos** är en mosaik med tre kartor sida vid sida: min modell, MET Norges nowcast och SMHI:s SNOW, avgränsade till MEPS-området. Drar eller zoomar man i en karta följer de andra med, och tidsreglaget styr alla tre. Senaste radarbilden kan ligga svagt i bakgrunden under prognoserna. Kartorna finns i tre upplösningar: momentan intensitet var 5:e minut, summa per kvart (som KNEP) och summa per timme (som SNOW). Samma färg betyder samma medelintensitet i alla tre och i alla källor; legenden för summorna är i mm per period, och SNOW, som bara finns per timme, visas som timmens medel även i 5 och 15 min. Ett klick på en karta ger en tidsserie i punkten med radarn, min modell, MET Norges nowcast (5 min) och SNOW (median per timme med min till max i ensemblen), och en tabell med timsummorna sida vid sida. **Händelser** spelar upp namngivna väderhändelser med radarn, kedjans och KNEP-proxyns prognos sedda 30 och 60 min i förväg, i samma tre upplösningar, med risken för kraftig nederbörd och poäng per horisont (ETS, SEDI och volym).
+Sidan har tre flikar. **Prognos** är en mosaik med tre kartor sida vid sida: min modell, MET Norges nowcast och SMHI:s SNOW, avgränsade till MEPS-området. Drar eller zoomar man i en karta följer de andra med, och tidsreglaget styr alla tre. Senaste radarbilden kan ligga svagt i bakgrunden under prognoserna. Kartorna finns i tre upplösningar: momentan intensitet var 5:e minut, summa per kvart (som KNEP) och summa per timme (som SNOW). Samma färg betyder samma medelintensitet i alla tre och i alla källor; legenden för summorna är i mm per period, och SNOW, som bara finns per timme, visas som timmens medel även i 5 och 15 min. Ett klick på en karta ger en tidsserie i punkten med radarn, min modell, MET Norges nowcast (5 min) och SNOW (median per timme med min till max i ensemblen), och en tabell med timsummorna sida vid sida. **Händelser** spelar upp namngivna väderhändelser med radarn, kedjans och KNEP-proxyns prognos sedda 30 och 60 min i förväg, i samma tre upplösningar, med risken för kraftig nederbörd och poäng per horisont (ETS, SEDI och volym). **Verifiering** visar hur Tim-KNEP, MET Norge, SNOW och persistens har träffat de senaste 7 eller 30 dygnen, mot radarn och mot regnmätarna (avsnittet Verifiering).
 
 KNEP är inte fri öppen data hos SMHI (realtidsfilerna levereras mot avgift), så den jämförs via proxyn i händelseflikarna.
 
@@ -62,13 +62,24 @@ Driften hämtar MET Norge och SNOW som kartor (`src/knep/compare.py`) och ritar 
 
 Hämtningen tar cirka 15 sekunder när ett nytt MET-lopp hämtas och någon sekund annars. Fallerar en källa saknas den bara den cykeln, och prognosen publiceras ändå. `--no-compare` stänger av hämtningen, och historiska körningar (`--time`) hämtar inget eftersom källorna bara har senaste loppet.
 
+## Verifiering
+
+`verify.py` räknar på Pi:n, i varje cykel men med det tunga arbetet en gång i timmen:
+
+1. Radarns analyser läggs på ett rutnät om 4 km (radarns 2 km i block om 2). Ett block räknas som uppmätt bara om alla dess pixlar kom från SMHI, OPERA eller radarvolymer, alltså inte från utfyllnad med flyttad analys, och timsumman sparas när minst 11 av 12 bilder finns.
+2. Första cykeln i timmen sparas utgåvan: timsummorna för +1 till +5 h från Tim-KNEP, MET Norges och SNOW:s senaste lopp (som `compare.py` sparar som tal i `cache/verif/src/`) och persistens, radarns senaste timme.
+3. När mätarna för utgåvans sista timme har kommit, 2,5 h efter den, räknas kontingenstabeller för 0,1, 0,5, 1, 2 och 4 mm, kontinuerliga summor och FSS (0,5, 1 och 4 mm på 4, 20 och 60 km) mot radarn, och tabeller mot SMHI:s timsummor (parameter 7) i blocket där mätaren står. Radarn verifieras också mot mätarna, som jämförelse. Allt summeras per dygn (UTC) i `cache/verif/days/`.
+4. `verif.json` får måtten (ETS, CSI, POD, FAR, frekvensbias, HSS, PSS, MCC, SEDI, FSS, MAE, RMSE, medelfel, korrelation och volymkvot) för 7 och 30 dygn med 90 %-intervall ur bootstrap över dygnen, och skillnaden mot Tim-KNEP räknad på exakt samma rutor och timmar som den andra modellen. Där finns också de råa summorna per dygn, kartan över området (`verif/area.png`), mätarna som använts och hur gamla MET Norges och SNOW:s lopp var vid utgåvan.
+
+Tim-KNEP utgår från samma radaranalys som är facit, så mot radarn gynnas Tim-KNEP de första timmarna. Mätarna är oberoende och står därför bredvid. `--no-verify` stänger av allt.
+
 ## Radarbortfall
 
-Kompositen (`src/knep/composite.py`) fyller pixlar som brukar ha data men saknar data nu: först med OPERA-kompositen om `--fallback` är satt, sedan med förra analysen flyttad med rörelsefältet. Kvaliteten för flyttade pixlar avtar med tiden och efter 90 min släpps de. Sidan visar vilka svenska radarer som saknas. För en egen komposit av enskilda radarvolymer finns `sources.volume_composite`, som hämtar ODIM-volymer från EUMETNET:s öppna radardata.
+Kompositen (`src/knep/analys/composite.py`) fyller pixlar som brukar ha data men saknar data nu: först med OPERA-kompositen om `--fallback` är satt, sedan med förra analysen flyttad med rörelsefältet. Kvaliteten för flyttade pixlar avtar med tiden och efter 90 min släpps de. Sidan visar vilka svenska radarer som saknas. För en egen komposit av enskilda radarvolymer finns `sources.volume_composite`, som hämtar ODIM-volymer från EUMETNET:s öppna radardata.
 
 ## Volymkorrektion mot regnmätarna
 
-Radarns årsvolym rättas mot SMHI:s automatiska stationer (parameter 7, timsumma). Metoden följer BALTEX-justeringen (Michelson m.fl. 2000, SMHI RMK 90) men som klimatologi, i `src/knep/bias.py`:
+Radarns årsvolym rättas mot SMHI:s automatiska stationer (parameter 7, timsumma). Metoden följer BALTEX-justeringen (Michelson m.fl. 2000, SMHI RMK 90) men som klimatologi, i `src/knep/analys/bias.py`:
 
 - **Nivå**: log K = a + b·h + c·h² per månad, där h är höjden på den lägsta radarstrålen, plus en restkarta med Barnes-viktning för det som inte beror på höjden (blockering, klotterfilter). Faktorn beror inte på intensiteten, så den kan inte trycka ned toppar för att få summan rätt.
 - **Svans**: efter nivån jämförs timkvantilerna 99 till 99,95 % för mätare och radar, och radarns svans rättas med R·(R/5)^γ över 5 mm/h.

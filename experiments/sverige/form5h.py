@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 import form  # noqa: E402
 from data import CYCLE, load_days  # noqa: E402
-from knep import nwp  # noqa: E402
+from knep.prognos import nwp  # noqa: E402
 from verify5h import (CHAIN_DIR, FSS_THR, NQ, OUT, Q, SCALES_KM, THR, Meps, Obs, Scores,  # noqa: E402
                       chain_forecast, meps_quarters, systems_for)
 

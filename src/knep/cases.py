@@ -27,7 +27,9 @@ import numpy as np
 from pysteps.extrapolation.semilagrangian import extrapolate
 from scipy.ndimage import uniform_filter
 
-from . import composite, model, render
+from . import render
+from .analys import composite
+from .prognos import model
 
 log = logging.getLogger("knep.cases")
 STEP = timedelta(minutes=5)
@@ -330,7 +332,7 @@ def write_index(root: Path):
 def smhi_frames(cache: Path):
     import requests
 
-    from . import radar
+    from .analys import radar
 
     session = requests.Session()
     session.headers["User-Agent"] = "knep/0.1 (hobbyprojekt)"
