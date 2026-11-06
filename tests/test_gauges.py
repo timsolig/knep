@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from knep import gauges
+from knep.analys import gauges
 
 MS = lambda s: int(datetime.fromisoformat(s).replace(tzinfo=UTC).timestamp() * 1000)  # noqa: E731
 

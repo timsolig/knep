@@ -7,7 +7,8 @@ import numpy as np
 from rasterio.crs import CRS
 from rasterio.transform import from_origin
 
-from knep import radar, render, runs
+from knep import render, runs
+from knep.analys import radar
 
 STEP = timedelta(minutes=5)
 

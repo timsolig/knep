@@ -7,7 +7,9 @@ import numpy as np
 from rasterio.crs import CRS
 from rasterio.transform import from_origin
 
-from knep import cases, model, radar
+from knep import cases
+from knep.analys import radar
+from knep.prognos import model
 
 H, W = 120, 160
 T0 = datetime(2023, 8, 8, 12, 0, tzinfo=UTC)
