@@ -42,8 +42,21 @@ from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-import domare as D  # noqa: E402
+
+
+def _load_domare():
+    """Analysens domare via sökvägen och under ett eget namn (andra domare.py finns i experimenten)."""
+    import importlib.util
+    name = "analys_domare"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, HERE / "domare.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules[name]
+
+
+D = _load_domare()
 
 OUT = Path("/data/analys/a2")
 STEP = 4  # tillskottet räknas på var 4:e ruta

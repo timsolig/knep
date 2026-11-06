@@ -7,17 +7,25 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "experiments/analys"))
-for name in ("domare", "a2"):
-    if name not in sys.modules:
-        spec = importlib.util.spec_from_file_location(name, ROOT / f"experiments/analys/{name}.py")
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules[name] = mod
-        spec.loader.exec_module(mod)
-a2 = sys.modules["a2"]
-domare = sys.modules["domare"]
+spec = importlib.util.spec_from_file_location("analys_a2", ROOT / "experiments/analys/a2.py")
+a2 = importlib.util.module_from_spec(spec)
+sys.modules["analys_a2"] = a2
+spec.loader.exec_module(a2)
+domare = a2.D
 
-from test_analys_domare import H, W, make_dag  # noqa: E402
+H, W = 150, 150
+
+
+def make_dag(seed=0, n_st=40, wet_frac=0.4):
+    """Stationer på slumpade rutor med kvarts- och timvärden som stämmer med varandra."""
+    rng = np.random.default_rng(seed)
+    r, c = rng.integers(0, H, n_st), rng.integers(0, W, n_st)
+    q = np.where(rng.random((n_st, 96)) < wet_frac, rng.gamma(1.0, 1.0, (n_st, 96)), 0.0)
+    h = q.reshape(n_st, 24, 4).sum(axis=2)
+    st = np.arange(n_st)
+    kv = domare.Matare(np.repeat(st, 96), np.repeat(r, 96), np.repeat(c, 96), np.tile(np.arange(96), n_st), q.ravel())
+    tm = domare.Matare(np.repeat(st, 24), np.repeat(r, 24), np.repeat(c, 24), np.tile(np.arange(24), n_st), h.ravel())
+    return domare.Dag("2000-01-01", (H, W), kv, tm, np.zeros((H, W), np.float32), None)
 
 
 def _fields(dag, scale=1.0):
