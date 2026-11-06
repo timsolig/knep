@@ -35,7 +35,16 @@ pysteps är bara referens, och modellen behöver inte likna KNEP, MET Norge elle
 
 ## Miljö
 
-Claude Code körs i containern i `dev/`. Repot ligger i `/work` och radararkivet i `/data`. Driften går på värden i containern från `deploy/compose.yaml` och följer `main` av sig själv (en sammanslagning är i drift inom fem minuter), så ändringar går via grenar och pull requests, aldrig direkt mot driften.
+Claude Code körs direkt på Pi:n. Repot ligger i `~/knep` och radararkivet i `~/radar-arkiv`; experimenten och nattkörningen använder de gamla sökvägarna `/work` och `/data`, som ska vara symlänkar dit. Driften går i containern från `deploy/compose.yaml` och följer `main` av sig själv (en sammanslagning är i drift inom fem minuter), så ändringar går via grenar och pull requests, aldrig direkt mot driften. Rör aldrig driftens container eller volymer.
+
+## Pull requests
+
+Claude öppnar och slår ihop sina egna pull requests. `main` är skyddad: kontrollerna `pytest` och `docker` måste gå igenom och grenen måste vara à jour med `main`, även för administratören.
+
+- Kör `uv run pytest` lokalt innan grenen pushas. Ändringar av modellen kräver dessutom att experimenten körs om (se Regler).
+- Öppna med `gh pr create` och slå ihop med `gh pr merge --auto --merge --delete-branch`, så att GitHub väntar på kontrollerna. Aldrig `--admin`, aldrig push direkt till `main` eller `data`, aldrig `--force`.
+- Följ upp efter sammanslagningen: kontrollera att driften har bytt till den nya commiten och att nästa cykel publicerar. Om den inte fungerar, öppna en PR som återställer.
+- Fråga användaren först om ändringen tar bort data, ändrar vad sidan visar på ett sätt som inte är beställt, eller släpper en ny modellversion.
 
 ## Regler
 
