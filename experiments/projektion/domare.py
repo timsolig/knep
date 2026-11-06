@@ -47,7 +47,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 sys.path.insert(0, str(HERE.parent / "sverige"))
 from data import load_days, radar_path  # noqa: E402
-from knep import advect, model, radar, render  # noqa: E402
+from knep.analys import radar  # noqa: E402
+from knep.prognos import advect, model  # noqa: E402
+from knep import render  # noqa: E402
 
 ROOT = Path("/data/projektion")
 CACHE = ROOT / "cache"

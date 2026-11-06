@@ -26,7 +26,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
 import domare as D  # noqa: E402
-from knep import model  # noqa: E402
+from knep.prognos import model  # noqa: E402
 
 
 class Variant(D.KedjaOm):

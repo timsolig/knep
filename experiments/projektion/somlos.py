@@ -54,7 +54,9 @@ import domare as D  # noqa: E402
 
 sys.path.insert(0, str(HERE.parent / "sverige"))
 from data import CYCLE, meps_path, radar_path  # noqa: E402
-from knep import nwp, radar, render, seamless  # noqa: E402
+from knep.analys import radar  # noqa: E402
+from knep.prognos import nwp, seamless  # noqa: E402
+from knep import render  # noqa: E402
 
 CACHE = D.CACHE / "somlos"
 NQ = D.NQ
@@ -430,7 +432,7 @@ def search(n: int, seed: int, procs: int, log: Path) -> None:
 def timing(day: str, hour: int) -> None:
     """Kedjan (model.Chain.run, 60 steg) och blandningen av alla 60 bilder med MEPS, som
     seamless.run_operational gör, på 2 km för en utgåva; utan hämtning och rendering."""
-    from knep import model
+    from knep.prognos import model
 
     ctx = D.Ctx(day, 2)
     t = datetime.fromisoformat(day).replace(tzinfo=UTC) + timedelta(hours=hour)

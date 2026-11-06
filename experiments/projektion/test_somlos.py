@@ -7,7 +7,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import somlos as S  # noqa: E402
-from knep import seamless  # noqa: E402
+from knep.prognos import seamless  # noqa: E402
 
 
 def _fields(seed=0, shape=(120, 140)):

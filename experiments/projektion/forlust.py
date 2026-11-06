@@ -51,7 +51,8 @@ import domare as D  # noqa: E402
 
 sys.path.insert(0, str(HERE.parent / "sverige"))
 from data import radar_path  # noqa: E402
-from knep import advect, model, radar, seamless  # noqa: E402
+from knep.analys import radar  # noqa: E402
+from knep.prognos import advect, model, seamless  # noqa: E402
 
 OUT = D.ROOT / "forlust"
 TIMMAR = [3, 11, 17]                 # tre utgåvor per dygn ryms i nattens tid (cirka 40 s styck)

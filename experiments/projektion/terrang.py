@@ -20,7 +20,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 import domare as D  # noqa: E402
 from konservering import Variant  # noqa: E402
-from knep import model  # noqa: E402
+from knep.prognos import model  # noqa: E402
 
 HOJD = Path("/data/projektion/hojd_2km.npz")
 _cache: dict = {}

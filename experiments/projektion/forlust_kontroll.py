@@ -12,7 +12,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import domare as D  # noqa: E402
 import forlust as F  # noqa: E402
-from knep import advect, model  # noqa: E402
+from knep.prognos import advect, model  # noqa: E402
 
 day, hour = sys.argv[1], int(sys.argv[2])
 t = datetime.fromisoformat(day).replace(tzinfo=UTC) + timedelta(hours=hour)

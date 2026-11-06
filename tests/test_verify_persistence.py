@@ -12,8 +12,9 @@ import numpy as np
 from rasterio.crs import CRS
 from rasterio.transform import from_origin
 
-from knep import composite, verify
-from knep.radar import Grid
+from knep.analys import composite
+from knep import verify
+from knep.analys.radar import Grid
 
 STEP = timedelta(minutes=5)
 HOUR = timedelta(hours=1)

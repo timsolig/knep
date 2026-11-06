@@ -27,7 +27,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "sverige"))
 from data import load_days, radar_path  # noqa: E402
-from knep import radar, render, verify  # noqa: E402
+from knep.analys import radar  # noqa: E402
+from knep import render, verify  # noqa: E402
 
 STEP, HOUR = timedelta(minutes=5), timedelta(hours=1)
 KEDJA = Path("/data/sverige/kedja")

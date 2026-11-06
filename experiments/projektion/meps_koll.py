@@ -12,7 +12,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 sys.path.insert(0, str(HERE.parent / "sverige"))
 from data import CYCLE, load_days, meps_path  # noqa: E402
-from knep import nwp  # noqa: E402
+from knep.prognos import nwp  # noqa: E402
 
 
 def runs(day: str) -> list[datetime]:

@@ -23,7 +23,9 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from knep import model, radar, render, verify
+from knep.analys import radar
+from knep.prognos import model
+from knep import render, verify
 
 STEP, HOUR = timedelta(minutes=5), timedelta(hours=1)
 DIR = Path("/data/projektion/drift/radar")
