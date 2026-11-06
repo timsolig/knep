@@ -215,9 +215,44 @@ for _n, _kw in VARIANTS.items():
     domare.SYSTEMS[_n] = make_system(_n, _kw)
 
 
+KEY_ROWS = [("timme/alla", "falskt vid torr mätare"), ("kvart/alla", "falskt vid torr mätare"),
+            ("timme/over400", "falskt vid torr mätare"), ("timme/lovart", "falskt vid torr mätare"),
+            ("timme/alla", "kvot summa"), ("timme/over400", "kvot summa"), ("timme/lovart", "kvot summa"),
+            ("kvart/over400", "kvot summa"), ("kvart/lovart", "kvot summa"),
+            ("timme/alla", "CSI 0.5"), ("kvart/alla", "CSI 0.5"), ("timme/over400", "CSI 0.5"), ("timme/lovart", "CSI 0.5"),
+            ("timme/alla", "MAE")]
+
+
+def cmd_urval(a) -> None:
+    """Regeln, bestämd innan träningen kördes: bland varianterna som inte är sämre i något mått för
+    falska ekon eller terrängen (domarens verdict, samre_i tom) väljs den med störst minskning av
+    kartmåttet (rutor med eko i över hälften av de torra timmarna). Lika: den med minst ingrepp (F0 < F1 ...)."""
+    base = domare.load_results("A0", a.del_)
+    res = {}
+    for n in a.system or list(VARIANTS):
+        r = domare.load_results(n, a.del_)
+        if not r:
+            continue
+        tab = domare.table(r, base, B=1000)
+        v = domare.verdict(tab)
+        rut = tab["rutor"]["rutor med eko i över hälften av de torra timmarna, per dag"]
+        res[n] = {"dagar": len(set(r) & set(base)), "dom": v, "rutor": rut,
+                  "rader": {f"{k} {m}": tab[k][m] for k, m in KEY_ROWS}}
+        print(f"\n{n} ({res[n]['dagar']} dagar): sämre i {v['samre_i']}, bättre i {v['battre_i']}")
+        print(f"  rutor {rut['varde']:.1f} mot {rut['bas']:.1f}, {rut['diff']:+.2f} ({rut['lo']:+.2f} till {rut['hi']:+.2f})")
+        for k, m in KEY_ROWS:
+            x = tab[k][m]
+            print(f"  {k:14s} {m:24s} {x['varde']:.4f} mot {x['bas']:.4f}  {x['diff']:+.4f} ({x['lo']:+.4f} till {x['hi']:+.4f})")
+    ok = [n for n in res if not res[n]["dom"]["samre_i"]]
+    val = max(ok, key=lambda n: (res[n]["rutor"]["diff"], -list(VARIANTS).index(n))) if ok else None
+    print("\nvalt:", val)
+    FOUT.mkdir(parents=True, exist_ok=True)
+    (FOUT / f"urval_{a.del_}.json").write_text(json.dumps({"valt": val, "varianter": res}, ensure_ascii=False, indent=1, default=float))
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("cmd", choices=["karta", "kor", "tabell"])
+    p.add_argument("cmd", choices=["karta", "kor", "tabell", "urval"])
     p.add_argument("system", nargs="*")
     p.add_argument("--del", dest="del_", default="validering", choices=["validering", "traning"])
     p.add_argument("--dag")
@@ -231,6 +266,8 @@ def main() -> None:
         for d in a.dagar or [a.dag]:
             a.dag = d
             domare.cmd_kor(a)
+    elif a.cmd == "urval":
+        cmd_urval(a)
     else:
         domare.cmd_tabell(a)
 
