@@ -1,0 +1,33 @@
+===== 2026-11-03T22:56:17Z försök 1 =====
+Kvartssummorna hämtas fortfarande. Fallbygget startar av sig självt när de är klara, och jag fortsätter när jobben hör av sig.
+
+Kvartssummorna är vid 76 av 187 stationer (klart cirka 00:00). Bakgrundskedjan bygger sedan alla fall och hör av sig när den är klar.
+
+Kvartssummorna är vid 151 av 187 stationer. Bygget av fallen startar när de är klara.
+
+Bygget av fallen pågår i bakgrunden (cirka 25 min).
+
+Bygget har kommit till valideringsdagarna (296 fall hittills, inga fel). Väntar på att det blir klart.
+
+Uppgift 2 är klar och committad på `natt/2026-11-03`. Inget är pushat. Rapporten finns i `experiments/natt/rapporter/2026-11-03/2-bortfallsfall.md` och slutar med `Status: klar`.
+
+- **Fallen:** Det finns 223 träningsfall från 28 dagar och 128 valideringsfall från 16 dagar. De ligger under `/data/bortfall/fall/{traning,validering}/`, och varje mapp har en `index.json`. Hela bygget gick utan fel och tog ungefär en halvtimme i en process. Med samma frö blir det samma fall om man kör om.
+- **Varje fall innehåller:**
+  - SMHI:s radar i ett utsnitt runt hålet, från 60 min före bortfallet till dess slut. Radarn i hålet är facit.
+  - Hålets mask och avståndet till närmaste radar som fungerar.
+  - MEPS-timmarna ur den körning som fanns när timmen började. De 16 valideringsfallen från 2019 saknar MEPS, eftersom MEPS då låg på ett äldre rutnät.
+  - Regnmätarna, både timsummor (p7) och kvartssummor (p14).
+- **Spridning:** Längderna fördelar sig jämnt över 30, 60, 120, 180 och 360 min. Antalet släckta radarer går från en till alla tolv.
+- **Rest från uppgift 1:** Kvartssummorna från mätarna är nu hämtade, 185 stationer.
+- **Tester:** 12 nya enhetstester i `tests/test_bortfall_fall.py`. Hela sviten, 68 tester, går igenom. Inget i `src/knep/` är ändrat.
+- **Data:** Fallen tar 438 MB, så nattens nya data är cirka 1,4 GB av taket på 2 GB. Det är 3,6 GB ledigt på `/data`.
+
+Det här behöver uppgift 3 veta:
+- **De flesta hål kräver flera släckta radarer.** Med regeln att ingen annan radar får nå inom 240 km ger bara Gotlandsradarn (mest Östersjön) och Luleå hål när de släcks ensamma. Det blev 15 olika hål.
+- **Facit måste döljas för systemen.** Hålets pixlar från bortfallets första bild (index 12) och framåt är facit och får inte ges till systemen.
+- **Bootstrap över dagar, inte fall.** Fall från samma dag har ofta samma regn och är därför inte oberoende.
+- **Ingen OPERA och inga enskilda radarvolymer.** OPERA innehåller själv de släckta radarerna och vore fusk. Volymerna finns i arkivet först från 2025.
+
+Ett av bakgrundsjobben stoppades när det nådde sin tidsgräns. Det påverkar inte resultatet. Jobbet skulle bara vänta tills bygget var klart och sedan skriva en sammanfattning. Väntan tog aldrig slut, troligen för att `pgrep -f "fall.py"` hittade jobbets egen kommandorad.
+
+Själva bygget hade redan gått klart utan fel, och siffrorna i rapporten kommer från det: 223 träningsfall och 128 valideringsfall. Jag startar inte om väntejobbet. Uppgift 2 är klar och committad.

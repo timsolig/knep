@@ -1,0 +1,12 @@
+{
+ "vald": "t360_x2.5",
+ "vikter": {
+  "t50_small": 360.0,
+  "t50_large": 900.0,
+  "shape": 2.5,
+  "sigma_km": 30.0,
+  "match": true
+ },
+ "fall": 56,
+ "poang": 0.5286360185101069
+}

@@ -1,0 +1,47 @@
+===== 2026-11-03T20:37:14Z försök 1 =====
+Radarhämtningen kör i bakgrunden (8 av 28 dygn klara, väntas bli klar runt 22:00, sedan mätarna). MEPS är klart för alla 28 dygn. Rapportutkastet är committat; jag fyller i hämtningens slutsiffror och status när den är klar.
+
+Tio av 28 dygn är klara och farten håller. Jag väntar vidare på att radarn och mätarna blir klara.
+
+Övervakningen löpte ut efter sin tidsgräns, men bakgrundsjobbet `barkko711` meddelar när hämtningen är klar, och en väckning är inlagd till 21:37. Jag väntar.
+
+Hämtningen fortsätter (18 av 28 dygn klara). Nästa kontroll sker 22:08.
+
+Jag väntar på mätarna (bakgrundsjobbet och övervakningen meddelar när de är klara).
+
+Jag väntar på kvartssummorna.
+
+Uppgift 1 är klar och committad på `natt/2026-11-03`, och `uv run pytest` går igenom (56 tester). Radar och MEPS finns nu för alla 28 träningsdagar. Kvartssummorna från regnmätarna hämtas fortfarande och blir inte klara innan den här sessionen slutar.
+
+**Träningsdagar:** 28 dagar, sju per årstid, 2020 till 2025. De ligger i `experiments/bortfall/traning.json` och väljs av `valj_traning.py`. Ingen dag ligger i `dagar.json` eller inom två dygn från en sådan. Från `dagar.json` lästes bara datumen, och ingen data från testdagarna har hämtats eller använts.
+
+**Hämtat** (av `experiments/bortfall/hamta.py`, som går att köra om):
+
+| Data | Läge |
+|---|---|
+| Radarn | Klar: 367 bilder per dygn, 6 bilder gick inte att hämta |
+| MEPS | Klar: alla 140 körningar |
+| Regnmätare, timme | Klar: 200 stationer, 5 saknas efter avbrutna anslutningar från SMHI |
+| Regnmätare, kvart | Pågår: 51 av 187 stationer vid 22:40, cirka 2,5 stationer per minut |
+
+Ungefär 0,95 GB ny data i natt, så det finns cirka 1 GB kvar av taket.
+
+Kvartssummorna sparas först när alla stationer är hämtade, och bakgrundsprocessen kan avbrytas när sessionen slutar. Rapporten säger åt uppgift 2 att köra `hamta.py kontroll` och starta om hämtningen av mätarna om den filen saknas. Kvartssummorna behövs först i uppgift 3, och då bara som kontroll.
+
+**Två fynd som bör tas upp:**
+- **OPERA kan inte användas i simulerade bortfall.** OPERA-kompositen innehåller samma svenska radarer, så den ser radaren som ska vara släckt. Den lämnas därför utanför nattens system.
+- **Volymlagret i driften får inga svenska eller finska radarer.** De publiceras som `SCAN`, en fil per elevation, men `sources.fetch_pvol` letar bara under `PVOL/`. Så är det både i realtidshinken och i arkivet, så i dag används bara norska och danska volymer. Det är ett fel i driften. Jag har inte rättat det, eftersom det inte behövs för experimenten och påverkar driften när det mergas. Arkivet har för övrigt volymer bara från januari 2025.
+
+**Planen för resten av natten** står i rapporten. Det viktigaste är att uppgift 2 inte sparar radarbilderna igen utan bara fallens beskrivning och läser facit ur `/data/radar/`, annars spräcks datataket. Dessutom ska domaren ta bootstrap över dagar, inte fall. Den ska också redovisa att `fill_gaps` släpper pixlarna efter 90 min, så att baslinjen "fylld" är lika med "hål" i ålderklassen 90 till 360 min.
+
+Rapporten ligger i `experiments/natt/rapporter/2026-11-03/1-inventering.md` och slutar med `Status: klar`.
+
+Kvartssummorna från regnmätarna saknas efter i natt, men radarn, MEPS och timsummorna finns för alla 28 träningsdagar.
+
+Hämtningen av kvartssummorna stoppades 22:42, när den nådde gränsen på 2 h för bakgrundsjobb. Då var 101 av 187 stationer hämtade, men filen skrivs först när alla är klara, så inget sparades. En ny körning tar cirka 75 min och hinner inte före min tidsgräns 23:37, så jag har inte startat om den.
+
+Rapporten säger nu att uppgift 2 tidigt ska starta `hamta.py matare --logg /data/bortfall/hamta_radar.log` i bakgrunden. Timsummorna finns redan och hoppas över. Kvartssummorna behövs först i uppgift 3, och då bara som kontroll.
+
+Rapporten är committad och har fortfarande `Status: klar`, eftersom uppgiften gällde att välja dagarna och hämta radarn.
+
+Det jobb som stoppades nu var bara väntslingan som bevakade hämtningen. Själva hämtningen stoppades redan 22:42, så inget nytt har gått förlorat och inget behöver startas om. Rapporten säger redan att uppgift 2 ska köra om hämtningen av kvartssummorna.
