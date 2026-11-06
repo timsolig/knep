@@ -21,8 +21,8 @@ import requests
 from rasterio.transform import Affine, array_bounds
 from rasterio.warp import Resampling, reproject
 
-from .. import compare
-from ..analys.radar import Grid
+from knep import compare
+from knep.analys.radar import Grid
 
 log = logging.getLogger("knep")
 

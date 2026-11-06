@@ -466,7 +466,9 @@
        ETS, FAR, MCC, FSS och fler mått per ledtid och dygn, med osäkerheten och skillnaden mot Tim-KNEP. Där står också vilka rutor och mätare som är facit.</p>
     <h4><span class="sw" style="background:var(--snow)"></span>Att tänka på</h4>
     <p>MET Norge räknar två timmar framåt. SNOW finns per timme och är ensemblens median, så kraftiga skurar blir svagare där.
-       Tim-KNEP blandar in vädermodellen MEPS längre fram, och risken för minst 10 mm/h finns för de två första timmarna.</p>
+       Tim-KNEP bygger bara på radarn och flyttar regnet med dess rörelse hela vägen till fem timmar, utan någon vädermodell.
+       Därför är kartan skarp även längre fram, men regn som bildas eller dör ut under tiden kan den inte se. SNOW bygger på vädermodellen MEPS.
+       Risken för minst 10 mm/h finns för de två första timmarna.</p>
     <p class="status">Tangenter: pilarna stegar, mellanslag spelar, N går till nu, 1, 2 och 3 byter upplösning, M visar mätarna. Knappen Länk kopierar vyn.</p>
   </div>
   <div class="if">
@@ -885,12 +887,11 @@ function liveStatus() {
   const el = $('status');
   const gaps = m.missing_radars?.length ? ` Radar saknas: ${m.missing_radars.join(', ')}, området fylls med flyttad analys och grannländernas radar.` : '';
   const vc = m.volume_correction ? ` Volymkorrigerad mot regnmätarna, medianfaktor ${num(m.volume_correction.median)}.` : '';
-  const sl = m.seamless?.meps_run ? ` Längre fram blandas MEPS in (körning ${clock.format(new Date(m.seamless.meps_run))}), rättad mot radarn.` : '';
   el.className = 'status' + (age > STALE_MIN || gaps ? ' warn' : '');
   document.title = `Nederbörd ${clock.format(new Date(m.analysis))}`;
   el.textContent = age > STALE_MIN
     ? `Ingen ny radarbild på ${age} min. Prognosen kan vara inaktuell.`
-    : `Analys ${clock.format(new Date(m.analysis))}, ${ago(Math.round((new Date(m.frames.at(-1).time) - new Date(m.analysis)) / MIN))} framåt, uppdateras var femte minut.${sl}${gaps}${vc}`;
+    : `Analys ${clock.format(new Date(m.analysis))}, ${ago(Math.round((new Date(m.frames.at(-1).time) - new Date(m.analysis)) / MIN))} framåt, uppdateras var femte minut.${gaps}${vc}`;
   const c = m.compare || {};
   $('sources').textContent = [...live.panes.keys()].filter(k => k !== 'ours').map(k => {
     const e = c[k], info = modelInfo(k);
@@ -2223,7 +2224,7 @@ function located(e) {
 }
 
 // förklaringen: visas första gången, och med ? uppe till höger
-const INTRO = 3;  // höj när förklaringen ändras, så att den visas igen
+const INTRO = 4;  // höj när förklaringen ändras, så att den visas igen
 function introOpen() { try { $('intro').showModal(); } catch (e) { $('intro').setAttribute('open', ''); } }
 $('help').addEventListener('click', introOpen);
 $('intro-close').addEventListener('click', () => { $('intro').close(); store.set('intro', INTRO); });

@@ -13,7 +13,11 @@ from datetime import timedelta
 import numpy as np
 
 from knep.analys import radar
-from knep.prognos import seamless
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "meps"))  # MEPS finns bara i experimenten, inte i Tim-KNEP
+import seamless  # noqa: E402
 
 NQ = 20
 

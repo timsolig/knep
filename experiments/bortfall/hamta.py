@@ -33,7 +33,8 @@ sys.path.insert(0, str(HERE.parents[1] / "src"))
 import data as sv  # noqa: E402
 
 from knep.analys import bias, radar  # noqa: E402
-from knep.prognos import nwp  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "meps"))  # MEPS finns bara i experimenten, inte i Tim-KNEP
+import nwp  # noqa: E402
 
 DATA = Path("/data")
 OUT = DATA / "bortfall"

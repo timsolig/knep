@@ -29,7 +29,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from knep.analys import radar  # noqa: E402
-from knep.prognos import nwp  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "meps"))  # MEPS finns bara i experimenten, inte i Tim-KNEP
+import nwp  # noqa: E402
 
 HERE = Path(__file__).parent
 DATA = Path("/data")

@@ -55,7 +55,9 @@ import domare as D  # noqa: E402
 sys.path.insert(0, str(HERE.parent / "sverige"))
 from data import CYCLE, meps_path, radar_path  # noqa: E402
 from knep.analys import radar  # noqa: E402
-from knep.prognos import nwp, seamless  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "meps"))  # MEPS finns bara i experimenten, inte i Tim-KNEP
+import nwp  # noqa: E402
+import seamless  # noqa: E402
 from knep import render  # noqa: E402
 
 CACHE = D.CACHE / "somlos"
