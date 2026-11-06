@@ -1,0 +1,22 @@
+===== 2026-11-04T00:31:24Z försök 1 =====
+Domaren är byggd och testad, och baslinjerna är körda på alla 128 valideringsfall (16 dagar). Rapporten ligger i `experiments/natt/rapporter/2026-11-03/3-domare.md` med `Status: klar`, och allt är committat på `natt/2026-11-03`. `uv run pytest` gick igenom med 89 tester.
+
+**Domaren (`experiments/bortfall/domare.py`)**
+- Ett system får bara det som hade funnits i realtid. Det matas en bild i taget, med NaN i hålet, MEPS bara för timmar som har börjat och regnmätare med en timmes fördröjning.
+- Utanför hålet använder domaren alltid den riktiga radarn, så ett system inte kan förbättra sömmen genom att ändra fältet där. NaN i hålet räknas som 0 mm/h.
+- Måtten följer uppdraget och räknas per åldersklass (0 till 30, 30 till 90 och 90 till 360 min). Skillnaden mot driftens utfyllnad får ett 95 %-intervall från bootstrap över dagar (2000 dragningar). Med färre än 5 dagar ges ingen dom.
+- Regnmätarna finns med som oberoende kontroll, med radarns eget fel som golv.
+- Det finns 21 tester för måtten och för körningen. Systemet `facit` (radarn själv) får 1 på FSS och CSI, 1 på volym och 0 på söm, vilket bekräftar att domaren räknar rätt. Ett test kontrollerar att ett system aldrig får se facit i hålet.
+
+**Rättning under körningen:** mätararkivet innehöll uppenbara fel, bland annat en station med konstant 180 mm per kvart och ett värde på 498 071 mm. Det gjorde mätarkontrollen meningslös. Domaren räknar nu inte mätarvärden under 0 eller över 30 mm per kvart och 60 mm per timme. Jag körde om alla baslinjer med spärren. Systemen får fortfarande de råa mätarvärdena och måste rensa dem själva.
+
+**Vad baslinjerna visar**
+- **Driftens utfyllnad (`fylld`) hjälper mycket de första 90 minuterna.** FSS vid 1 mm på 30 km är 0,95 för 0 till 30 min och 0,82 för 30 till 90 min, mot 0 utan utfyllnad.
+- **Efter 90 minuter finns ingenting**, eftersom `fill_gaps` släpper pixlarna då. Där ligger hälften av alla bedömda bilder, så där finns mest att vinna för nästa system.
+- **Utfyllnaden överskattar regnet efter en stund:** volymen stiger till 1,12 mot radarn för 30 till 90 min.
+- **Den utjämnade varianten är inte bättre än driften.** Den vinner lite i CSI men förlorar i FSS, så domaren ger inget skäl att slå på utjämningen i driften.
+
+**Kvar att göra**
+- Volymdomen är skev när båda systemen ligger nära 1, eftersom skillnaden räknas på avståndet till 1. En sådan dom ska läsas försiktigt. Jag har beskrivit det men inte ändrat det.
+- Domaren mäter ännu inte prognosen efter bortfallet; det var planerat till uppgift 6.
+- Fyra filer från provkörningen (`experiments/bortfall/resultat/validering/*_prov3.json`) räknades före mätarspärren och är inaktuella. `rm` var inte tillåtet i natt, så de ligger kvar ocommittade och kan tas bort.

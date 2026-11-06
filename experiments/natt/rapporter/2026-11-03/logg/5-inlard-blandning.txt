@@ -1,0 +1,6 @@
+===== 2026-11-04T04:40:16Z försök 1 =====
+Extraktionen av träningsfallen kör i bakgrunden: 2 av 27 fall klara, cirka 50 s per fall med två processer. Jag fortsätter när den är klar.
+
+Träningen kör i bakgrunden; väntar på den.
+
+Utkastet är committat. Valideringen körs i bakgrunden; jag fortsätter när den är klar.

@@ -1,0 +1,34 @@
+===== 2026-11-04T02:00:07Z försök 1 =====
+Sökningen kör i bakgrunden; jag väntar på besked från övervakningen.
+
+Cirka 9 fall per 10 minuter, så sökningen bör bli klar runt 03:10. Bakgrundsjobbet meddelar när det är klart.
+
+Utkastet är committat. Valideringen fortsätter; jag väntar på nästa besked.
+
+Väntar på att blandningens validering blir klar.
+
+Väntar på MEPS- och Flytt-körningarna.
+
+Väntar på testsviten.
+
+Uppgift 4 är klar. Rapporten ligger i `experiments/natt/rapporter/2026-11-03/4-meps-i-halet.md` och slutar med `Status: klar`. Allt är committat på `natt/2026-11-03`, och `uv run pytest` gick igenom (97 tester).
+
+**Det jag byggde** (`experiments/bortfall/meps_hal.py`, 8 nya tester):
+- `Meps`: fyller hålet med MEPS rättad mot radarn utanför hålet, med samma läges- och mängdrättning som `seamless.py`.
+- `Flytt`: driftens `fill_gaps` utan 90-minutersgränsen, så att den flyttade analysen inte släpps.
+- `Blandning`: blandar `Flytt` och den rättade MEPS per skala, med vikter efter bortfallets ålder.
+
+Vikterna valdes på 56 träningsfall och frystes i `meps_vikter.json` innan valideringen startade. De ger MEPS liten vikt: 0,07 vid 90 min och 0,5 vid 6 h.
+
+**Vad domaren säger om valideringen (128 fall, 16 dagar):**
+- **MEPS rättad mot radarn ger en dålig analys i hålet.** Före 90 min är den sämre än driften i alla mått; till exempel FSS 5 mm på 30 km 0,37 mot 0,88 de första 30 min. Efter 90 min är den bättre än driftens tomma hål men sämre än `Flytt`, och sömmen mot radarn utanför blir kantigare.
+- **Vinsten kommer av att inte släppa pixlarna efter 90 min.** `Flytt` är identisk med driften före 90 min. Efter 90 min, där driften inte har något alls, ger den FSS 1 mm på 30 km 0,73 och CSI 1 mm 0,37. Det är tydligt bättre i alla FSS- och CSI-mått. En nackdel är att volymen blir för stor (1,37 gånger radarn).
+- **MEPS i blandningen ger ingen säker förbättring mot `Flytt`.** Inget mått avgörs åt något håll. Punktvärdena tyder på att volymfelet minskar (1,24 mot 1,37), men FSS 5 mm sjunker något.
+- Före 90 min ger domaren formellt "bättre" till Blandning i några mått, men skillnaderna är högst 0,001. Det beror på att intervallen blir mycket smala när två system är nästan lika, och är ingen verklig förbättring.
+
+**Inte gjort:**
+- Prognosen efteråt är inte mätt, eftersom domaren inte mäter den än; den ligger på uppgift 6.
+- Jag har inte ändrat `max_age` i driften. Det bör prövas mot prognosen efteråt först.
+- Två filer ligger kvar ocommittade: en inaktuell provkörning (`resultat/traning/meps_sok_prov2.json`) och loggfilen för uppgiften.
+
+**Nästa steg:** uppgift 5 bör använda `Flytt` som baslinje vid sidan av driften, eftersom det är den som ska slås efter 90 min. Om `Flytt` håller även för prognosen efteråt räcker en liten PR som höjer `max_age` i `fill_gaps`.
