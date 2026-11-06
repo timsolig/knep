@@ -108,7 +108,7 @@ def test_meps_hours_cover_window():
 
 
 def test_lut_matches_radar_coding():
-    from knep import radar
+    from knep.analys import radar
 
     raw = np.array([0, 1, 100, 200, 254, 255], np.uint8)
     rain = fall.to_rain(raw)

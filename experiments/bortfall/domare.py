@@ -72,7 +72,7 @@ from scipy.ndimage import binary_dilation, binary_erosion, uniform_filter
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
-from knep import composite  # noqa: E402
+from knep.analys import composite  # noqa: E402
 
 FALL = Path("/data/bortfall/fall")
 RESULTAT = HERE / "resultat"
@@ -339,7 +339,7 @@ class Fylld:
         out, _, _, self.state = composite.fill_gaps(b, src, self.state, self.motion, smooth=self.smooth)
         # i drift sparas den visade analysen (out) och kedjan räknar rörelsen på den
         self.analyser = (self.analyser + [out])[-7:]
-        from knep.model import motion_field
+        from knep.prognos.model import motion_field
         self.motion = motion_field(np.stack(self.analyser), 3, 3, 4) if len(self.analyser) >= 2 else None
         return out
 

@@ -48,7 +48,8 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 
 import domare  # noqa: E402
-from knep import composite, seamless  # noqa: E402
+from knep.analys import composite  # noqa: E402
+from knep.prognos import seamless  # noqa: E402
 
 VIKTER = HERE / "meps_vikter.json"
 
@@ -199,7 +200,7 @@ class Flytt(domare.Fylld):
         src = np.where(np.isfinite(b), composite.SOURCE_SMHI, composite.SOURCE_NONE).astype(np.uint8)
         out, _, _, self.state = composite.fill_gaps(b, src, self.state, self.motion, max_age=self.max_age)
         self.analyser = (self.analyser + [out])[-7:]
-        from knep.model import motion_field
+        from knep.prognos.model import motion_field
         self.motion = motion_field(np.stack(self.analyser), 3, 3, 4) if len(self.analyser) >= 2 else None
         return out
 

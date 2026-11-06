@@ -53,7 +53,8 @@ sys.path.insert(0, str(HERE.parent / "sverige"))
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 import data as sv  # noqa: E402
 
-from knep import composite, nwp, radar  # noqa: E402
+from knep.analys import composite, radar  # noqa: E402
+from knep.prognos import nwp  # noqa: E402
 
 DATA = Path("/data")
 OUT = DATA / "bortfall" / "fall"
