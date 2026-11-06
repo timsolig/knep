@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import requests
 
-from . import bias, composite, radar
+from . import bias, composite, klotter, radar
 
 log = logging.getLogger("knep")
 
@@ -114,11 +114,14 @@ def _analyses(times, cache, state_dir, session, fallback):
 
 
 def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requests.Session, *,
-         fallback: bool = False, bias_path: Path | None = None, collect: bool = False) -> Analys | None:
+         fallback: bool = False, bias_path: Path | None = None, collect: bool = False,
+         klotter_path: Path | None = None) -> Analys | None:
     """Analyserna för de `history` senaste bilderna fram till t0, eller None om för få finns.
 
     bias_path: låst karta för volymkorrektionen (None stänger av). collect: samla radarns värden
     vid mätarna och räkna veckofaktorn (bara i realtid, eftersom den hämtar senaste timmens mätare).
+    klotter_path: karta över misstänkt fast klotter (klotter.py); None, standard, stänger av filtret.
+    Filtret verkar före volymkorrektionen och ändrar inte de sparade analyserna i state_dir.
     """
     times = [t0 - k * radar.STEP for k in range(history)][::-1]
     fields, kept, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback)
@@ -127,6 +130,14 @@ def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requ
         return None
     rain = np.stack(fields)
     extra = {}
+    if klotter_path is not None:
+        m = klotter.load(klotter_path, rain.shape[1:])
+        if m is None:
+            log.warning("klotterkartan %s saknas eller har fel form; inget filter", klotter_path)
+        else:
+            before = int((np.nan_to_num(rain) > 0).sum())
+            rain = np.stack([klotter.rensa(f, m) for f in rain])
+            log.info("klotterfiltret: %d rutor med eko borttagna", before - int((np.nan_to_num(rain) > 0).sum()))
     if bias_path is not None:
         if collect:
             try:

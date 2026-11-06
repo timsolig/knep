@@ -1,6 +1,7 @@
-"""Filter mot fast klotter i A0. INTE inkopplat i analysen: domaren godkände det inte på
-valideringen natten 2026-11-06 (se experiments/natt/rapporter/2026-11-06/4-filter.md). Modulen
-ligger kvar som förslag till nästa försök och används inte av bygg() eller cli.py.
+"""Filter mot fast klotter i A0, ett val som är av som standard (`bygg(..., klotter_path=...)`,
+`knep --klotter KARTA`). Kartdelen av F4 i experiments/analys/filter.py; domaren bedömde den på
+valideringen natten 2026-11-06 (experiments/natt/rapporter/2026-11-06/4-filter.md). Kartan för F4
+är den utan utvidgning (`filter.py karta_drift` skriver den med nyckeln `klotter`).
 
 En karta över misstänkta klotterrutor räknas en gång utanför driften (experiments/analys/filter.py,
 ur eko under torra mätartimmar, textur och isolering, inte ur hur ofta rutan är våt). I varje bild

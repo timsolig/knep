@@ -33,6 +33,14 @@ def test_rain_around_suspected_cells_is_kept():
     np.testing.assert_array_equal(klotter.rensa(rain, _map()), rain)
 
 
+def test_filter_is_off_by_default():
+    import inspect
+
+    from knep import analys
+
+    assert inspect.signature(analys.bygg).parameters["klotter_path"].default is None
+
+
 def test_load_checks_shape(tmp_path):
     p = tmp_path / "k.npz"
     np.savez_compressed(p, klotter=_map())

@@ -54,6 +54,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 FOUT = Path("/data/analys/filter")
 KARTA = FOUT / "karta.npz"
 EKRAR = FOUT / "ekrar.json"
+KARTA_DRIFT = FOUT / "klotter_f4.npz"
 
 # kartans trösklar, satta i förväg ur uppgift 1:s tabeller (inte valda på data här)
 TORR_OVER = 0.10      # f_torr minus medianen inom 30 km
@@ -112,11 +113,16 @@ def build_map() -> None:
 
 class Filter:
     def __init__(self, grid, kontext: float = 0.03, karta: bool = True, ekrar: bool = True, prickar: bool = False,
-                 klotter: np.ndarray | None = None, fasta: dict | None = None, geo: dict | None = None):
+                 klotter: np.ndarray | None = None, fasta: dict | None = None, geo: dict | None = None,
+                 utvidgad: bool = True):
         """klotter, fasta och geo ges i testerna; annars läses kartan och listan ur FOUT och
-        strålarnas geometri räknas ur rutnätet."""
+        strålarnas geometri räknas ur rutnätet. utvidgad=False tar kartan utan utvidgningen med
+        en ruta, alltså bara rutorna som själva uppfyller kriterierna."""
         self.kontext, self.use_karta, self.use_ekrar, self.prickar = kontext, karta, ekrar, prickar
-        self.M = np.load(KARTA)["klotter"] if klotter is None else klotter
+        if klotter is None:
+            z = np.load(KARTA)
+            klotter = z["klotter"] if utvidgad else (z["torr"] | z["eko"])
+        self.M = klotter
         assert self.M.shape == grid.shape
         if geo is None and ekrar:
             from bild import geometry
@@ -187,6 +193,8 @@ VARIANTS = {
     "F1": dict(kontext=0.03, karta=True, ekrar=True),
     "F2": dict(kontext=0.10, karta=True, ekrar=True),
     "F3": dict(kontext=0.03, karta=True, ekrar=True, prickar=True),
+    # försök 2: som F1 men utan utvidgningen (nästa steg 2 i försök 1:s rapport)
+    "F4": dict(kontext=0.03, karta=True, ekrar=True, utvidgad=False),
 }
 
 
@@ -247,12 +255,13 @@ def cmd_urval(a) -> None:
     val = max(ok, key=lambda n: (res[n]["rutor"]["diff"], -list(VARIANTS).index(n))) if ok else None
     print("\nvalt:", val)
     FOUT.mkdir(parents=True, exist_ok=True)
-    (FOUT / f"urval_{a.del_}.json").write_text(json.dumps({"valt": val, "varianter": res}, ensure_ascii=False, indent=1, default=float))
+    namn = f"urval_{a.del_}" + ("_" + "_".join(a.system) if a.system else "")
+    (FOUT / f"{namn}.json").write_text(json.dumps({"valt": val, "varianter": res}, ensure_ascii=False, indent=1, default=float))
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("cmd", choices=["karta", "kor", "tabell", "urval"])
+    p.add_argument("cmd", choices=["karta", "karta_drift", "kor", "tabell", "urval"])
     p.add_argument("system", nargs="*")
     p.add_argument("--del", dest="del_", default="validering", choices=["validering", "traning"])
     p.add_argument("--dag")
@@ -262,6 +271,12 @@ def main() -> None:
     a = p.parse_args()
     if a.cmd == "karta":
         build_map()
+    elif a.cmd == "karta_drift":
+        # F4:s karta (utan utvidgning) i formen som src/knep/analys/klotter.py läser
+        z = np.load(KARTA)
+        m = z["torr"] | z["eko"]
+        np.savez_compressed(KARTA_DRIFT, klotter=m)
+        print(KARTA_DRIFT, int(m.sum()), "rutor")
     elif a.cmd == "kor":
         for d in a.dagar or [a.dag]:
             a.dag = d
