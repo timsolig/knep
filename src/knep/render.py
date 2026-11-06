@@ -58,6 +58,7 @@ def legend(minutes: int = 5):
 
 # radaranalysen bakåt på sidan, i underkatalogen hist/
 HISTORY_HOURS, HISTORY_DIR = 12, "hist"
+A1_DIR = "a1"  # A1, analysen interpolerad längs rörelsen (analys/a1.py), ritad som hist/
 
 UNITS = {5: "mm/h", 15: "mm per 15 min", 60: "mm per timme"}
 STEP = timedelta(minutes=5)
@@ -156,14 +157,15 @@ class Renderer:
     def png_prob(self, p: np.ndarray, path: Path) -> None:
         self._png(p, PROB_LEVELS, PROB_COLORS, path)
 
-    def history(self, out: Path, frames: list[tuple], now: datetime, hours: float = HISTORY_HOURS) -> dict:
+    def history(self, out: Path, frames: list[tuple], now: datetime, hours: float = HISTORY_HOURS,
+                directory: str = HISTORY_DIR) -> dict:
         """Radaranalysen bakåt: varje 5-minutersbild, kvart och timme ritas en gång till hist/ med
         tiden i namnet och ligger kvar i hours timmar. Namnen ändras aldrig, så sidan kan cacha dem.
 
         frames: (tid, fält) för analyserna i den här cykeln. Kvartar och timmar ritas när alla
         deras bilder finns i frames, så den senaste timmen räcker för att fylla på.
         """
-        d = out / HISTORY_DIR
+        d = out / directory
         d.mkdir(parents=True, exist_ok=True)
         todo = [(t, "obs", f) for t, f in frames]
         for t, _, f in todo:
@@ -186,7 +188,7 @@ class Renderer:
             if t - timedelta(minutes=minutes) < oldest or t > now:
                 p.unlink()
                 continue
-            entry = {"time": _iso(t), "kind": "obs", "file": f"{HISTORY_DIR}/{p.name}"}
+            entry = {"time": _iso(t), "kind": "obs", "file": f"{directory}/{p.name}"}
             if minutes > 5:
                 entry["start"] = _iso(t - timedelta(minutes=minutes))
             lists[minutes].append(entry)

@@ -25,7 +25,7 @@ from pathlib import Path
 import requests
 
 from . import analys, compare, models, prognos, render, runs, verify
-from .analys import gauges, radar
+from .analys import a1, gauges, radar
 
 NO_NEW_DATA = 75
 log = logging.getLogger("knep")
@@ -127,6 +127,14 @@ def main(argv: list[str] | None = None) -> int:
         started = time.monotonic()
         extra["history"] = rend.history(args.out, [(t, f) for t, kind, f, *_ in frames if kind == "obs"], t0, args.back)
         log.info("analys bakåt: %d bilder på %.1f s", len(extra["history"]["frames"]), time.monotonic() - started)
+        started = time.monotonic()
+        try:  # A1 får aldrig stoppa prognosen
+            a1_frames = a1.update(state_dir, a.times, a.rain, p.motion)
+            extra["levels"] = {"a0": "history", "a2": None,
+                               "a1": rend.history(args.out, a1_frames, t0, args.back, directory=render.A1_DIR)}
+            log.info("A1: %d intervall på %.1f s", len(a1_frames), time.monotonic() - started)
+        except Exception as e:  # noqa: BLE001
+            log.warning("A1: %s", e)
     if args.runs > 0:
         try:  # utgåvan sparas första cykeln i timmen; ett fel här får inte stoppa prognosen
             if runs.due(args.out, t0):

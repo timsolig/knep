@@ -73,6 +73,14 @@ Hämtningen tar cirka 15 sekunder när ett nytt MET-lopp hämtas och någon seku
 
 Tim-KNEP utgår från samma radaranalys som är facit, så mot radarn gynnas Tim-KNEP de första timmarna. Mätarna är oberoende och står därför bredvid. `--no-verify` stänger av allt.
 
+## Analysens nivåer
+
+Fliken Analys på sidan visar nederbörden de senaste tolv timmarna i tre nivåer bredvid varandra:
+
+- **A0** är analysen som den är: SMHI:s komposit med reserverna vid bortfall och volymkorrektionen. Varje 5-minutersbild får gälla de fem minuterna före den, så en skur som flyttar sig långt mellan bilderna blir ett pärlband i kvarts- och timsummorna.
+- **A1** (`src/knep/analys/a1.py`) fyller i tiden mellan bilderna: fältet en minut in i intervallet är den första bilden flyttad framåt och den andra flyttad bakåt längs kedjans rörelsefält, viktade efter tiden. Kvart och timme är medel av intervallen. Ett nytt intervall tar ungefär en sekund på Pi:n.
+- **A2** rättas mot regnmätarna när de har kommit, 1 till 2,5 h efter timmen. Den är inte byggd än; den ska bedömas med en egen domare (korsvalidering mot mätare som hålls utanför) innan den blir facit i verifieringen.
+
 ## Radarbortfall
 
 Kompositen (`src/knep/analys/composite.py`) fyller pixlar som brukar ha data men saknar data nu: först med OPERA-kompositen om `--fallback` är satt, sedan med förra analysen flyttad med rörelsefältet. Kvaliteten för flyttade pixlar avtar med tiden och efter 90 min släpps de. Sidan visar vilka svenska radarer som saknas. För en egen komposit av enskilda radarvolymer finns `sources.volume_composite`, som hämtar ODIM-volymer från EUMETNET:s öppna radardata.

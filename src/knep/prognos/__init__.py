@@ -29,6 +29,7 @@ class Prognos:
     rain: np.ndarray  # (steg, rader, kolumner), mm/h var 5:e minut efter analysen
     prob: np.ndarray | None  # sannolikheter för kraftig nederbörd (trösklar, steg, rader, kolumner)
     extra: dict = field(default_factory=dict)  # till manifestet, t.ex. seamless
+    motion: np.ndarray | None = None  # (2, rader, kolumner) pixlar per 5 min, kedjans rörelsefält
 
 
 def kor(analys, state_dir: Path, steps: int, *, model_path: Path | None = None, prob_hours: float = 2.0,
@@ -42,6 +43,7 @@ def kor(analys, state_dir: Path, steps: int, *, model_path: Path | None = None, 
     obs, t0 = analys.rain, analys.t0
     extra = {}
     prob = None
+    motion = None
     if reference:
         fc = model.nowcast(obs, steps)
     else:
@@ -51,6 +53,7 @@ def kor(analys, state_dir: Path, steps: int, *, model_path: Path | None = None, 
         res = chain.run(obs, t0, steps, state)
         state.save(state_dir / "model.npz")
         np.save(state_dir / "motion.npy", res.motion.astype(np.float32))
+        motion = res.motion
         fc, prob = res.rain, res.prob
         if seamless:
             from . import seamless as sm
@@ -60,4 +63,4 @@ def kor(analys, state_dir: Path, steps: int, *, model_path: Path | None = None, 
             except (requests.RequestException, ValueError, KeyError, OSError) as e:  # utan MEPS: bara kedjan
                 log.warning("MEPS: %s", e)
     log.info("prognos %s, %d steg på %.1f s", t0, steps, time.monotonic() - started)
-    return Prognos(fc, prob, extra)
+    return Prognos(fc, prob, extra, motion)
