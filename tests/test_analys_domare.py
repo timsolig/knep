@@ -204,3 +204,19 @@ def test_table_and_verdict():
     assert not v["battre"] and any("falskt" in s for s in v["samre_i"])
     # likadan som baslinjen: inte bättre
     assert not domare.verdict(domare.table(base, base, B=300))["battre"]
+
+
+def test_metric_with_one_day_of_support_is_not_judged():
+    rng = np.random.default_rng(1)
+    base = {f"d{i}": _fake_day(rng, 0.6) for i in range(10)}
+    sysd = {d: _fake_day(rng, 0.5) for d in base}
+    for d in base:  # mätare över 400 m med över 5 mm bara den första dagen
+        for x in (base, sysd):
+            x[d]["timme/over400"]["sg5"] = 0.0
+            x[d]["timme/over400"]["sa5"] = 0.0
+    base["d0"]["timme/over400"].update(sg5=10.0, sa5=10.0)
+    sysd["d0"]["timme/over400"].update(sg5=10.0, sa5=5.0)  # sämre, men bara en händelse
+    tab = domare.table(sysd, base, B=300)
+    assert tab["timme/over400"]["kvot >5 mm"]["dagar"] == 1
+    assert domare.verdict(tab)["battre"]
+    assert "timme over400 kvot >5 mm" in domare.verdict(tab, min_days=0)["samre_i"]

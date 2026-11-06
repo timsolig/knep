@@ -367,6 +367,23 @@ GROUPS = {  # vilka mått som hör till vilken del av regeln
 }
 
 
+MIN_DAYS = 5  # ett mått bedöms bara om dess nämnare har underlag från minst så många dagar
+
+
+def _support(name: str) -> list[str]:
+    """Komponenterna i måttets nämnare (dagar där de är 0 bidrar inte till måttet)."""
+    for t in AMT_THR:
+        if name == f"kvot >{t:g} mm":
+            return [f"sg{t:g}"]
+    for t in CSI_THR:
+        if name == f"CSI {t:g}":
+            return [f"hit{t:g}", f"mis{t:g}", f"fal{t:g}"]
+        if name == f"FSS {t:g}":
+            return [f"fp2{t:g}", f"fo2{t:g}"]
+    return {"kvot summa": ["sg"], "MAE": ["n"], "falskt vid torr mätare": ["ndry"],
+            "falskt där allt inom 25 km är torrt": ["ndryo"], "hopp, kvot mot mätarna": ["jg"]}[name]
+
+
 def _sum(per_day: list[dict]) -> dict:
     out = {}
     for d in per_day:
@@ -412,7 +429,8 @@ def table(per_day: dict[str, dict], base: dict[str, dict] | None = None, B: int 
                 boots_b.append(metrics(_sum([{key: base[d][key]} for d in sel])[key], res))
             mb = metrics(tot_b[key], res)
         for name, (v, kind) in mv.items():
-            row = {"varde": v, "battre": kind}
+            row = {"varde": v, "battre": kind,
+                   "dagar": int(sum(sum(per_day[d][key][c] for c in _support(name)) > 0 for d in names))}
             if base is not None:
                 g = np.array([_goodness(x[name][0], kind) - _goodness(y[name][0], kind) for x, y in zip(boots, boots_b)])
                 g = g[np.isfinite(g)]
@@ -433,25 +451,33 @@ def table(per_day: dict[str, dict], base: dict[str, dict] | None = None, B: int 
     return out
 
 
-def verdict(tab: dict) -> dict:
+def verdict(tab: dict, min_days: int = MIN_DAYS) -> dict:
     """Regeln: bättre om något mått för mängd eller träff (kvart eller timme, alla mätare) är bättre
     med intervallet helt över 0, och inget mått för falska ekon eller terrängen är sämre med
-    intervallet helt under 0. Intervallen är skillnaden i godhet (större är bättre)."""
+    intervallet helt under 0. Intervallen är skillnaden i godhet (större är bättre).
+
+    Ett mått bedöms bara om nämnaren har underlag från minst min_days dagar; annars bygger
+    intervallet ur bootstrap på en eller ett par händelser och säger inget (min_days=0 bedömer allt)."""
     better, worse = [], []
+
+    def ok(row):
+        return row.get("dagar", min_days) >= min_days and np.isfinite(row["lo"]) and np.isfinite(row["hi"])
+
     for res in ("kvart", "timme"):
         for g in ("mängd", "träff"):
             for name in GROUPS[g]:
                 row = tab[f"{res}/alla"][name]
-                if row["lo"] > 0:
+                if ok(row) and row["lo"] > 0:
                     better.append(f"{res} {name}")
         for name in GROUPS["falska"]:
-            if tab[f"{res}/alla"][name]["hi"] < 0:
+            row = tab[f"{res}/alla"][name]
+            if ok(row) and row["hi"] < 0:
                 worse.append(f"{res} {name}")
         for sub in ("over400", "lovart"):
             for g in ("mängd", "träff", "falska"):
                 for name in GROUPS[g]:
                     row = tab[f"{res}/{sub}"][name]
-                    if np.isfinite(row["hi"]) and row["hi"] < 0:
+                    if ok(row) and row["hi"] < 0:
                         worse.append(f"{res} {sub} {name}")
     r = tab["rutor"]["rutor med eko i över hälften av de torra timmarna, per dag"]
     if r["hi"] < 0:
@@ -464,15 +490,15 @@ def markdown(tab: dict, namn: str, bas: str | None) -> str:
     for key, rows in tab.items():
         lines.append(f"\n**{key}**\n")
         if bas:
-            lines.append(f"| mått | {namn} | {bas} | skillnad i godhet (95 %) | bättre är |")
-            lines.append("|---|---|---|---|---|")
+            lines.append(f"| mått | {namn} | {bas} | skillnad i godhet (95 %) | bättre är | dagar |")
+            lines.append("|---|---|---|---|---|---|")
         else:
             lines.append(f"| mått | {namn} | bättre är |")
             lines.append("|---|---|---|")
         for name, r in rows.items():
             v = f"{r['varde']:.3f}"
             if bas:
-                lines.append(f"| {name} | {v} | {r['bas']:.3f} | {r['diff']:+.3f} ({r['lo']:+.3f} till {r['hi']:+.3f}) | {r['battre']} |")
+                lines.append(f"| {name} | {v} | {r['bas']:.3f} | {r['diff']:+.3f} ({r['lo']:+.3f} till {r['hi']:+.3f}) | {r['battre']} | {r.get('dagar', '')} |")
             else:
                 lines.append(f"| {name} | {v} | {r['battre']} |")
     return "\n".join(lines).replace(".", ",").replace("+,", "+").replace("(,", "(")
@@ -683,10 +709,11 @@ def cmd_tabell(a) -> None:
     print(f"{len(sys_r)} dagar")
     print(markdown(tab, a.system[0], a.mot))
     if base is not None:
-        v = verdict(tab)
+        v, v0 = verdict(tab), verdict(tab, min_days=0)
         print("\nDomen:", json.dumps(v, ensure_ascii=False, indent=1))
+        print("\nDomen utan kravet på underlag:", json.dumps(v0, ensure_ascii=False, indent=1))
         (OUT / f"tabell_{a.system[0]}_mot_{a.mot}_{a.del_}.json").write_text(
-            json.dumps({"tabell": tab, "dom": v, "dagar": sorted(sys_r)}, ensure_ascii=False, indent=1, default=float))
+            json.dumps({"tabell": tab, "dom": v, "dom_utan_underlagskrav": v0, "dagar": sorted(sys_r)}, ensure_ascii=False, indent=1, default=float))
 
 
 def main() -> None:
