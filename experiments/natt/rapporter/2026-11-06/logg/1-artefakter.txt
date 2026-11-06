@@ -42,3 +42,18 @@ Uppgiften var redan klar när den här påminnelsen kom, så jag har inte gjort 
 - **Rapporten:** den ligger i `experiments/natt/rapporter/2026-11-06/1-artefakter.md` med `Status: delvis`, eftersom solstrålar, anaprop och satellitens molnmask saknas.
 - **Committen:** f68e871 är committad efter att `uv run pytest` gått igenom med 138 godkända.
 ===== 2026-11-06T15:38:25Z försök 2 =====
+Uppgift 1 är klar och committad som `2cc7a4a` på `natt/2026-11-06`. `uv run pytest` gick igenom med 138 godkända tester. Rapporten `experiments/natt/rapporter/2026-11-06/1-artefakter.md` slutar nu med `Status: klar`.
+
+Försök 1 hade redan inventerat varje ruta (eko, eko vid torra mätare, stillastående, textur, ekrar, vindkraft och höjdmodellen). Det som saknades var solstrålar och anaprop, som bara syns bild för bild. Försök 2 läste därför alla 288 bilder på de 44 tränings- och valideringsdagarna. Testdagarna lästes inte.
+
+- **Solstrålar finns, men bara när solen står vid horisonten.** När solen står mellan −5 och +5° ligger 20 till 26 % av ekrarna inom ±3° från solens riktning. På andra solhöjder är andelen 0,6 till 2,2 %, och slumpen ger 1,9 %. I 22 fall följer strålen solens riktning över flera bilder i rad. Hälften av dem kommer från Kiruna under midnattssolen, och det längsta fallet är 14 bilder i rad. Solen står då mellan −0,7 och +0,8°. Ett test i varje cykel är billigt och ger nästan inga falska larm.
+- **Fasta ekrar återkommer.** Den vanligaste är sebaa 134°, som syns på 34 av 44 dagar. Andra är sebaa 86 till 89°, seosd 295° och 218°, sekaa cirka 200° och sehem 120° och 134°. De stämmer med ekrarna som försök 1 fann ur dygnsfrekvensen.
+- **Anaprop syns inte i de här dagarna.**
+  - Kantiga ekon där mätarna inom 25 km är torra har sin topp mitt på dagen och på sommaren. Anaprop borde ha sin topp på natten, så det är nästan säkert sommarskurar som mätarna missar. Ett filter bild för bild som byggde på torra mätare skulle alltså ta bort riktiga skurar. Det måste kombineras med rörelsen eller bara användas på rutor som kartan redan pekar ut som klotter.
+  - En skur av spridda prickar vid sekrn och sella 2023-01-04 kan inte avgöras: det kan vara lätt snö eller anaprop, och det saknas både mätare och satellit där.
+
+Förslaget till filtret för uppgift 4 har fått tre nya punkter i rapporten: ett soltest, en lista över fasta ekrar per radar och ingen rättning för anaprop på det här underlaget.
+
+**Det som saknas:** satellitens molnmask. Hämtningen nekades, eftersom behörighetsinställningarna spärrar nätet, så jag kunde inte se om EUMETSAT:s data går att läsa utan konto.
+
+Nya filer i repot är `experiments/analys/bild.py`, `bild_sammanstall.py` och `bild_prov.py`. Inget under `src/` ändrades. Den nya datan tar 65 MB, så allt under `/data/analys/artefakter/` är cirka 300 MB, och /data har 5,9 GB ledigt.
