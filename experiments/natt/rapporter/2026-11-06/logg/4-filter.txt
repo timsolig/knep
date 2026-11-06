@@ -105,3 +105,24 @@ Inget i domaren, `deploy/`, `models/` eller `.github/` ändrades, och inget push
 
 Den här aviseringen betyder bara att bevakningen av valideringen har löpt ut. Valideringen var redan klar och allt är committat, så det finns inget mer att göra.
 ===== 2026-11-06T23:11:54Z försök 2 =====
+Uppgift 4 är klar i försök 2. Domaren godkänner nu ett filter, men vinsten vid mätarna är nästan noll. Rapporten ligger i `experiments/natt/rapporter/2026-11-06/4-filter.md` med `Status: klar`, och allt är committat på `natt/2026-11-06`. Inget är pushat. `uv run pytest` gav 163 godkända.
+
+**Ändringen i försök 2:** försök 1 slutade med att domaren inte godkände något filter. Jag provade därför filtret med klotterkartan utan den extra kant på en ruta som försök 1 lade runt den misstänkta rutorna. Det blev varianten F4, och kartan går från 2 122 till 621 rutor. Diagnosen på träningsdagarna visade att de två mätare som filtret påverkade låg just i den kanten. Inga trösklar ändrades.
+
+**Träningen (13 dagar):** samma urvalsregel som i försök 1 väljer F4. Den är den enda varianten som inte blir sämre i något mått. Den blir bättre i FSS.
+
+**Valideringen (16 dagar), F4 mot A0:**
+- Domaren säger "bättre". Inget mått för falska ekon eller terrängen (över 400 m och lovartsidan) blir sämre.
+- Vinsten vid mätarna är försumbar: FSS ökar bara med 0,00001 till 0,00004, eftersom nästan ingen mätare ligger i kartans rutor.
+- Det filtret faktiskt gör syns bara i måttet för fast klotter mellan mätarna. Rutorna som har eko i mer än hälften av de torra timmarna går från 36,6 till 27,6 per dag (95 %: +5,9 till +12,5 i godhet).
+- Ett förbehåll: valideringen hade redan använts för F0 och F1 i försök 1 innan F4 lades till. Själva valet av F4 gjordes ändå på träningsdagarna, och testdelen lästes aldrig.
+
+**I `src/`:** kartdelen av filtret finns nu som valet `knep --klotter KARTA` (`bygg(..., klotter_path=None)`), och standardvärdet är av.
+- Filtret verkar före volymkorrektionen och ändrar varken de sparade analyserna eller manifestet.
+- Det ger exakt samma bilder som F4:s kartdel: 0 olika rutor på 99 bilder (`experiments/analys/filter_lika.py`).
+- Det tar cirka 0,05 s per bild.
+- Ekrarna är inte med, eftersom de inte märktes i något mått.
+
+**Innan det kan slås på i driften:** kartan ligger i `/data/analys/filter/klotter_f4.npz`. Den behöver tränas om på alla 28 träningsdagar (urvalet gjordes på 13), släppas i GitHub Releases och låsas i `models/models.json`. Det är en ny modellversion, så det har jag inte gjort utan ditt godkännande.
+
+Jag föreslår också i rapporten att domaren får ett mått som ser klotter där det inte finns mätare, eftersom den inte kan se det mesta av det filtret gör. Domaren ändrade jag inte.
