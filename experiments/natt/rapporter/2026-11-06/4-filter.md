@@ -1,5 +1,59 @@
 # Uppgift 4: ett första filter mot radarns artefakter i A0
 
+## Sammanfattning (efter försök 2)
+
+- **F4** (kartan över klotter utan utvidgningen, kontrollen mot omgivningen och ekrarna) valdes på träningsdagarna enligt samma regel som i försök 1, och på valideringen ger domaren **bättre än A0** utan att något mått blir sämre. Inget mått för falska ekon eller terrängen (över 400 m, lovart) har intervallet på fel sida.
+- Vinsten vid mätarna är **mycket liten**: FSS ökar med 0,00001 till 0,00004. Filtret rör nästan aldrig ekot inom en ruta från en mätare. Det som syns är kartmåttet: **rutorna med eko i över hälften av de torra timmarna går från 36,6 till 27,6 per dag** (+9,0, 95 % +5,9 till +12,5), alltså fast klotter mellan mätarna, som domaren inte kan se annars.
+- Kartdelen ligger i `src/knep/analys/klotter.py` som ett val, **av som standard**: `knep --klotter /data/analys/filter/klotter_f4.npz` (eller `bygg(..., klotter_path=...)`). Den ger exakt samma bilder som kartdelen av F4 och tar cirka 0,05 s per bild. Ekrarna är inte med i `src/`, eftersom de inte märktes i något mått (F0).
+- Försök 1 (nedan) valde F0, som inte gör något som syns, och F1 med utvidgningen blev sämre i summakvoten över 400 m.
+
+## Försök 2
+
+Försök 1 hade slutat med en rapport (`Status: delvis`) och allt committat. Försök 2 tog nästa steg 2 ur den rapporten: kartan **utan utvidgningen** med en ruta. Idén kom ur `filter_diag.py` på träningsdagarna: de två mätarna som filtret rörde låg i utvidgningen och inte i rutorna som själva uppfyllde kriterierna. Ingen tröskel ändrades.
+
+- `filter.py`: `Filter(..., utvidgad=False)` tar kartan `torr | eko` ur `karta.npz` (samma kriterier, samma träningsdagar). Varianten **F4** = F1 utan utvidgningen. Kartan har **621 rutor** i stället för 2 122, varav 183 över 400 m (433 ur kriteriet torra mätare, 287 ur eko och textur eller isolering).
+- **Träningen**, samma 13 dagar och samma regel (`filter.py urval F0 F1 F2 F3 F4 --del traning`, `/data/analys/filter/urval_traning_F0_F1_F2_F3_F4.json`): F4 är inte sämre i något mått, bättre i FSS 0,5, 1 och 5 (kvart och timme), och kartmåttet går från 52,1 till 43,0 (+9,1, +6,8 till +11,5). Ingen annan variant klarar kravet att inte bli sämre, så **regeln väljer F4**. F0 till F3 räknades om med samma resultat som i försök 1.
+- **Valideringen**, 16 dagar (`filter.py tabell F4 --mot A0`, `/data/analys/domare/tabell_F4_mot_A0_validering.json`):
+
+| delmängd | mått | F4 | A0 | skillnad i godhet (95 %) |
+|---|---|---|---|---|
+| kartan | rutor med eko i över hälften av de torra timmarna, per dag | **27,6** | 36,6 | **+9,0 (+5,9 till +12,5)** |
+| timme, alla | falskt vid torr mätare | 0,01036 | 0,01036 | 0 (0 till 0) |
+| timme, alla | falskt där allt inom 25 km är torrt | 0,00971 | 0,00971 | 0 (0 till 0) |
+| timme, alla | kvot summa | 0,8901 | 0,8901 | −0,0000 (−0,0000 till +0,0000) |
+| timme, alla | FSS 0,5 | 0,72258 | 0,72257 | +0,00001 (+0,000004 till +0,000019) |
+| timme, alla | FSS 1 | 0,63422 | 0,63421 | +0,00001 (+0,000005 till +0,000015) |
+| kvart, alla | FSS 0,5 | 0,48137 | 0,48136 | +0,000006 (+0,000002 till +0,000010) |
+| timme, över 400 m | falskt vid torr mätare | 0,00885 | 0,00885 | 0 (0 till 0) |
+| timme, över 400 m | kvot summa | 0,5236 | 0,5237 | −0,0001 (−0,0001 till +0,0000) |
+| kvart, över 400 m | kvot summa | 0,4952 | 0,4952 | −0,0001 (−0,0001 till +0,0000) |
+| timme, över 400 m | FSS 1 | 0,42864 | 0,42863 | +0,00002 (+0,000006 till +0,000043) |
+| timme, lovart | kvot summa | 0,6710 | 0,6711 | −0,0001 (−0,0003 till +0,0000) |
+| timme, lovart | FSS 0,5 | 0,66079 | 0,66079 | +0,000005 (+0,000000 till +0,000016) |
+| timme, alla | MAE (mm) | 0,2333 | 0,2333 | 0 |
+
+Domen: `battre: true` med bättre i kvart FSS 0,5 och 1 och timme FSS 0,5, 1 och 5, och `samre_i` tom. De små skillnaderna i summakvoten över 400 m och på lovartsidan är desamma som för F0, alltså ekrarna, och intervallen når 0.
+
+**Tolkningen.** Formellt klarar F4 domarens krav, men vid mätarna är skillnaden försumbar: utan utvidgningen ligger nästan ingen mätare i kartans rutor, och FSS ändras bara genom de få rutor inom grannskapet som rensas. Domaren kan inte se mer, eftersom klottret står där det inte finns mätare. Det som visar att filtret gör något är kartmåttet, och det minskar med en fjärdedel med intervallet helt på den bättre sidan. Att terrängen inte förlorar något syns i att alla mått över 400 m och på lovartsidan är oförändrade. Filtret tar bort mindre än F1 (27,6 mot 24,1 rutor per dag), och det är priset för att inte röra mätarna.
+
+**Förbehåll.** Valideringen var redan sedd för F0 och F1 i försök 1 när F4 lades till. Valet av F4 gjordes ändå på träningen med samma regel och samma trösklar, och idén kom ur diagnosen på träningsdagarna, men valideringen är inte lika orörd som för försök 1. Testdelen lästes inte.
+
+**I `src/`** (liten ändring, standard av):
+
+- `src/knep/analys/__init__.py`: `bygg(..., klotter_path=None)`. Med en karta rensas varje bild med `klotter.rensa` före volymkorrektionen; de sparade analyserna i `state_dir` ändras inte, och manifestet ändras inte (antalet borttagna rutor loggas). Saknas kartan eller har den fel form loggas en varning och inget filtreras.
+- `src/knep/cli.py`: `--klotter KARTA`, standard ingen.
+- `src/knep/analys/klotter.py`: docstringen säger nu att modulen är kartdelen av F4.
+- `experiments/analys/filter.py karta_drift` skriver kartan till `/data/analys/filter/klotter_f4.npz` (nyckeln `klotter`). Den är tränad och ska inte checkas in; för drift ska den släppas i GitHub Releases och låsas i `models/models.json`, vilket inte gjordes (`models/` fick inte ändras, och det är en ny modellversion som användaren ska godkänna).
+- `experiments/analys/filter_lika.py` visar att `klotter.rensa` ger samma bilder som kartdelen av F4: 0 olika rutor på 99 bilder 2019-03-08 (484 rutor borttagna).
+- `tests/test_klotter.py`: test för att valet är av som standard. `uv run pytest`: 163 godkända.
+
+**Tiden** på Pi:n: `klotter.rensa` tar cirka 0,05 s per bild, alltså under en sekund för en cykel med 12 bilder. Domaren med F4 tog 66 till 90 s per dag.
+
+---
+
+Nedan följer rapporten från försök 1 oförändrad, utom Nästa steg och Status som gäller hela uppgiften.
+
+
 Före uppgiften fanns rapporterna 1 (artefakterna), 2 (domaren) och 3 (A2), alla med `Status: klar`. Inget var halvfärdigt, och domaren användes som den är.
 
 ## Vad jag gjorde
@@ -116,7 +170,7 @@ Ur körningarna (två processer, delad processor med driften): varje system räk
 
 ## Det som inte blev gjort och begränsningar
 
-- **Inget i drift.** Valet i `src/knep/analys/` lades bara till om filtret höll, och det gjorde det inte. Jag kopplade först in kartdelen som ett val (`bygg(..., klotter_path=None)` och `--klotter`, standard av) och tog sedan bort inkopplingen igen när valideringen var klar; `src/knep/analys/__init__.py` och `src/knep/cli.py` är oförändrade mot `main`. Modulen `src/knep/analys/klotter.py` (kartdelen, samma regel som i F1) och dess test `tests/test_klotter.py` ligger kvar **utan att användas**, eftersom körningen inte fick radera filer. Den som vill ha bort dem kan ta bort de två filerna; inget annat beror på dem.
+- **Inget i drift** (gäller försök 1; i försök 2 kopplades kartdelen in som valet `--klotter`, se ovan). Valet i `src/knep/analys/` lades bara till om filtret höll, och det gjorde det inte. Jag kopplade först in kartdelen som ett val (`bygg(..., klotter_path=None)` och `--klotter`, standard av) och tog sedan bort inkopplingen igen när valideringen var klar; `src/knep/analys/__init__.py` och `src/knep/cli.py` är oförändrade mot `main`. Modulen `src/knep/analys/klotter.py` (kartdelen, samma regel som i F1) och dess test `tests/test_klotter.py` ligger kvar **utan att användas**, eftersom körningen inte fick radera filer. Den som vill ha bort dem kan ta bort de två filerna; inget annat beror på dem.
 - **Rörelsen ingår inte i filtret.** Stillheten mot rörelsefältet skiljer inte klotter från orografi (uppgift 1), så den användes inte. Ett test för klotter som står still medan omgivningen rör sig behöver kombineras med att omgivningen är torr, och det gör kontrollen mot omgivningen redan.
 - **Satellitens molnmask** hämtades inte (nätet användes inte i den här uppgiften heller).
 - **Träningen gjordes på 13 av 28 dagar**, och kartan räknades på alla 28, så träningssiffrorna för kartdelen är delvis i urvalet. Valideringen är oberoende.
@@ -134,8 +188,9 @@ Ur körningarna (två processer, delad processor med driften): varje system räk
 ## Nästa steg
 
 1. **Domaren**: summakvoten belönar överskott när analysen är för torr (över 400 m är kvoten 0,5). Ett mått som inte gör det vore kvoten för perioder där mätaren har regn (> 0,1 mm), eller att kvoten i terrängens delmängder bara bedöms tillsammans med MAE. Det är en ändring av domaren och ska beslutas för sig och köras om för A0, A1 och A2, inte för att få igenom F1.
-2. **Kartdelen utan utvidgning**, vald på träningsdagarna (alla 28), och bedömd igen på valideringen. Då rör den sannolikt ingen mätare alls, och domaren kan bara se den i kartmåttet.
+2. **Kartdelen utan utvidgning**: gjord i försök 2 (F4), godkänd av domaren men med försumbar vinst vid mätarna. Nästa steg är att träna om den på alla 28 träningsdagar (nu 13 för urvalet), släppa kartan i GitHub Releases som en ny modellfil om användaren vill det, och slå på `--klotter` i driften först efter det. Domaren behöver dessutom ett mått som ser klotter mellan mätarna och kan bedömas med intervall, t.ex. kartmåttet med i domen, eller satellitens molnmask som oberoende torrhet.
 3. **Filtret före A1 och A2**: uppgift 2 och 3 visade att A1 och A2 smetar ut och skalar upp klottret. F1 under A1 och A2 bör ge färre falska ekon per kvart i terrängen, där A2 förlorade mot A1.
 4. **Ekrarna**: testet för en smal och lång stråle slår till för sällan för att märkas. Ett test med lägre andel längs strålen inne i de fasta sektorerna, eller per avståndsband, vore nästa försök.
+5. **Filerna från försök 2**: `experiments/analys/filter.py` (F4, `utvidgad`, `karta_drift`, urvalets filnamn), `experiments/analys/filter_lika.py` (ny), `src/knep/analys/__init__.py`, `src/knep/analys/klotter.py`, `src/knep/cli.py`, `tests/test_klotter.py`. Ny data: `/data/analys/filter/klotter_f4.npz`, `urval_traning_F0_F1_F2_F3_F4.json`, `urval_validering_F0_F1_F4.json` och domarens summor i `/data/analys/domare/F4/` (under 5 MB tillsammans; /data hade 5,3 GB ledigt).
 
-Status: delvis
+Status: klar
