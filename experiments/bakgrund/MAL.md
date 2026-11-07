@@ -10,6 +10,16 @@ Planeraren läser den här filen före varje uppgift. Användaren äger **Princi
 - Domaren avgör, på valideringen, med intervall. Testdelen rörs aldrig.
 - Inget släpps i drift utan användaren. Bakgrunden föreslår, användaren beslutar.
 
+## Användarens beslut 2026-11-07
+
+Svaren på frågorna nedan. De går före prioriteringarna; planeraren tar dem som uppgifter i den här ordningen när de inte väntar på något annat.
+
+1. **A2T på sidan:** ja. `--a2` slås på i `deploy/` av Claude i en egen PR mot `main` när den här grenen är ihopslagen (koden finns bara här). Bakgrunden skriver sidans två texter för A2 (förklaringen och "bara kvart och timme" i 5-minutersläget) och höjer `INTRO`.
+2. **A2T som andra facit i `verify.py`:** ja, vid sidan av radarn, enligt de fem punkterna i `rapporter/2026-11-07/0005-prognos-mot-a2t-facit.md` (timsumman sparas som tal, senaste versionen, mätarmåtten fortsatt mot mätarna, gruppen `a2t` i `Day` och `verif.json`, en rad på fliken Verifiering). Kontrollen per station och dygn görs före eller i samma uppgift.
+3. **Analysens domare:** ja, komplettera summakvoten med kvoten för perioder då mätaren har regn, och kör om baslinjerna (A0, A1, A2T, F4). Den gamla kvoten redovisas kvar bredvid, så att tidigare rapporter går att jämföra.
+4. **F4:s klotterkarta som modellfil:** ja. Träna om på alla 28 träningsdagar, och kör sedan testdelen (punkt 5). Själva släppet (`deploy/release_model.sh` och låsningen) gör Claude i en PR mot `main` efter testdelen.
+5. **Testdelen:** ja, **en gång**, för baslinjerna A0, A1 och kedjan, F4 (omtränad) och A2T, med kommandona i `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md`. Det här är ett undantag från principen om testdelen, bara för de här systemen och bara den här gången; inget får väljas eller ändras efter att testdelen är sedd. Resultatet går i en egen rapport.
+
 ## Prioriteringar
 
 1. **Analysen slår A0 och A1, och blir ett facit.** A2T slår både A0 och A1 enligt domaren på valideringen (2026-11-07), finns avstängd i `src/knep/analys/a2.py` och sedan uppgift 0004 i cykeln med valet `--a2` (av som standard). Att visa den på sidan är nu ett beslut för användaren. A2T är prövad som facit för prognosen (uppgift 0005) och är bättre än radarn vid mätare det inte har sett; att lägga den i `verify.py` väntar på användaren. Därefter, som egna avstängda val eller förbättringar: en kontroll per station och dygn mot trasiga mätare (den bredare kontrollen A2TK, 2026-11-07, kastade mest verkliga skurtoppar och läggs ner), kartmåttet per timme och mängden i terrängen som taket tar bort. A1:s underskott på lovartsidan visade sig vara utjämning av toppar, inte förlust av regn. Filtret F4 mot fast klotter (bland annat vindkraftsparker) är godkänt mot A0. A2 behövs också som facit i verifieringen, eftersom radarn bara ser en liten del av de våta mätartimmarna i november, och kräver då en kontroll av mätarna.
