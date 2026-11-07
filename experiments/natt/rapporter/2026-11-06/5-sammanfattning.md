@@ -1,6 +1,6 @@
 # Uppgift 5: sammanfattning av natten 2026-11-06 (analysen)
 
-Före uppgiften fanns rapporterna 1 till 4, alla med `Status: klar` (uppgift 3 och 4 i två försök). Inget var halvfärdigt. Den här uppgiften har inte kört något nytt mot data: siffrorna nedan är tagna ur rapporterna 1 till 4, som citerar domarens tabellfiler i `/data/analys/domare/tabell_*_validering.json`. Jag har inte kunnat läsa tabellfilerna själv i den här uppgiften (kommandot nekades av behörigheterna), så siffrorna är kontrollerade mot rapporterna och inte mot filerna en gång till. `sammanfattning.md`, med namnet som uppdraget anger, hänvisar hit och har ett kort sammandrag.
+Före uppgiften fanns rapporterna 1 till 4, alla med `Status: klar` (uppgift 3 och 4 i två försök). Inget var halvfärdigt. Den här uppgiften har inte kört något nytt mot data: siffrorna nedan är tagna ur rapporterna 1 till 4, som citerar domarens tabellfiler i `/data/analys/domare/tabell_*_validering.json`. I försök 2 har jag stämt av ett urval mot filerna, och de stämmer: kvarten för alla mätare i `tabell_A1_mot_A0_validering.json` (kvot summa, MAE, CSI 0,5), domen, kartmåttet (36,6 till 27,6, skillnaden +9,0 med 5,9 till 12,5) och FSS 1 över 400 m (0,429) i `tabell_F4_mot_A0_validering.json`. Resten är inte kontrollerat mot filerna en gång till. `sammanfattning.md`, med namnet som uppdraget anger, hänvisar hit och har ett kort sammandrag.
 
 ## Vad uppgift 1 till 4 kom fram till
 
@@ -154,17 +154,14 @@ Driften med filtret, efter att kartan har släppts och låsts (en historisk cyke
 
 - `uv run pytest`: **163 godkända** (2 min 20 s).
 - Ändringarna i `src/` mot `main` är små: `src/knep/analys/__init__.py` (+13), `src/knep/analys/klotter.py` (ny, 49 rader) och `src/knep/cli.py` (+4). Valet är av som standard, och ett test kontrollerar det.
-- **Inget i den här uppgiften är committat.** Allt arbete i uppgift 1 till 4 var committat när uppgiften började: det enda som inte var spårat var loggfilen `logg/5-sammanfattning.txt`. När pytest hade gått igenom nekades alla skalkommandon av behörigheterna, även `git add`. Därför ligger `5-sammanfattning.md`, `sammanfattning.md` och `logg/5-sammanfattning.txt` ospårade i utcheckningen. Så committar du dem:
-
-      git add experiments/natt/rapporter/2026-11-06
-      git commit -m "Natt 2026-11-06: sammanfattningen av uppgift 1 till 4 (uppgift 5)"
-
-  Inget pushades, och ingen PR öppnades.
+- **Committat.** I försök 1 nekades `git add` av behörigheterna, men körningen committade rapporterna när sessionen slutade (`f58381a`). I försök 2 har jag kontrollerat att kommandona för testdelen ovan stämmer med koden: `kor` och `tabell` i `domare.py`, `karta_drift`, `kor --dagar` och `tabell` i `filter.py` och `a1falt` och `kor` i `a2.py` finns, `--del` har bara `validering` och `traning`, och `a2.py` läser bara `validering` (rad 449 och 451). Kartan `/data/analys/filter/klotter_f4.npz` finns redan, och `--klotter` finns i `src/knep/cli.py` med standard av. Rapporterna är rättade och committas en gång till. Inget pushades, och ingen PR öppnades.
 
 ## Ändrade filer
 
 - `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md` (den här rapporten) och `sammanfattning.md` (en hänvisning hit med ett kort sammandrag, under namnet som uppdraget anger).
 
-Rapporten är skriven och pytest går igenom, men commiten kunde inte göras (se Kontrollen ovan).
+## Nästa steg
 
-Status: delvis
+Användaren beslutar om testdelen ska köras och om F4:s karta ska släppas som modellfil (se Rekommendation och Det som återstår).
+
+Status: klar

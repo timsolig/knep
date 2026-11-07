@@ -10,6 +10,4 @@ I korthet:
 - **Filtret F4 är bättre än A0, men bara marginellt vid mätarna.** Det minskar kartmåttet för fast klotter från 36,6 till 27,6 rutor per dag och rör inte terrängen.
 - **Rekommendationen:** driften går som i dag. Slå på `--klotter` först när kartan har släppts som modellfil (det ska användaren godkänna) och testdelen har körts.
 
-Den här filen och `5-sammanfattning.md` är inte committade, eftersom git nekades av behörigheterna (se 5-sammanfattning.md).
-
-Status: delvis
+Status: klar

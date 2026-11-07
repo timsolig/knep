@@ -23,3 +23,4 @@ Sammanfattningen är skriven, men inget från den här uppgiften är committat. 
 git add experiments/natt/rapporter/2026-11-06
 git commit -m "Natt 2026-11-06: sammanfattningen av uppgift 1 till 4 (uppgift 5)"
 ```
+===== 2026-11-07T00:00:08Z försök 2 =====
