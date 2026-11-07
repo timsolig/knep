@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0009 · 2026-11-08 00:02 · domare-vat-kvot · klar
+- Varför: Användarens beslut c (analysens domare med kvoten för perioder då mätaren har regn, och baslinjerna omkörda) är nästa beslut i ordningen nu när a och b är klara, och den behövs innan F4 tränas om och testdelen körs.
+- Resultat: Domaren har nu `kvot våt` (Σanalys/Σmätare där mätaren har regn) i stället för summakvoten i domens mängdgrupp, med den gamla regeln kvar bredvid. På hela valideringen (16 dagar) ändras ingen av de fyra domarna: A2T slår fortfarande A0 och A1 utan sämre mått (kvot våt per timme över 400 m 0,614 mot A0 0,467 och A1 0,455), F4 godkänns fortfarande mot A0 (bara FSS bättre, kvoterna exakt som A0), och A1 fälls fortfarande mot A0, nu av `kvot våt` per timme på lovartsidan (0,598 mot 0,609, −0,020, −0,038 till −0,002) i stället för av summakvoten per kvart och timme där.
+- Rapport: [rapporter/2026-11-07/0009-domare-vat-kvot.md](rapporter/2026-11-07/0009-domare-vat-kvot.md), 175 min
+
 ### 0008 · 2026-11-07 21:04 · a2t-facit-i-verify · klar
 - Varför: Användarens beslut b (A2T som andra facit i verifieringen) är nästa beslut i ordningen, beslut a är klart och `--a2` är på i drift, och rapporten 0005 visar att radarn som enda facit blåser upp Tim-KNEP:s försprång mot persistensen vid +1 h.
 - Resultat: A2T:s timsumma sparas nu som tal i `cache/verif/a2t/` (senaste versionen skriver över), `score()` och `summary()` ger gruppen `a2t` i `Day` och `verif.json` med exakt samma radar- och mätartal som förut (prövat mot en körning utan A2T-filer), och fliken Verifiering visar Mot A2T bara när underlaget finns; i en provkörning på träningsdagen 2020-07-24 (3 utgåvor) är Tim-KNEP:s försprång mot persistensen vid +1 h för CSI 1 mm +0,305 mot radarn, +0,219 mot A2T och −0,006 mot mätarna.
