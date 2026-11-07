@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0004 · 2026-11-07 11:14 · a2t-i-cykeln · klar
+- Varför: A2T slår A0 och A1 och finns nu i src, men ingen cykel räknar den; ett avstängt val --a2 i cli.py gör att visa A2 på sidan blir ett beslut om en flagga, utan att valideringen behöver ses igen.
+- Resultat: valet `--a2` (av som standard) räknar nu A2T i cykeln ur A1:s sparade timsummor och mätarna i `gauges.json`, fyller `a2/` och `levels.a2` med kvart och timme bakåt, ger samma fält som `a2.A2T.timme` direkt (`np.array_equal` i testerna, PNG byte för byte i hela cykeln), och kostade i en provkörning på träningsdagen 2020-07-24 2,9 till 5,0 s extra i de cykler som räknar en timme och cirka 11 MB på disk.
+- Rapport: [rapporter/2026-11-07/0004-a2t-i-cykeln.md](rapporter/2026-11-07/0004-a2t-i-cykeln.md), 22 min
+
 ### 0003 · 2026-11-07 10:50 · a2t-till-src · klar
 - Varför: A2T är den enda analysen som slår både A0 och A1 enligt domaren, och att flytta den till src som ett avstängt val är nästa steg mot facit och sidan utan att valideringen behöver ses igen.
 - Resultat: A2T finns nu som en liten, avstängd modul i `src/knep/analys/a2.py` som ger bit för bit samma fält som experimentet (`np.array_equal`, största skillnad 0 mm per kvart och per timme) på 8 syntetiska fall och på alla 24 timmar och 96 kvartar för tre träningsdagar, domaren ger exakt samma tal på 2020-07-24, och en timme med sina fyra kvartar tar 1,1 till 1,3 s på hela rutnätet på Pi:n med cirka 57 MB extra minne.
