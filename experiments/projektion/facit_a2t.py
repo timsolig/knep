@@ -376,6 +376,19 @@ def cmd_summera(a) -> None:
                     "hi": np.round(np.percentile(samp, 97.5, 0), 4).tolist()}
             tab["kedja_minus_persistens"] = diff
         res["tabeller"][gname] = tab
+    # per dag (utan mask): CSI 1 mm och FSS 1 mm/30 km för kedjan och persistensen per ledtid och facit
+    res["per_dag"] = {}
+    for d, pd in zip(days, plist):
+        res["per_dag"][d] = {}
+        for fname in ("radar", "a2t", "matare"):
+            e = {}
+            for s in ("kedja", "persistens"):
+                sc = scores(pd[f"{fname}/alla/{s}"])
+                e[f"csi1_{s}"] = np.round(sc["csi"][:, 0], 3).tolist()
+                if "fss" in sc:
+                    e[f"fss1_30_{s}"] = np.round(sc["fss"][:, 0, 1], 3).tolist()
+                e[f"kvot_{s}"] = np.round(sc["kvot"], 3).tolist()
+            res["per_dag"][d][fname] = e
     RESULT.parent.mkdir(exist_ok=True)
     out = RESULT if not a.namn else RESULT.with_name(f"facit_a2t_{a.namn}.json")
     out.write_text(json.dumps(res, ensure_ascii=False, indent=1))
