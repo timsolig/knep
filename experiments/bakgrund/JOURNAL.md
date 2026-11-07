@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0005 · 2026-11-07 13:39 · prognos-mot-a2t-facit · klar
+- Varför: A2T finns nu i src och i cykeln, och att räkna kedjan och persistensen mot A2T i stället för radarn svarar både på varför Tim-KNEP är svag mot persistensen vid +1 h (mål 4) och på om A2T duger som facit i verifieringen (mål 1).
+- Resultat: på 15 träningsdagar (90 utgåvor) slår kedjan persistensen vid alla ledtider mot alla tre facit, men försprånget vid +1 h krymper när radarn byts mot A2T (CSI 1 mm +0,257 till +0,196, FSS 1 mm/10 km +0,253 till +0,204, MAE −0,084 till −0,066 mm) och mest mot mätarna (CSI 1 mm +0,105, 95 % +0,066 till +0,136, mindre än vid +2 h med +0,142); klottermasken (F4) ändrar skillnaden med högst 0,01, så klottret ger persistensen nästan ingenting på de här dagarna.
+- Rapport: [rapporter/2026-11-07/0005-prognos-mot-a2t-facit.md](rapporter/2026-11-07/0005-prognos-mot-a2t-facit.md), 143 min
+
 ### 0004 · 2026-11-07 11:14 · a2t-i-cykeln · klar
 - Varför: A2T slår A0 och A1 och finns nu i src, men ingen cykel räknar den; ett avstängt val --a2 i cli.py gör att visa A2 på sidan blir ett beslut om en flagga, utan att valideringen behöver ses igen.
 - Resultat: valet `--a2` (av som standard) räknar nu A2T i cykeln ur A1:s sparade timsummor och mätarna i `gauges.json`, fyller `a2/` och `levels.a2` med kvart och timme bakåt, ger samma fält som `a2.A2T.timme` direkt (`np.array_equal` i testerna, PNG byte för byte i hela cykeln), och kostade i en provkörning på träningsdagen 2020-07-24 2,9 till 5,0 s extra i de cykler som räknar en timme och cirka 11 MB på disk.
