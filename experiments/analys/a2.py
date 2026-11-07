@@ -73,6 +73,12 @@ PARAMS = {
 }
 KMAX = 4.0
 
+# varianterna mot de falska ekona per kvart (uppgiften a2-falska-ekon, 2026-11-07): ändringar i
+# PARAMS["kvart"], valda på träningspunkterna (a2.py varianter) och frysta innan valideringen kördes.
+# Timmen är oförändrad. K_SVAG: ingen uppskalning (k = min(k, 1)) där A1 är under K_SVAG mm.
+# TORR2, R_TORR2: A2 = 0 där A1 är under TORR2 mm och alla sedda mätare inom R_TORR2 km är torra.
+FRYSTA: dict[str, dict] = {}
+
 
 # ---------------------------------------------------------------- geometri
 
@@ -129,12 +135,23 @@ def sigma_b(rng_km, p):
     return p["SB"] * np.sqrt(1.0 + p["C"] * (rng_km / 100.0) ** 2)
 
 
+def svag_kvot(ratio, bg, p):
+    """Varianten utan uppskalning av svagt eko: där A1 är under K_SVAG gäller min(k, 1).
+
+    K_SVAG = 0 (standard) ändrar ingenting."""
+    ks = p.get("K_SVAG", 0.0)
+    if ks <= 0:
+        return ratio
+    return np.where(bg < ks, np.minimum(ratio, 1.0), ratio)
+
+
 def analys_punkter(t_bg, t_xy, t_rng, ratio_t, g_xy, g_mm, g_bg, g_rng, ratio_g, g_wet_tree, p,
                    torrmask=True):
     """A2 i målpunkterna för en period.
 
     t_bg: A1 i målpunkterna (mm per period); g_*: periodens mätare som systemet ser;
     ratio_t, ratio_g: kvoten i stor skala i målen och vid mätarna."""
+    ratio_t, ratio_g = svag_kvot(ratio_t, t_bg, p), svag_kvot(ratio_g, g_bg, p)
     out = ratio_t * t_bg
     ok_g = np.isfinite(g_bg) & np.isfinite(g_mm)
     if ok_g.sum() >= 1:
@@ -150,6 +167,11 @@ def analys_punkter(t_bg, t_xy, t_rng, ratio_t, g_xy, g_mm, g_bg, g_rng, ratio_g,
         wet = g_mm > 0
         dry_g = np.array([len(n) > 0 and not wet[n].any() for n in nb], bool)
         out = np.where(dry_g & (t_bg < p["TORR"]), 0.0, out)
+        if p.get("TORR2", 0.0) > 0:
+            # torrmasken över svagt eko: A1 under TORR2 och alla sedda mätare inom R_TORR2 torra
+            nb2 = tree.query_ball_point(t_xy, p.get("R_TORR2", p["R_TORR"]))
+            dry2 = np.array([len(n) > 0 and not wet[n].any() for n in nb2], bool)
+            out = np.where(dry2 & (t_bg < p["TORR2"]), 0.0, out)
     return np.where(np.isfinite(t_bg), out, np.nan)
 
 
@@ -217,6 +239,47 @@ def cmd_punkter(a):
         gc.collect()
 
 
+def terr_path(day_s):
+    return OUT / "punkter_terr" / f"{day_s}.npz"
+
+
+def cmd_terrang(a):
+    """Höjden och lovartsidan (som i domaren) i mätarnas rutor på träningsdagarna, för diagnosen.
+
+    Rörelsen läses ur domarens cache (OUT/rorelse) och räknas, och sparas där, om den saknas."""
+    from pyproj import Transformer
+    from knep.analys import radar
+    i, n = (int(x) for x in a.bit.split("/"))
+    elev = np.load(D.HOJD)["h"].astype(np.float32)
+    for day_s in D.days("traning")[i::n]:
+        p = terr_path(day_s)
+        if p.exists() or not (OUT / "punkter" / f"{day_s}.npz").exists():
+            continue
+        t = time.time()
+        rd = D.Radardag(day_s)
+        rd.sparse_motion()
+        grid = rd.grid
+        rd.rain = None  # bilderna behövs inte längre
+        gc.collect()
+        h, w = grid.shape
+        rr, cc = np.mgrid[0:h, 0:w]
+        x, y = grid.transform * (cc + 0.5, rr + 0.5)
+        lon, lat = Transformer.from_crs(grid.crs, "EPSG:4326", always_xy=True).transform(x, y)
+        lov = D.lovart_mask(elev, rd.hourly_motion(), np.asarray(lat), np.asarray(lon))
+        z = np.load(OUT / "punkter" / f"{day_s}.npz")
+        out = {}
+        for res in ("kvart", "timme"):
+            r, c, tt = z[f"{res}_r"], z[f"{res}_c"], z[f"{res}_t"]
+            hour = tt if res == "timme" else tt // 4
+            out[f"{res}_elev"] = elev[r, c]
+            out[f"{res}_lovart"] = lov[hour, r, c]
+        p.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(p, **out)
+        print(day_s, "terräng", f"{time.time() - t:.0f} s", flush=True)
+        del rd, lov
+        gc.collect()
+
+
 # ---------------------------------------------------------------- träningen på punkterna
 
 class Punktdag:
@@ -234,12 +297,19 @@ class Punktdag:
                 t=z[f"{res}_t"], mm=z[f"{res}_mm"].astype(float), a=z[f"{res}_a"].astype(float),
                 rng=z[f"{res}_rng"].astype(float), xy=np.c_[c, r].astype(float) * D.RES_KM,
                 fold=folds[r, c], dist=fd[:, r, c])
+        tp = terr_path(path.stem)
+        if tp.exists():
+            zt = np.load(tp)
+            for res in ("kvart", "timme"):
+                self.res[res]["over400"] = zt[f"{res}_elev"] > D.HIGH_M
+                self.res[res]["lovart"] = zt[f"{res}_lovart"].astype(bool)
 
 
-def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True):
-    """A2 i varje mätare i gruppen k ur mätarna som syns när grupp k bedöms. Ger (g, a, a2)."""
+def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True, full=False):
+    """A2 i varje mätare i gruppen k ur mätarna som syns när grupp k bedöms. Ger (g, a, a2), och med
+    full=True också kvoten k i målen och målens index i pd.res[res]."""
     H, Q = pd.res["timme"], pd.res[res]
-    G, A, P = [], [], []
+    G, A, P, K, I = [], [], [], [], []
     nper = D.NPER[res]
     for k in range(D.FOLDS):
         seen_h = H["dist"][k] > D.BUFFER_KM
@@ -256,6 +326,9 @@ def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True):
             a2 = analys_punkter(Q["a"][tgt], Q["xy"][tgt], Q["rng"][tgt], rt, Q["xy"][gs], Q["mm"][gs],
                                 Q["a"][gs], Q["rng"][gs], rg, None, p, torrmask)
             G.append(Q["mm"][tgt]); A.append(Q["a"][tgt]); P.append(a2)
+            K.append(rt); I.append(np.flatnonzero(tgt))
+    if full:
+        return tuple(np.concatenate(x) for x in (G, A, P, K, I))
     return np.concatenate(G), np.concatenate(A), np.concatenate(P)
 
 
@@ -281,6 +354,111 @@ def score_params(pdays, res, p, torrmask=True):
     s2["falskt"] = float((a2[g == 0] > thr).mean())
     s0["falskt"] = float((a[g == 0] > thr).mean())
     return s2, s0
+
+
+def _collect(pdays, res, p):
+    """Alla mål på dagarna: g, a (bakgrunden), a2, k och delmängderna (över 400 m, lovart)."""
+    out = {k: [] for k in ("g", "a", "a2", "k", "over400", "lovart")}
+    for pd in pdays:
+        g, a, a2, k, idx = _predict_day(pd, res, p, full=True)
+        Q = pd.res[res]
+        out["g"].append(g); out["a"].append(a); out["a2"].append(a2); out["k"].append(k)
+        for s in ("over400", "lovart"):
+            out[s].append(Q[s][idx] if s in Q else np.zeros(len(idx), bool))
+    return {k: np.concatenate(v) for k, v in out.items()}
+
+
+def score_full(pdays, res, p):
+    """Målet och måtten som i score_params, och falskt vid torr mätare för alla, över 400 m och lovart."""
+    c = _collect(pdays, res, p)
+    s = _score(c["g"], c["a2"])
+    s["mal"] = float(_objective(s))
+    thr = D.ECHO[res]
+    dry = c["g"] == 0
+    for name, sel in (("alla", np.ones(len(dry), bool)), ("over400", c["over400"]), ("lovart", c["lovart"])):
+        m = dry & sel & np.isfinite(c["a2"])
+        s[f"falskt_{name}"] = float((c["a2"][m] > thr).mean()) if m.any() else float("nan")
+        s[f"ntorr_{name}"] = int(m.sum())
+    return s
+
+
+def cmd_diagnos(a):
+    """Var de falska ekona per kvart (och timme) kommer ifrån: bakgrunden redan över tröskeln, lyft av
+    kvoten k eller lyft av OI-tillskottet. Bara träningsdagarna."""
+    pdays = _train_pdays(a)
+    result = {}
+    for res in a.res:
+        p = PARAMS[res]
+        c = _collect(pdays, res, p)
+        thr = D.ECHO[res]
+        ka = svag_kvot(c["k"], c["a"], p) * c["a"]
+        dry = (c["g"] == 0) & np.isfinite(c["a2"])
+        rows = {}
+        for name, sel in (("alla", np.ones(len(dry), bool)), ("over400", c["over400"]), ("lovart", c["lovart"])):
+            m = dry & sel
+            f2 = m & (c["a2"] > thr)
+            r = {
+                "torra": int(m.sum()),
+                "falskt bakgrund": float((c["a"][m] > thr).mean()),
+                "falskt A2": float(f2.sum() / m.sum()),
+                "A2 falskt, bakgrund redan över": int((f2 & (c["a"] > thr)).sum()),
+                "A2 falskt, lyft av k": int((f2 & (c["a"] <= thr) & (ka > thr)).sum()),
+                "A2 falskt, lyft av OI": int((f2 & (ka <= thr)).sum()),
+                "bakgrund falskt, borttaget av A2": int((m & (c["a"] > thr) & (c["a2"] <= thr)).sum()),
+                "k median vid lyft av k": float(np.median(c["k"][f2 & (c["a"] <= thr) & (ka > thr)]))
+                if (f2 & (c["a"] <= thr) & (ka > thr)).any() else float("nan"),
+                "k medel vid torra": float(c["k"][m].mean()),
+                "bakgrund median vid lyft": float(np.median(c["a"][f2 & (c["a"] <= thr)]))
+                if (f2 & (c["a"] <= thr)).any() else float("nan"),
+            }
+            # bakgrundens värde vid de falska ekona (klasser)
+            ab = c["a"][f2 & (c["a"] <= thr)]
+            r["bakgrund vid lyft: 0"] = int((ab == 0).sum())
+            r["bakgrund vid lyft: (0, 0,05]"] = int(((ab > 0) & (ab <= 0.05)).sum())
+            r["bakgrund vid lyft: (0,05, thr]"] = int((ab > 0.05).sum())
+            rows[name] = r
+        result[res] = rows
+        print(res, json.dumps(rows, ensure_ascii=False, indent=1), flush=True)
+    (OUT / "diagnos.json").write_text(json.dumps(result, ensure_ascii=False, indent=1))
+
+
+# varianterna som prövas för kvarten på träningen: (namn, ändringar i PARAMS["kvart"])
+VARIANTER = (
+    [("standard", {})]
+    + [(f"K_SVAG={v:g}", {"K_SVAG": v}) for v in (0.05, 0.1, 0.2, 0.3)]
+    + [(f"TORR2={v:g} R={r:g}", {"TORR2": v, "R_TORR2": r}) for v in (0.1, 0.2, 0.3) for r in (30.0, 40.0, 80.0)]
+    + [(f"K_SVAG={k:g} TORR2={v:g} R={r:g}", {"K_SVAG": k, "TORR2": v, "R_TORR2": r})
+       for k in (0.1, 0.2) for v in (0.1, 0.2) for r in (40.0, 80.0)]
+)
+
+
+def _train_pdays(a):
+    files = sorted((OUT / "punkter").glob("*.npz"))
+    tr = set(D.days("traning"))
+    files = [f for f in files if f.stem in tr]
+    if getattr(a, "dagar", 0):
+        files = files[: a.dagar]
+    pdays = [Punktdag(f) for f in files]
+    print(len(pdays), "träningsdagar,", sum("over400" in pd.res["kvart"] for pd in pdays), "med terrängen",
+          flush=True)
+    return pdays
+
+
+def cmd_varianter(a):
+    """Varianterna mot de falska ekona, på träningspunkterna (samma korsvalidering som trana)."""
+    pdays = _train_pdays(a)
+    path = OUT / "varianter.json"
+    result = json.loads(path.read_text()) if path.exists() else {}
+    for res in a.res:
+        rows = result.get(res, {})
+        for namn, ch in VARIANTER:
+            if namn in rows:
+                continue
+            t = time.time()
+            rows[namn] = {"andring": ch, **score_full(pdays, res, dict(PARAMS[res], **ch))}
+            print(res, namn, f"{time.time() - t:.0f} s", json.dumps(rows[namn], ensure_ascii=False), flush=True)
+            result[res] = rows
+            path.write_text(json.dumps(result, ensure_ascii=False, indent=1))
 
 
 GRID = {
@@ -386,7 +564,10 @@ class A2:
         g = m.subset(sel)
         xy = np.c_[g.c, g.r].astype(float) * D.RES_KM
         a = F1[g.r, g.c].astype(float)
-        out = np.maximum(_up(ratio_c, self.shape, 4 * STEP) * np.nan_to_num(F1, nan=0.0), 0.0)
+        F0 = np.nan_to_num(F1, nan=0.0)
+        ratio_f = svag_kvot(_up(ratio_c, self.shape, 4 * STEP), F0, p)
+        ratio_g = svag_kvot(ratio_g, a, p)
+        out = np.maximum(ratio_f * F0, 0.0)
         ok = np.isfinite(a)
         if ok.any():
             bg = np.sqrt(np.maximum(ratio_g[ok] * a[ok], 0.0))
@@ -404,8 +585,17 @@ class A2:
             dry_c = ((d_any <= p["R_TORR"]) & (d_wet > p["R_TORR"])).reshape(self.cshape)
             h, w = self.shape
             dry = np.repeat(np.repeat(dry_c, STEP, 0), STEP, 1)[:h, :w]
-            dry &= np.nan_to_num(F1, nan=0.0) < p["TORR"]
+            dry &= F0 < p["TORR"]
             out[dry] = 0.0
+            if p.get("TORR2", 0.0) > 0:
+                # torrmasken över svagt eko (se analys_punkter)
+                r2 = p.get("R_TORR2", p["R_TORR"])
+                d_any2 = cKDTree(xy).query(self.cxy, distance_upper_bound=r2 + 1)[0]
+                d_wet2 = cKDTree(xy[wet]).query(self.cxy, distance_upper_bound=r2 + 1)[0] if wet.any() \
+                    else np.full(len(self.cxy), np.inf)
+                dry2 = ((d_any2 <= r2) & (d_wet2 > r2)).reshape(self.cshape)
+                dry2 = np.repeat(np.repeat(dry2, STEP, 0), STEP, 1)[:h, :w] & (F0 < p["TORR2"])
+                out[dry2] = 0.0
         return np.where(np.isfinite(F1), out, np.nan).astype(np.float32)
 
     def falt(self, dag, matare, hours=range(24)):
@@ -444,21 +634,30 @@ def make_a2(kv1, tm1, grid, params=None):
     return A2(kv1, tm1, radar_range_km(grid), params)
 
 
+def system_params(namn: str) -> dict:
+    """Parametrarna för A2 (PARAMS) eller en fryst variant i FRYSTA (ändringar för kvarten)."""
+    if namn == "A2":
+        return PARAMS
+    return {"timme": dict(PARAMS["timme"]), "kvart": dict(PARAMS["kvart"], **FRYSTA[namn])}
+
+
 def cmd_kor(a):
     i, n = (int(x) for x in a.bit.split("/"))
     todo = [a.dag] if a.dag else D.days("validering")[i::n]
+    namn = a.namn
+    params = system_params(namn)
     for day_s in todo:
         assert day_s in D.days("validering")
-        target = D.OUT / "A2" / f"{day_s}.json"
+        target = D.OUT / namn / f"{day_s}.json"
         if target.exists() or not a1_path(day_s).exists():
             continue
         t = time.time()
         dag, grid, kv1, tm1 = _load_val(day_s)
         t1 = time.time()
-        res = D.evaluate(make_a2(kv1, tm1, grid), dag)
+        res = D.evaluate(make_a2(kv1, tm1, grid, params), dag)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(res))
-        print(day_s, "A2", f"läst {t1 - t:.0f} s, A2 och domaren {time.time() - t1:.0f} s", flush=True)
+        print(day_s, namn, f"läst {t1 - t:.0f} s, A2 och domaren {time.time() - t1:.0f} s", flush=True)
         del dag, kv1, tm1
         gc.collect()
 
@@ -477,13 +676,16 @@ def cmd_tid(a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["a1falt", "punkter", "trana", "kor", "tid"])
+    ap.add_argument("cmd", choices=["a1falt", "punkter", "terrang", "diagnos", "varianter", "trana", "kor",
+                                    "tid"])
     ap.add_argument("--bit", default="0/1")
     ap.add_argument("--dag")
+    ap.add_argument("--namn", default="A2", help="kor: A2 eller en fryst variant i FRYSTA")
     ap.add_argument("--res", nargs="+", default=["timme", "kvart"])
     ap.add_argument("--dagar", type=int, default=0, help="trana: bara de första dagarna (provkörning)")
     a = ap.parse_args()
-    {"a1falt": cmd_a1falt, "punkter": cmd_punkter, "trana": cmd_trana, "kor": cmd_kor, "tid": cmd_tid}[a.cmd](a)
+    {"a1falt": cmd_a1falt, "punkter": cmd_punkter, "terrang": cmd_terrang, "diagnos": cmd_diagnos,
+     "varianter": cmd_varianter, "trana": cmd_trana, "kor": cmd_kor, "tid": cmd_tid}[a.cmd](a)
 
 
 if __name__ == "__main__":

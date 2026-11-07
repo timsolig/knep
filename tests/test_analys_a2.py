@@ -72,6 +72,64 @@ def test_dry_mask_only_where_both_radar_and_gauges_are_dry():
     assert np.nanmax(np.where(tm[0] == 0, h[0], 0)) == 0
 
 
+def test_variants_off_by_default_give_identical_fields():
+    dag = make_dag(seed=4)
+    kv, tm = _fields(dag, scale=0.6)
+    kv += 0.02  # svagt eko överallt
+    rng = np.full((H, W), 60.0, np.float32)
+    off = {r: dict(a2.PARAMS[r], K_SVAG=0.0, TORR2=0.0, R_TORR2=30.0) for r in a2.PARAMS}
+    q0, h0 = a2.A2(kv, tm, rng).falt(dag, (dag.kvart, dag.timme), hours=[2, 3])
+    q1, h1 = a2.A2(kv, tm, rng, params=off).falt(dag, (dag.kvart, dag.timme), hours=[2, 3])
+    assert np.array_equal(q0, q1, equal_nan=True) and np.array_equal(h0, h1, equal_nan=True)
+    assert a2.system_params("A2") is a2.PARAMS
+    for namn in a2.FRYSTA:  # de frysta varianterna ändrar bara kvarten
+        assert a2.system_params(namn)["timme"] == a2.PARAMS["timme"]
+
+
+def _wet_dag(mm_q):
+    """Tre mätare tätt ihop med samma kvartsvärde (och timvärde 4 · mm_q) hela dygnet."""
+    n = 3
+    r, c = np.array([70, 75, 80]), np.array([70, 75, 80])
+    st = np.arange(n)
+    kv = domare.Matare(np.repeat(st, 96), np.repeat(r, 96), np.repeat(c, 96), np.tile(np.arange(96), n),
+                       np.full(n * 96, mm_q))
+    tm = domare.Matare(np.repeat(st, 24), np.repeat(r, 24), np.repeat(c, 24), np.tile(np.arange(24), n),
+                       np.full(n * 24, 4 * mm_q))
+    return domare.Dag("2000-01-01", (H, W), kv, tm, np.zeros((H, W), np.float32), None)
+
+
+def test_no_upscaling_of_weak_echo():
+    dag = _wet_dag(2.0)  # mätarna har mycket mer än radarn: k > 1
+    kv = np.full((96, H, W), 0.08, np.float32)  # svagt eko under tröskeln 0,125
+    kv[:, 70:81, 70:81] = 0.5                   # starkare eko vid mätarna
+    tm = kv.reshape(24, 4, H, W).sum(axis=1)
+    rng = np.full((H, W), 60.0, np.float32)
+    base = {r: dict(a2.PARAMS[r], SB=1e-6, ALFA=0.1) for r in a2.PARAMS}  # utan OI, bara kvoten
+    q0, _ = a2.A2(kv, tm, rng, params=base).falt(dag, (dag.kvart, dag.timme), hours=[5])
+    var = {"timme": base["timme"], "kvart": dict(base["kvart"], K_SVAG=0.1)}
+    q1, _ = a2.A2(kv, tm, rng, params=var).falt(dag, (dag.kvart, dag.timme), hours=[5])
+    t = 20
+    assert q0[t, 60, 60] > 0.125            # standard: kvoten lyfter det svaga ekot över tröskeln
+    assert np.isclose(q1[t, 60, 60], 0.08)  # varianten: k = min(k, 1) där A1 är svag
+    assert q1[t, 75, 75] > 0.5 and np.isclose(q1[t, 75, 75], q0[t, 75, 75])  # starkt eko skalas som förut
+
+
+def test_dry_mask_over_weak_echo():
+    for mm, removed in ((0.0, True), (1.0, False)):
+        dag = _wet_dag(mm)
+        kv = np.full((96, H, W), 0.08, np.float32)  # svagt eko, över TORR men under TORR2
+        tm = kv.reshape(24, 4, H, W).sum(axis=1)
+        rng = np.full((H, W), 60.0, np.float32)
+        base = {r: dict(a2.PARAMS[r], SB=1e-6, ALFA=1e9) for r in a2.PARAMS}  # varken OI eller kvot
+        var = {"timme": base["timme"], "kvart": dict(base["kvart"], TORR2=0.1, R_TORR2=30.0)}
+        q0, _ = a2.A2(kv, tm, rng, params=base).falt(dag, (dag.kvart, dag.timme), hours=[5])
+        q1, _ = a2.A2(kv, tm, rng, params=var).falt(dag, (dag.kvart, dag.timme), hours=[5])
+        t = 20
+        assert np.isclose(q0[t, 75, 75], 0.08)  # standardmasken rör inte ekot över TORR
+        assert (q1[t, 75, 75] == 0.0) == removed
+        assert np.isclose(q1[t, 140, 140], 0.08)  # långt från mätarna: ingen mask
+
+
 def test_cross_validated_a2_runs_through_the_judge():
     dag = make_dag(seed=3, n_st=60)
     kv, tm = _fields(dag, scale=0.7)
