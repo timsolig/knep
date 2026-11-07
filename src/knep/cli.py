@@ -143,7 +143,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.a2 and a1_frames is not None:
             try:  # A2 får aldrig stoppa prognosen
                 doc = a2_cykel.las_arkiv(args.a2_matare, t0) if args.a2_matare else a2_cykel.las_gauges_json(args.out)
-                extra["levels"]["a2"] = a2_cykel.kor(state_dir, args.out, rend, a1_frames, t0, args.back, doc)
+                extra["levels"]["a2"] = a2_cykel.kor(state_dir, args.out, rend, a1_frames, t0, args.back, doc,
+                                                     verif_dir=None if args.no_verify else args.cache / "verif")
             except Exception as e:  # noqa: BLE001
                 log.warning("A2: %s", e)
     if args.runs > 0:

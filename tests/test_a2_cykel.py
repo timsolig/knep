@@ -176,6 +176,28 @@ def test_rakna_om_nar_fler_varden_kommer(tmp_path):
     assert len(list((tmp_path / "a2").glob("q*.png"))) == 4  # kvartarna byttes också
 
 
+def test_timsumman_sparas_till_verifieringen_och_skrivs_over(tmp_path):
+    from knep import verify
+    ivs = _intervals(8)
+    _, _, stations = _stations(9, n=30)
+    full = _doc(10, stations, hours_with={NEWEST})
+    halv = json.loads(json.dumps(full))
+    t = a2_cykel._iso(NEWEST)
+    halv["60"][t] = dict(list(full["60"][t].items())[:10])
+    rend, vdir = render.Renderer(GRID), tmp_path / "verif"
+    a2_cykel.kor(tmp_path, tmp_path, rend, ivs, NOW, 12, halv, verif_dir=vdir)
+    f1, n1 = verify.a2t_hour(vdir, NEWEST)
+    tm = a2_cykel.rakna(tmp_path, tmp_path / "ny", GRID, NOW, full)[-1][1]  # samma räkning som nästa kor gör
+    a2_cykel.kor(tmp_path, tmp_path, rend, ivs, NOW, 12, full, verif_dir=vdir)
+    f2, n2 = verify.a2t_hour(vdir, NEWEST)
+    assert n2 > n1 and f2.shape == verify.vgrid(GRID).shape and not np.array_equal(f1, f2, equal_nan=True)
+    assert np.array_equal(f2, verify.block(tm).astype(np.float16).astype(np.float32), equal_nan=True)
+    assert [p.name for p in verify.a2t_dir(vdir).iterdir()] == [f"{NEWEST:%Y%m%dT%H}.npz"]
+    # utan verif_dir sparas inget
+    a2_cykel.kor(tmp_path / "b", tmp_path / "b", rend, ivs, NOW, 12, full)
+    assert not (tmp_path / "b" / "verif").exists()
+
+
 # ---------------------------------------------------------------- hela cykeln
 
 WEST, NORTH, RES, CW, CH = 126648, 7771252, 2000, 475, 894
