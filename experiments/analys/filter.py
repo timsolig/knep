@@ -268,7 +268,9 @@ def main() -> None:
     p.add_argument("--mot")
     p.add_argument("--dagar", nargs="*", help="flera dagar i följd (i stället för --dag)")
     p.add_argument("--bit", default="0/1")
+    p.add_argument("--ut", help=f"domarens katalog för dagfiler och tabeller (standard {domare.OUT})")
     a = p.parse_args()
+    domare.set_out(a.ut)
     if a.cmd == "karta":
         build_map()
     elif a.cmd == "karta_drift":

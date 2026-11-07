@@ -2,6 +2,7 @@
 
     uv run python experiments/analys/domare.py kor A0 [--del validering] [--dag 2023-08-08]
     uv run python experiments/analys/domare.py tabell A1 --mot A0 [--del validering]
+    uv run python experiments/analys/domare.py kontroll A0 [--dag 2023-08-08]   (gamla måtten oförändrade)
 
 Ett system är en klass med `namn`, `matare` (om det använder regnmätarna) och
 `falt(dag, matare) -> (kvart, timme)`: nederbörden i mm per kvart (96, H, W) och per timme
@@ -16,11 +17,12 @@ grupp ur den körning som inte såg gruppen. System utan mätare körs en gång;
 är då samma fält, så de bedöms på samma grupper.
 
 Per dag sparas summor (antal, summor, träffar, falska larm) per upplösning och delmängd i
-/data/analys/domare/<system>/<dag>.json, så att måtten för en mängd dagar och bootstrap över
+/data/analys/domare_v2/<system>/<dag>.json, så att måtten för en mängd dagar och bootstrap över
 dagarna räknas ur summorna. Måtten:
 
-  mängd    kvoten summa(analys)/summa(mätare), samma kvot för perioder där mätaren har över
-           1, 5 och 10 mm, och MAE (mm per period)
+  mängd    kvoten summa(analys)/summa(mätare) över alla perioder ("kvot summa"), samma kvot för
+           perioder där mätaren har regn, över 0 mm ("kvot våt"), och för perioder där mätaren
+           har över 1, 5 och 10 mm, och MAE (mm per period)
   träff    CSI och FSS vid 0,5, 1 och 5 mm per period. FSS mot punkter: P är andelen rutor över
            tröskeln i ett fönster om FSS_WIN × FSS_WIN rutor (22 km) kring mätaren, O är 0 eller 1
            för mätaren, FSS = 1 − Σ(P − O)² / (ΣP² + ΣO²)
@@ -33,6 +35,14 @@ dagarna räknas ur summorna. Måtten:
            höjdområdet)
   hopp     för timmar där mätaren har alla fyra kvartarna: Σ|kvart(k) − kvart(k−1)| för analysen
            genom samma summa för mätaren (1 betyder att analysen hoppar lika mycket som mätarna)
+
+Regeln (verdict) använder "kvot våt" i stället för "kvot summa" i gruppen mängd (användarens
+beslut 2026-11-07, punkt 3): summakvoten räknar också eko vid torra mätare som mängd och belönar
+därför för höga toppar och falska ekon så länge radarn i stort är för torr. "kvot summa" står
+kvar i tabellerna, och verdict(tab, regel="gammal") ger domen med den gamla regeln, så att
+tidigare rapporter går att jämföra. Dagfilerna med de nya summorna (saw, sgw) ligger i
+/data/analys/domare_v2/ (OUT, --ut); de gamla i /data/analys/domare/ saknar dem och ger bara
+den gamla regeln. Rörelsefälten läses och sparas fortfarande i /data/analys/domare/rorelse/.
 
 Mätarna kontrolleras grovt: värden under 0 eller över 100 mm per timme (60 mm per kvart) tas bort
 (p7 och p14 har enstaka värden på hundratusentals mm).
@@ -58,7 +68,9 @@ from scipy.spatial import cKDTree
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-OUT = Path("/data/analys/domare")
+OUT = Path("/data/analys/domare_v2")   # dagfiler och tabeller med kvot våt (byts med --ut)
+OUT_V1 = Path("/data/analys/domare")   # de gamla dagfilerna och tabellerna, utan kvot våt
+RORELSE = OUT_V1 / "rorelse"           # rörelsefälten är desamma för båda
 RADAR = Path("/data/radar")
 HOJD = Path("/data/projektion/hojd_2km.npz")
 GAUGES = {"timme": Path("/data/bortfall/matare/p7.npz"), "kvart": Path("/data/bortfall/matare/p14.npz")}
@@ -193,7 +205,7 @@ def lovart_mask(elev: np.ndarray, motion_h: np.ndarray, lat: np.ndarray, lon: np
 # ---------------------------------------------------------------- bedömningen av en dag
 
 def _empty():
-    return {"n": 0, "sa": 0.0, "sg": 0.0, "ae": 0.0,
+    return {"n": 0, "sa": 0.0, "sg": 0.0, "ae": 0.0, "saw": 0.0, "sgw": 0.0,
             **{f"sa{t:g}": 0.0 for t in AMT_THR}, **{f"sg{t:g}": 0.0 for t in AMT_THR},
             **{f"{k}{t:g}": 0.0 for t in CSI_THR for k in ("hit", "mis", "fal", "fpo", "fp2", "fo2")},
             "ndry": 0, "fdry": 0, "ndryo": 0, "fdryo": 0, "ja": 0.0, "jg": 0.0, "nj": 0}
@@ -218,6 +230,9 @@ def _accumulate(acc: dict, a: np.ndarray, g: np.ndarray, p: dict, dry_area: np.n
     acc["sa"] += float(a.sum())
     acc["sg"] += float(g.sum())
     acc["ae"] += float(np.abs(a - g).sum())
+    wet = g > 0
+    acc["saw"] += float(a[wet].sum())
+    acc["sgw"] += float(g[wet].sum())
     for t in AMT_THR:
         s = g > t
         acc[f"sa{t:g}"] += float(a[s].sum())
@@ -345,7 +360,9 @@ def metrics(acc: dict, res: str) -> dict[str, tuple[float, str]]:
     """Måtten ur summerade komponenter: namn -> (värde, vad som är bättre)."""
     def q(a, b):
         return a / b if b > 0 else np.nan
-    m = {"kvot summa": (q(acc["sa"], acc["sg"]), NEAR1)}
+    m = {"kvot summa": (q(acc["sa"], acc["sg"]), NEAR1),
+         # dagfiler från före kvot våt saknar saw och sgw: måttet blir NaN och bedöms inte
+         "kvot våt": (q(acc.get("saw", 0.0), acc.get("sgw", 0.0)), NEAR1)}
     for t in AMT_THR:
         m[f"kvot >{t:g} mm"] = (q(acc[f"sa{t:g}"], acc[f"sg{t:g}"]), NEAR1)
     m["MAE"] = (q(acc["ae"], acc["n"]), LOWER)
@@ -361,10 +378,12 @@ def metrics(acc: dict, res: str) -> dict[str, tuple[float, str]]:
 
 
 GROUPS = {  # vilka mått som hör till vilken del av regeln
-    "mängd": ["kvot summa"] + [f"kvot >{t:g} mm" for t in AMT_THR] + ["MAE"],
+    "mängd": ["kvot våt"] + [f"kvot >{t:g} mm" for t in AMT_THR] + ["MAE"],
     "träff": [f"CSI {t:g}" for t in CSI_THR] + [f"FSS {t:g}" for t in CSI_THR],
     "falska": ["falskt vid torr mätare", "falskt där allt inom 25 km är torrt"],
 }
+# den gamla regeln (före 2026-11-07): summakvoten i stället för kvoten för våta perioder
+GROUPS_GAMMAL = dict(GROUPS, mängd=["kvot summa"] + GROUPS["mängd"][1:])
 
 
 MIN_DAYS = 5  # ett mått bedöms bara om dess nämnare har underlag från minst så många dagar
@@ -380,7 +399,7 @@ def _support(name: str) -> list[str]:
             return [f"hit{t:g}", f"mis{t:g}", f"fal{t:g}"]
         if name == f"FSS {t:g}":
             return [f"fp2{t:g}", f"fo2{t:g}"]
-    return {"kvot summa": ["sg"], "MAE": ["n"], "falskt vid torr mätare": ["ndry"],
+    return {"kvot summa": ["sg"], "kvot våt": ["sgw"], "MAE": ["n"], "falskt vid torr mätare": ["ndry"],
             "falskt där allt inom 25 km är torrt": ["ndryo"], "hopp, kvot mot mätarna": ["jg"]}[name]
 
 
@@ -390,7 +409,7 @@ def _sum(per_day: list[dict]) -> dict:
         for k, acc in d.items():
             o = out.setdefault(k, {kk: 0 for kk in acc})
             for kk, v in acc.items():
-                o[kk] += v
+                o[kk] = o.get(kk, 0) + v
     return out
 
 
@@ -430,7 +449,7 @@ def table(per_day: dict[str, dict], base: dict[str, dict] | None = None, B: int 
             mb = metrics(tot_b[key], res)
         for name, (v, kind) in mv.items():
             row = {"varde": v, "battre": kind,
-                   "dagar": int(sum(sum(per_day[d][key][c] for c in _support(name)) > 0 for d in names))}
+                   "dagar": int(sum(sum(per_day[d][key].get(c, 0) for c in _support(name)) > 0 for d in names))}
             if base is not None:
                 g = np.array([_goodness(x[name][0], kind) - _goodness(y[name][0], kind) for x, y in zip(boots, boots_b)])
                 g = g[np.isfinite(g)]
@@ -451,13 +470,17 @@ def table(per_day: dict[str, dict], base: dict[str, dict] | None = None, B: int 
     return out
 
 
-def verdict(tab: dict, min_days: int = MIN_DAYS) -> dict:
+def verdict(tab: dict, min_days: int = MIN_DAYS, regel: str = "ny") -> dict:
     """Regeln: bättre om något mått för mängd eller träff (kvart eller timme, alla mätare) är bättre
     med intervallet helt över 0, och inget mått för falska ekon eller terrängen är sämre med
     intervallet helt under 0. Intervallen är skillnaden i godhet (större är bättre).
 
+    regel="ny" (standard) tar kvot våt i gruppen mängd, regel="gammal" summakvoten som före
+    2026-11-07 (GROUPS_GAMMAL).
+
     Ett mått bedöms bara om nämnaren har underlag från minst min_days dagar; annars bygger
     intervallet ur bootstrap på en eller ett par händelser och säger inget (min_days=0 bedömer allt)."""
+    groups = {"ny": GROUPS, "gammal": GROUPS_GAMMAL}[regel]
     better, worse = [], []
 
     def ok(row):
@@ -465,17 +488,17 @@ def verdict(tab: dict, min_days: int = MIN_DAYS) -> dict:
 
     for res in ("kvart", "timme"):
         for g in ("mängd", "träff"):
-            for name in GROUPS[g]:
+            for name in groups[g]:
                 row = tab[f"{res}/alla"][name]
                 if ok(row) and row["lo"] > 0:
                     better.append(f"{res} {name}")
-        for name in GROUPS["falska"]:
+        for name in groups["falska"]:
             row = tab[f"{res}/alla"][name]
             if ok(row) and row["hi"] < 0:
                 worse.append(f"{res} {name}")
         for sub in ("over400", "lovart"):
             for g in ("mängd", "träff", "falska"):
-                for name in GROUPS[g]:
+                for name in groups[g]:
                     row = tab[f"{res}/{sub}"][name]
                     if ok(row) and row["hi"] < 0:
                         worse.append(f"{res} {sub} {name}")
@@ -541,7 +564,7 @@ class Radardag:
         """(97, 2, H/4, W/4): rörelsen vid 00:00, 00:15, ..., 24:00 i pixlar per 5 min, var 4:e ruta."""
         if self._motion is not None:
             return self._motion
-        p = OUT / "rorelse" / f"{self.day_s}.npz"
+        p = RORELSE / f"{self.day_s}.npz"
         h, w = self.grid.shape
         if p.exists():
             sm = np.load(p)["m"].astype(np.float32)
@@ -710,22 +733,71 @@ def cmd_tabell(a) -> None:
     print(markdown(tab, a.system[0], a.mot))
     if base is not None:
         v, v0 = verdict(tab), verdict(tab, min_days=0)
-        print("\nDomen:", json.dumps(v, ensure_ascii=False, indent=1))
+        vg, vg0 = verdict(tab, regel="gammal"), verdict(tab, min_days=0, regel="gammal")
+        print("\nDomen (kvot våt):", json.dumps(v, ensure_ascii=False, indent=1))
         print("\nDomen utan kravet på underlag:", json.dumps(v0, ensure_ascii=False, indent=1))
+        print("\nDomen med den gamla regeln (kvot summa):", json.dumps(vg, ensure_ascii=False, indent=1))
+        print("\nDomen med den gamla regeln utan kravet på underlag:", json.dumps(vg0, ensure_ascii=False, indent=1))
+        OUT.mkdir(parents=True, exist_ok=True)
         (OUT / f"tabell_{a.system[0]}_mot_{a.mot}_{a.del_}.json").write_text(
-            json.dumps({"tabell": tab, "dom": v, "dom_utan_underlagskrav": v0, "dagar": sorted(sys_r)}, ensure_ascii=False, indent=1, default=float))
+            json.dumps({"tabell": tab, "dom": v, "dom_utan_underlagskrav": v0, "dom_gammal_regel": vg,
+                        "dom_gammal_regel_utan_underlagskrav": vg0, "dagar": sorted(sys_r)},
+                       ensure_ascii=False, indent=1, default=float))
+
+
+def set_out(path: str | None) -> None:
+    """Byter katalogen för dagfiler och tabeller (--ut i domare.py, filter.py och a2.py)."""
+    global OUT
+    if path:
+        OUT = Path(path)
+
+
+def compare_old(new: dict, old: dict) -> list[str]:
+    """Skillnaderna mellan en ny och en gammal dagfil: alla summor i den gamla ska vara exakt
+    desamma i den nya, och den nya ska bara ha saw och sgw utöver dem."""
+    bad = []
+    if set(new) != set(old):
+        bad.append(f"nycklarna {sorted(set(new) ^ set(old))}")
+    for key in old:
+        n = new.get(key, {})
+        extra = set(n) - set(old[key])
+        if extra != (set() if key == "rutor" else {"saw", "sgw"}):
+            bad.append(f"{key}: nya summor {sorted(extra)}")
+        for c, v in old[key].items():
+            if n.get(c) != v:
+                bad.append(f"{key} {c}: {v} mot {n.get(c)}")
+    return bad
+
+
+def cmd_kontroll(a) -> None:
+    """De gamla måtten oförändrade: dagfilerna i OUT mot de gamla i OUT_V1."""
+    bad, n = [], 0
+    for s in a.system:
+        for d in [a.dag] if a.dag else days(a.del_):
+            p_new, p_old = OUT / s / f"{d}.json", OUT_V1 / s / f"{d}.json"
+            if not (p_new.exists() and p_old.exists()):
+                continue
+            n += 1
+            bad += [f"{s} {d} {b}" for b in compare_old(json.loads(p_new.read_text()), json.loads(p_old.read_text()))]
+    print(f"{n} dagfiler jämförda, {len(bad)} skillnader")
+    for b in bad[:50]:
+        print(" ", b)
+    if bad or not n:
+        sys.exit(1)
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("cmd", choices=["kor", "tabell"])
+    p.add_argument("cmd", choices=["kor", "tabell", "kontroll"])
     p.add_argument("system", nargs="+")
     p.add_argument("--del", dest="del_", default="validering", choices=["validering", "traning"])
     p.add_argument("--dag")
     p.add_argument("--mot")
     p.add_argument("--bit", default="0/1", help="i/n: var n:e dag från och med den i:e (för två processer)")
+    p.add_argument("--ut", help=f"katalogen för dagfiler och tabeller (standard {OUT})")
     a = p.parse_args()
-    {"kor": cmd_kor, "tabell": cmd_tabell}[a.cmd](a)
+    set_out(a.ut)
+    {"kor": cmd_kor, "tabell": cmd_tabell, "kontroll": cmd_kontroll}[a.cmd](a)
 
 
 if __name__ == "__main__":

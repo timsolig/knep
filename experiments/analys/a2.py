@@ -1320,7 +1320,9 @@ def main():
     ap.add_argument("--namn", default="A2", help="kor: A2 eller en fryst variant i FRYSTA")
     ap.add_argument("--res", nargs="+", default=["timme", "kvart"])
     ap.add_argument("--dagar", type=int, default=0, help="trana: bara de första dagarna (provkörning)")
+    ap.add_argument("--ut", help=f"kor, kor_traning: domarens katalog för dagfilerna (standard {D.OUT})")
     a = ap.parse_args()
+    D.set_out(a.ut)
     {"a1falt": cmd_a1falt, "punkter": cmd_punkter, "terrang": cmd_terrang, "diagnos": cmd_diagnos,
      "varianter": cmd_varianter, "trana": cmd_trana, "kor": cmd_kor, "tid": cmd_tid,
      "kontroll": cmd_kontroll, "varianter_qc": cmd_varianter_qc, "stationer": cmd_stationer,
