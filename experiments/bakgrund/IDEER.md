@@ -4,7 +4,7 @@ Kandidaterna som planeraren väljer från, ungefär i den ordning de ger mest nu
 
 ## Öppna
 
-- **Kontroll av mätarna i A2T** (mål 1). Innovationen mot grannarna (och mot radarn där den är säker) över en tröskel i standardavvikelser kastas ur indata, vald på träningen. Utan den sprider OI ett fel i en mätare upp till cirka 40 km. Krävs innan A2T blir facit i verifieringen eller flyttas till `src/`. Nytta medel till stor (det sista som står mellan A2T och ett förslag till användaren), kostnad 2 till 3 h, risk att kontrollen kastar riktigt terrängregn som radarn inte ser; därför ska andelen kastade över 400 m och på lovartsidan redovisas. Valideringen är sedd för A2-familjen två gånger, så bara en fryst variant.
+- **En smalare kontroll av mätarna i A2T** (mål 1). A2TK fälldes mot A2T eftersom 9 av 10 kastade perioder var för våta mätare, alltså verkliga skurtoppar. Kasta en för våt mätare bara där A1 är helt torr i rutan och omgivningen och grannarna är torra, och en för torr mätare där grannarna och radarn är tydligt våta. Lägg till en kontroll per station och dygn (station 2214807: 2 mm per kvart utan eko i 81 kvartar 2024-04-14). Välj på träningen med `a2.py varianter_qc` och de syntetiska felen, med kravet att summakvoten och FSS inte sjunker mot A2T på träningen. Nytta medel (skydd för facit), kostnad 2 till 3 h, risk att den inte hittar mer än A2TK. Valideringen är sedd tre gånger för A2-familjen.
 - **Kartmåttet och timmens svaga eko i A2T** (mål 1). Kartmåttet (47,2 rutor per dag mot A0:s 36,6) är det sämsta som är kvar och styrs av timmen, där `K_SVAG`/`SVAG_TAK` inte verkar. Pröva taket även per timme (`K_SVAG` cirka 0,5 mm) och F4:s bilder under A1 och A2T. Nytta medel, kostnad 2 till 3 h, risk att timmens kvot i terrängen sjunker.
 - **Mängden i terrängen tillbaka i A2T** (mål 1). Taket tar bort riktigt svagt regn i fjällen (kvoten över 400 m per kvart 0,632 till 0,575). Ett tak bara för svagt eko som står still (klotter) eller där strålen ligger lågt över terrängen. Nytta medel, kostnad 3 h, risk liten (A2T är baslinjen att slå).
 - **A2T till `src/knep/analys/a2.py` som avstängt val** (mål 1). Efter kontrollen av mätarna. Fyllning av `a2` i manifestet och användning som facit beslutar användaren. Nytta stor på sikt, kostnad 2 h med tester.
@@ -18,6 +18,8 @@ Kandidaterna som planeraren väljer från, ungefär i den ordning de ger mest nu
 - **max_age vid bortfall** (mål 6). Kandidaterna bedöms på prognosen.
 
 ## Avgjort
+
+- **Kontrollen av mätarna i A2T, A2TK** (uppgift 0002, 2026-11-07): mot grannarna inom 50 km och bakgrunden, T = 3 per kvart och 2,5 per timme, kastar 0,1 % av perioderna och inget över 400 m. Den slår A1 och A0 men är sämre än A2T med intervallet helt på fel sida i summakvoten och FSS (kvart kvot 0,846 mot 0,851, FSS 1 0,389 mot 0,392); bättre bara i MAE. Den hittar 3 till 20 % av 1 % syntetiska fel och en trasig station. A2T står kvar. [Rapporten](rapporter/2026-11-07/0002-a2t-kontroll-matare.md)
 
 - **A2 utan falska ekon per kvart i terrängen** (uppgift 0001, 2026-11-07): A2T (ingen uppskalning och tak över svagt eko under 0,125 mm per kvart) slår både A0 och A1 enligt domaren på valideringen utan att något mått blir sämre; falskt per kvart över 400 m 0,0118 mot A1:s 0,0133. Priset är lägre kvot i terrängen per kvart än A2. Torrmasken över svagt eko (`TORR2`) gav inget. [Rapporten](rapporter/2026-11-07/0001-a2-falska-ekon.md)
 

@@ -149,6 +149,8 @@ def kontroll(xy, mm, bg, rng_km, over400, p) -> np.ndarray:
     high = valid & (e_n > T * sn) & (e_b > T * sbb)
     if q["QC_SKYDD400"]:
         high &= ~np.asarray(over400, bool)
+    if q.get("QC_BARA_TORRA", False):  # bara mätare som är för torra (0 i regn) kastas
+        high[:] = False
     return low | high
 
 
@@ -626,6 +628,8 @@ VARIANTER_QC = (
     [("A2T", {})]
     + [(f"T={T:g} R={R:g}{' skydd400' if s else ''}", _qc(T, R, s))
        for T in (2.0, 2.5, 3.0, 4.0) for R in (25.0, 50.0) for s in (True, False)]
+    # efter valideringen av A2TK, bara på träningen som underlag för nästa steg (inte för valet av A2TK)
+    + [(f"T={T:g} R=50 bara torra", dict(_qc(T, 50.0, True), QC_BARA_TORRA=True)) for T in (2.5, 3.0)]
 )
 
 
