@@ -1210,8 +1210,23 @@ class A2:
         return kv, tm
 
 
+class _Rutnat(D.Radardag):
+    """Radardag utan bilderna: bara rutnätet (ur första bilden som finns) och rörelsen ur domarens
+    cache, som build_dag behöver. A2 läser A1:s sparade fält, så de 295 bilderna (cirka 1 GB) behövs
+    inte. Saknas rörelsen i cachen läses hela dagen som förut."""
+
+    def __init__(self, day_s):
+        from knep.analys import radar
+        self.day_s = day_s
+        self.day = datetime.fromisoformat(day_s).replace(tzinfo=UTC)
+        self.times = [self.day + (k - self.PRE) * radar.STEP for k in range(288 + self.PRE + 1)]
+        p = next(D.frame_path(t) for t in self.times if D.frame_path(t).exists())
+        self.grid = radar.read_rain(p)[1]
+        self._motion = None
+
+
 def _load_val(day_s):
-    rd = D.Radardag(day_s)
+    rd = _Rutnat(day_s) if (D.RORELSE / f"{day_s}.npz").exists() else D.Radardag(day_s)
     dag = D.build_dag(day_s, rd)
     grid = rd.grid
     del rd
