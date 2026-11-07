@@ -163,7 +163,7 @@ class Strom:
 def cmd_kor(a):
     from knep.analys import a1
     names = a.system or list(VARIANTS)
-    todo = [a.dag] if a.dag else D.days(a.del_)
+    todo = [a.dag] if a.dag else (a.dagar.split(",") if a.dagar else D.days(a.del_))
     i0, n = (int(x) for x in a.bit.split("/"))
     elev = np.load(D.HOJD)["h"].astype(np.float32)
     for day_s in todo[i0::n]:
@@ -223,16 +223,59 @@ def cmd_jamfor(a):
         print(res, "NaN lika", bool((np.isfinite(u) == np.isfinite(v)).all()), "största skillnad", float(np.abs(u - v)[both].max()))
 
 
+KEY_ROWS = [("timme/lovart", "kvot summa"), ("kvart/lovart", "kvot summa"), ("timme/over400", "kvot summa"),
+            ("timme/lovart", "MAE"), ("timme/lovart", "CSI 1"), ("kvart/alla", "CSI 0.5"), ("kvart/alla", "CSI 1"),
+            ("kvart/alla", "MAE"), ("timme/alla", "CSI 0.5"), ("timme/alla", "MAE"), ("kvart/alla", "FSS 5"),
+            ("kvart/alla", "hopp, kvot mot mätarna")]
+
+
+def cmd_valj(a):
+    """Valet på träningsdagarna, med regeln bestämd innan resultaten lästes:
+    bland varianterna som inte är sämre i något mått (domens regel) varken mot A0 eller mot A1, välj den
+    med störst skillnad i godhet mot A1 för summakvoten per timme på lovartsidan."""
+    names = a.system or [s for s in VARIANTS if s != "A1"]
+    res = {}
+    for s in ["A1"] + names:
+        per = {d: v for d, v in D.load_results(s, a.del_).items()}
+        row = {}
+        for bas in ("A0", "A1"):
+            if s == bas:
+                continue
+            base = D.load_results(bas, a.del_)
+            common = sorted(set(per) & set(base))
+            tab = D.table({d: per[d] for d in common}, {d: base[d] for d in common})
+            v = D.verdict(tab)
+            row[bas] = (tab, v, len(common))
+            (D.OUT / f"tabell_{s}_mot_{bas}_{a.del_}.json").write_text(json.dumps(
+                {"tabell": tab, "dom": v, "dom_utan_underlagskrav": D.verdict(tab, 0), "dagar": common},
+                ensure_ascii=False, indent=1, default=float))
+            print(f"\n{s} mot {bas} ({len(common)} dagar): bättre {v['battre']}, bättre i {v['battre_i']}, sämre i {v['samre_i']}")
+            for key, name in KEY_ROWS:
+                r = tab[key][name]
+                print(f"  {key:14s} {name:24s} {r['varde']:.3f} bas {r['bas']:.3f} {r['diff']:+.4f} ({r['lo']:+.4f} till {r['hi']:+.4f})")
+            r = tab["rutor"]["rutor med eko i över hälften av de torra timmarna, per dag"]
+            print(f"  kartmåttet {r['varde']:.1f} bas {r['bas']:.1f} {r['diff']:+.1f} ({r['lo']:+.1f} till {r['hi']:+.1f})")
+        res[s] = row
+    ok = [s for s in names if not res[s]["A0"][1]["samre_i"] and not res[s]["A1"][1]["samre_i"]]
+    score = {s: res[s]["A1"][0]["timme/lovart"]["kvot summa"]["diff"] for s in names}
+    print("\nutan sämre mått:", ok, "lovart timme mot A1:", {s: round(v, 4) for s, v in score.items()})
+    if ok:
+        print("valet:", max(ok, key=score.get))
+    else:
+        print("valet: ingen variant klarar regeln")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("cmd", choices=["diag", "kor", "jamfor"])
+    p.add_argument("cmd", choices=["diag", "kor", "jamfor", "valj"])
     p.add_argument("system", nargs="*")
     p.add_argument("--dag")
+    p.add_argument("--dagar", help="kommaseparerade dagar")
     p.add_argument("--del", dest="del_", default="traning", choices=["validering", "traning"])
     p.add_argument("--bit", default="0/1")
     p.add_argument("--spara", action="store_true", help="provkörning: spara fälten och skriv summorna under OUT/prov")
     a = p.parse_args()
-    {"diag": cmd_diag, "kor": cmd_kor, "jamfor": cmd_jamfor}[a.cmd](a)
+    {"diag": cmd_diag, "kor": cmd_kor, "jamfor": cmd_jamfor, "valj": cmd_valj}[a.cmd](a)
 
 
 if __name__ == "__main__":
