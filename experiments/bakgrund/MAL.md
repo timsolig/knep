@@ -12,7 +12,7 @@ Planeraren läser den här filen före varje uppgift. Användaren äger **Princi
 
 ## Prioriteringar
 
-1. **Analysen slår A0 och A1, och blir ett facit.** A2T slår både A0 och A1 enligt domaren på valideringen (2026-11-07). Det som återstår innan den kan föreslås: en kontroll av mätarna som inte gör A2T sämre (A2TK, 2026-11-07, kastade mest verkliga skurtoppar och var något sämre i kvot och FSS; nästa försök är smalare), sedan kartmåttet per timme och mängden i terrängen som taket tar bort, och därefter A2T som avstängt val i `src/`. A1:s underskott på lovartsidan visade sig vara utjämning av toppar, inte förlust av regn. Filtret F4 mot fast klotter (bland annat vindkraftsparker) är godkänt mot A0. A2 behövs också som facit i verifieringen, eftersom radarn bara ser en liten del av de våta mätartimmarna i november, och kräver då en kontroll av mätarna.
+1. **Analysen slår A0 och A1, och blir ett facit.** A2T slår både A0 och A1 enligt domaren på valideringen (2026-11-07). Nästa steg är A2T som avstängt val i `src/knep/analys/` (samma fält som experimentet, körtiden på Pi:n), så att den kan bli facit och visas när användaren beslutar det. Därefter, som egna avstängda val eller förbättringar: en kontroll per station och dygn mot trasiga mätare (den bredare kontrollen A2TK, 2026-11-07, kastade mest verkliga skurtoppar och läggs ner), kartmåttet per timme och mängden i terrängen som taket tar bort. A1:s underskott på lovartsidan visade sig vara utjämning av toppar, inte förlust av regn. Filtret F4 mot fast klotter (bland annat vindkraftsparker) är godkänt mot A0. A2 behövs också som facit i verifieringen, eftersom radarn bara ser en liten del av de våta mätartimmarna i november, och kräver då en kontroll av mätarna.
 2. **Träningen av modellerna.** Volymkorrektionen `bias-v1`: när underlaget i `/work/cache/bias/` är komplett, kör `knep-bias fit --cv`, granska mot mätarna och skriv en rekommendation om släpp. Sedan platskartan och rörelsefältet, om domaren visar att de håller tillbaka prognosen.
 3. **Prognosen tappar inte extremerna.** Kedjans konservering: `Inflode25` utan överskottet de första 30 minuterna (att klippa toppen, `Topp10`, fälldes av blockmaxet; nästa försök klipper ytan och väljs på 2 km), och närmaste granne efter 3 h (`NarmastRamp3`).
 4. **Prognosen vid de korta ledtiderna.** Varför Tim-KNEP och MET Norge ligger nära eller under persistensen vid +1 h, med A2 som facit när den finns.
@@ -28,6 +28,8 @@ Planeraren läser den här filen före varje uppgift. Användaren äger **Princi
 - F4:s klotterkarta som modellfil (`--klotter`): godkänd av domaren mot A0 men med liten vinst vid mätarna. Rekommendationen är att träna om den på alla 28 träningsdagar och köra testdelen före ett släpp. (2026-11-07)
 
 ## Ändringar
+
+- 2026-11-07 10:15: planeraren efter uppgift 0002: A2T flyttas till `src/` före kontrollen av mätarna i stället för efter. A2T är redan bedömd och behöver ingen kontroll för att bli ett avstängt val; en bredare kontroll per period ger inte mer (A2TK och `QC_BARA_TORRA`), och valideringen är sedd tre gånger för A2-familjen, så nästa ändring av A2T bör vänta och bedömas en gång. Kontrollen per station och dygn står kvar som ett eget val.
 
 - 2026-11-07 10:10: efter uppgift 0002: kontrollen av mätarna (A2TK) slår A1 och A0 men är något sämre än A2T i summakvoten och FSS, eftersom den mest kastar verkliga skurtoppar. A2T står kvar som utgångspunkt; en smalare kontroll (för våt bara mot helt torr radar, och per station och dygn) står i `IDEER.md`. Mål 1 och ordningen är oförändrade.
 
