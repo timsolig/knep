@@ -8,7 +8,7 @@ Planeraren läser den här filen före varje uppgift. Användaren äger **Princi
 
 - Tim-KNEP bygger bara på observationer: radar, regnmätare och satellit. Ingen vädermodell i analysen eller prognosen; MEPS och SNOW finns bara som jämförelse. Kedjan går till 5 h.
 - Domaren avgör, på valideringen, med intervall. Testdelen rörs aldrig.
-- Inget släpps i drift utan användaren. Bakgrunden föreslår, användaren beslutar.
+- Inget släpps i drift utan användaren. Bakgrunden föreslår, användaren beslutar. Undantag (användaren 2026-11-07): det som rätt domare på valideringen visar är en statistiskt säkerställd förbättring (intervallet helt på den bättre sidan, ingen spärr sämre) slår Claude ihop och slår på i drift utan att fråga. Skriv därför i rapporten tydligt om det uppfyller det, i en rad `Säkerställd förbättring: ja` eller `nej`. Modellsläpp kräver fortfarande testdelen och användaren.
 
 ## Användarens beslut 2026-11-07
 
@@ -19,6 +19,7 @@ Svaren på frågorna nedan. De går före prioriteringarna; planeraren tar dem s
 3. **Analysens domare:** ja, komplettera summakvoten med kvoten för perioder då mätaren har regn, och kör om baslinjerna (A0, A1, A2T, F4). Den gamla kvoten redovisas kvar bredvid, så att tidigare rapporter går att jämföra.
 4. **F4:s klotterkarta som modellfil:** ja. Träna om på alla 28 träningsdagar, och kör sedan testdelen (punkt 5). Själva släppet (`deploy/release_model.sh` och låsningen) gör Claude i en PR mot `main` efter testdelen.
 5. **Testdelen:** ja, **en gång**, för baslinjerna A0, A1 och kedjan, F4 (omtränad) och A2T, med kommandona i `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md`. Det här är ett undantag från principen om testdelen, bara för de här systemen och bara den här gången; inget får väljas eller ändras efter att testdelen är sedd. Resultatet går i en egen rapport.
+6. **Glappet nordväst om Riksgränsen, snart (beslutat 2026-11-07 22:10):** går direkt efter punkt 3 (uppgift 0009), före F4:s omträning och testdelen, så att testdelen körs på den rättade A0. SMHI:s komposit säger 0,0 mm/h i en båge 140 till 230 km nordväst om Kiruna där OPERA har regn, och `composite.layer` lägger bara in OPERA där SMHI är NaN; detaljerna och förslaget står först i `IDEER.md`. Rättningen blir ett val i A0 som är av som standard; att slå på det i drift beslutar användaren efter domaren.
 
 ## Prioriteringar
 
@@ -31,7 +32,8 @@ Svaren på frågorna nedan. De går före prioriteringarna; planeraren tar dem s
 
 ## Frågor till användaren
 
-- EUMETSAT: realtidslicensen verkar godkänd, men den allmänna licensen saknas fortfarande (2026-11-06). Arkivet går inte att hämta förrän den är godkänd.
+- EUMETSAT, provat 2026-11-07 22:00: **molnmasken går att hämta nu**, både färsk och arkiv: FCI Cloud Mask `EO:EUM:DAT:0678` (netCDF, från 2025-01-27) och `0800` (GRIB2, cirka 3,6 MB per bild, från 2025-01-24), FCI Cloud Type `0680`, och SEVIRI:s molnmask `EO:EUM:DAT:MSG:CLM` (GRIB, cirka 0,6 MB per bild, från 2004, täcker alla träningsdagar). Bara FCI Level 1c (`0662`, `0665`) nekas med "GeneralLicense required"; den behövs inte för molnmasken. Användaren fixar den allmänna licensen 2026-11-08. Nedladdningen kräver att produktens id url-kodas i `.../download/1.0.0/collections/<samling>/products/<id>`. Mål 5 är alltså inte blockerat längre.
+- Besvarat 2026-11-07 22:00: användaren har sett fliken Analys med A0, A1 och A2 i mobilen och tycker att den ser bra ut (det var där glappet vid Riksgränsen upptäcktes). Valet Mot A2T på fliken Verifiering är inte sett än.
 - Sidan med A2 (uppgift 0007) har inte kunnat ritas i en webbläsare på Pi:n. Nu när `--a2` är på i drift: se gärna på fliken Analys i 5 min, 15 min och 1 h och på förklaringen (`INTRO` 5) och säg till om något ser fel ut. (2026-11-07 20:40) Detsamma gäller valet Mot A2T på fliken Verifiering och `INTRO` 6 från uppgift 0008, som syns cirka 7,5 h efter att grenen är ihopslagen; provdata finns i `/data/verif_prov/2020-07-24/out`. (2026-11-07 21:04)
 - Frågorna nedan är besvarade (Användarens beslut 2026-11-07 ovan) och står kvar bara som underlag; planeraren stryker dem när besluten är genomförda.
 - Analysens domare: summakvoten belönar för höga toppar vid enstaka mätare så länge radarn i stort är för torr (det fällde F1 och gav A1 dess "underskott" på lovartsidan). Ska den kompletteras, till exempel med kvoten för perioder då mätaren har regn, och baslinjerna köras om? Bakgrunden ändrar inte domaren utan ditt beslut. (2026-11-07)
