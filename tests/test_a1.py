@@ -51,6 +51,49 @@ def test_saknade_data():
     assert np.isfinite(m[:, 20:]).all() and (m >= 0)[np.isfinite(m)].all()
 
 
+def test_stay_standard_av_och_stillastaende_regn_ligger_kvar():
+    """Valet stay: av (None) är exakt som förut; en stillastående topp smetas ut utan det men inte med."""
+    f = _blob(60, r=1.5)
+    mot = _motion(6.0)
+    old = a1.interval_mean(f, f, mot)
+    assert np.array_equal(old, a1.interpolate(f, f, a1.paths(mot), None))
+    assert old.max() < 0.8 * f.max()  # utan valet: toppen sjunker när rörelsen säger att allt flyttar sig
+    kept = a1.interval_mean(f, f, mot, stay=1.0)
+    assert np.allclose(kept, f, atol=1e-5)  # hela den gemensamma delen står still
+
+
+def test_stay_cell_som_flyttar_sig_flyttas_som_forut():
+    """En liten cell som flyttar sig långt har ingen gemensam del: stay ändrar nästan inget."""
+    v = 12.0
+    f0, f1 = _blob(30), _blob(30 + v)
+    a = a1.interval_mean(f0, f1, _motion(v))
+    b = a1.interval_mean(f0, f1, _motion(v), stay=1.0)
+    assert np.abs(a - b).max() < 0.03 * a.max()  # bara svansarna överlappar
+    # NaN och täckningen som förut
+    f0[:, :20] = np.nan
+    c = a1.interval_mean(f0, f1, _motion(v), stay=1.0)
+    assert np.array_equal(np.isnan(c), np.isnan(a1.interval_mean(f0, f1, _motion(v))))
+
+
+def test_stay_fraction_bara_uppfor():
+    terr = np.tile(np.arange(W, dtype=np.float32) * 10.0, (H, 1))  # 10 m per pixel österut
+    up = a1.stay_fraction(_motion(1.0), terr, 1.0)
+    down = a1.stay_fraction(_motion(-1.0), terr, 1.0)
+    assert np.allclose(up[:, 10:-10], 1 - np.exp(-10.0), atol=1e-4)
+    assert np.allclose(down, 0.0)
+
+
+def test_still_fraction_skiljer_stilla_fran_rorligt():
+    """Regn som står still trots rörelsefältet får andelen 1, en cell som flyttar sig med rörelsen 0."""
+    mot = _motion(6.0)
+    f = _blob(60, r=2.0)
+    s = a1.still_fraction(f, f, mot)
+    assert s[20, 60] > 0.95
+    g0, g1 = _blob(60, r=2.0), _blob(66, r=2.0)
+    assert a1.still_fraction(g0, g1, mot)[20, 55:75].max() < 0.05
+    assert np.allclose(a1.still_fraction(np.zeros((H, W)), np.zeros((H, W)), mot), 0.0)
+
+
 def test_update_sparar_hoppar_over_och_rensar(tmp_path):
     t = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
     step = timedelta(minutes=5)

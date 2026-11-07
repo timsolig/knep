@@ -1,0 +1,490 @@
+"""A2: analysen rättad mot SMHI:s regnmätare (kvart och timme), bedömd med domaren.
+
+    uv run python experiments/analys/a2.py a1falt [--bit 0/2]      # A1:s fält för valideringen, sparas
+    uv run python experiments/analys/a2.py punkter [--bit 0/2]     # radarn vid mätarna, träningsdagarna
+    uv run python experiments/analys/a2.py trana                   # välj parametrarna på träningsdagarna
+    uv run python experiments/analys/a2.py kor [--bit 0/2]         # A2 genom domaren på valideringen
+    uv run python experiments/analys/a2.py tid                     # tiden för en timme på hela rutnätet
+
+Metoden, för varje period (timme eller kvart) med de mätare systemet får se:
+
+1. Rättning i stor skala: en jämn kvot k(x) = (Σ w·g + α) / (Σ w·a + α) över mätarpar
+   (mätare g, A1 a i mätarens ruta) från de senaste WIN timmarna fram till och med perioden, med
+   Gaussvikter w med längdskalan L_STOR. α (mm) krymper kvoten mot 1 där mätarna är få eller torra.
+   Kvoten klipps till [1/4, 4]. Bakgrunden är b = sqrt(k·A1).
+2. Optimal interpolation av återstoden i kvadratrotsskala: innovationerna d = sqrt(g) − b vid
+   mätarna, bakgrundens fel σ_b(x)² = SB²·(1 + C·(avstånd till närmaste radar / 100 km)²) med
+   korrelationen exp(−r/L), mätarnas fel SO². Tillskottet räknas på vart 4:e ruta och interpoleras
+   upp; A2 = max(b + Δ, 0)².
+3. Torrmask: där A1 är under TORR (mm per period) och alla mätare inom R_TORR km som systemet ser
+   är torra (minst en) sätts A2 till 0. Regn tas alltså bara bort där både radarn och mätarna säger
+   torrt.
+
+Parametrarna väljs på träningsdagarna (experiments/projektion/traning.json) med samma
+korsvalidering som domaren, men på punkterna och med A0 utan utfyllnad som bakgrund i stället för A1
+(A1 kostar cirka 10 minuter per dag). Valideringen bedöms med domaren mot A0 och A1. Testdelen läses
+aldrig (domare.days kontrollerar det).
+"""
+
+from __future__ import annotations
+
+import argparse
+import gc
+import json
+import sys
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+
+import numpy as np
+from scipy.ndimage import distance_transform_edt
+from scipy.spatial import cKDTree
+from scipy.spatial.distance import cdist
+
+HERE = Path(__file__).resolve().parent
+
+
+def _load_domare():
+    """Analysens domare via sökvägen och under ett eget namn (andra domare.py finns i experimenten)."""
+    import importlib.util
+    name = "analys_domare"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, HERE / "domare.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules[name]
+
+
+D = _load_domare()
+
+OUT = Path("/data/analys/a2")
+STEP = 4  # tillskottet räknas på var 4:e ruta
+
+# frysta efter träningen (se trana); ändra inte efter att valideringen har körts
+# timmen: koordinatsökningen i trana (28 träningsdagar). Kvarten: stora skalan från timmen, L, SB, SO och
+# R_TORR valda i trana --res kvart (försök 2); sökningen behöll startvärdena (timmens SB och SO gånger
+# 0,5 och timmens R_TORR), eftersom inget annat värde sänkte målet med mer än 1e-5.
+PARAMS = {
+    "timme": {"L_STOR": 75.0, "ALFA": 8.0, "WIN": 6, "L": 40.0, "SB": 1.6, "C": 1.0, "SO": 0.3,
+              "TORR": 0.05, "R_TORR": 80.0},
+    "kvart": {"L_STOR": 75.0, "ALFA": 8.0, "WIN": 6, "L": 40.0, "SB": 0.8, "C": 1.0, "SO": 0.15,
+              "TORR": 0.0125, "R_TORR": 80.0},
+}
+KMAX = 4.0
+
+
+# ---------------------------------------------------------------- geometri
+
+def radar_range_km(grid) -> np.ndarray:
+    """Avståndet till närmaste radar i knep.analys.composite.RADARS, km per ruta."""
+    from pyproj import Transformer
+    from knep.analys.composite import RADARS
+    tr = Transformer.from_crs("EPSG:4326", grid.crs, always_xy=True)
+    h, w = grid.shape
+    rr, cc = np.mgrid[0:h, 0:w]
+    x, y = grid.transform * (cc + 0.5, rr + 0.5)
+    best = np.full((h, w), np.inf, np.float32)
+    for lat, lon, _, _ in RADARS.values():
+        x0, y0 = tr.transform(lon, lat)
+        best = np.minimum(best, (np.hypot(x - x0, y - y0) / 1000.0).astype(np.float32))
+    return best
+
+
+def fold_dist(shape) -> np.ndarray:
+    """(FOLDS, H, W): avståndet i km till grupp k (0 inne i gruppen)."""
+    f = D.fold_map(shape)
+    return np.stack([distance_transform_edt(f != k) * D.RES_KM for k in range(D.FOLDS)]).astype(np.float32)
+
+
+# ---------------------------------------------------------------- själva analysen
+
+def stor_kvot(xy_t, xy_g, g, a, p) -> np.ndarray:
+    """Kvoten i stor skala i punkterna xy_t (km) ur paren (g mätare, a radar) i xy_g."""
+    ok = np.isfinite(g) & np.isfinite(a)
+    if not ok.any():
+        return np.ones(len(xy_t))
+    xy_g, g, a = xy_g[ok], g[ok], a[ok]
+    d2 = cdist(xy_t, xy_g, "sqeuclidean")
+    w = np.exp(-0.5 * d2 / p["L_STOR"] ** 2)
+    k = (w @ g + p["ALFA"]) / (w @ a + p["ALFA"])
+    return np.clip(k, 1.0 / KMAX, KMAX)
+
+
+def oi_vikter(xy_g, sb_g, d, p) -> np.ndarray:
+    """Lös (B + R) v = d för mätarna (B = σ_b σ_b exp(−r/L), R = SO² I)."""
+    r = cdist(xy_g, xy_g)
+    B = sb_g[:, None] * sb_g[None, :] * np.exp(-r / p["L"])
+    B[np.diag_indices_from(B)] += p["SO"] ** 2
+    return np.linalg.solve(B, d)
+
+
+def oi_tillskott(xy_t, sb_t, xy_g, sb_g, v, p) -> np.ndarray:
+    r = cdist(xy_t, xy_g).astype(np.float32)
+    k = np.exp(r * np.float32(-1.0 / p["L"]))
+    return sb_t * (k @ (sb_g * v).astype(np.float32))
+
+
+def sigma_b(rng_km, p):
+    return p["SB"] * np.sqrt(1.0 + p["C"] * (rng_km / 100.0) ** 2)
+
+
+def analys_punkter(t_bg, t_xy, t_rng, ratio_t, g_xy, g_mm, g_bg, g_rng, ratio_g, g_wet_tree, p,
+                   torrmask=True):
+    """A2 i målpunkterna för en period.
+
+    t_bg: A1 i målpunkterna (mm per period); g_*: periodens mätare som systemet ser;
+    ratio_t, ratio_g: kvoten i stor skala i målen och vid mätarna."""
+    out = ratio_t * t_bg
+    ok_g = np.isfinite(g_bg) & np.isfinite(g_mm)
+    if ok_g.sum() >= 1:
+        bg_g = np.sqrt(np.maximum(ratio_g[ok_g] * g_bg[ok_g], 0))
+        d = np.sqrt(g_mm[ok_g]) - bg_g
+        sbg = sigma_b(g_rng[ok_g], p)
+        v = oi_vikter(g_xy[ok_g], sbg, d, p)
+        inc = oi_tillskott(t_xy, sigma_b(t_rng, p), g_xy[ok_g], sbg, v, p)
+        out = np.maximum(np.sqrt(np.maximum(out, 0)) + inc, 0) ** 2
+    if torrmask and len(g_mm):
+        tree = cKDTree(g_xy)
+        nb = tree.query_ball_point(t_xy, p["R_TORR"])
+        wet = g_mm > 0
+        dry_g = np.array([len(n) > 0 and not wet[n].any() for n in nb], bool)
+        out = np.where(dry_g & (t_bg < p["TORR"]), 0.0, out)
+    return np.where(np.isfinite(t_bg), out, np.nan)
+
+
+# ---------------------------------------------------------------- A1:s fält för valideringen
+
+def a1_path(day_s):
+    return OUT / "a1falt" / f"{day_s}.npz"
+
+
+def cmd_a1falt(a):
+    i, n = (int(x) for x in a.bit.split("/"))
+    for day_s in D.days("validering")[i::n]:
+        p = a1_path(day_s)
+        if p.exists():
+            continue
+        t = time.time()
+        rd = D.Radardag(day_s)
+        kv, tm = D.A1(rd).falt(None, None)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(p, kvart=kv.astype(np.float16), timme=tm.astype(np.float16))
+        print(day_s, "A1", f"{time.time() - t:.0f} s", flush=True)
+        del rd, kv, tm
+        gc.collect()
+
+
+# ---------------------------------------------------------------- punkterna på träningsdagarna
+
+def cmd_punkter(a):
+    from knep.analys import radar
+    i, n = (int(x) for x in a.bit.split("/"))
+    rng = None
+    for day_s in D.days("traning")[i::n]:
+        p = OUT / "punkter" / f"{day_s}.npz"
+        if p.exists():
+            continue
+        t = time.time()
+        day = datetime.fromisoformat(day_s).replace(tzinfo=UTC)
+        frames, grid = [], None
+        for k in range(1, 289):
+            f = D.frame_path(day + k * radar.STEP)
+            if f.exists():
+                r, g = radar.read_rain(f)
+                grid = grid or g
+                frames.append(r)
+            else:
+                frames.append(None)
+        shp = grid.shape
+        iv = np.stack([f if f is not None else np.full(shp, np.nan, np.float32) for f in frames])
+        del frames
+        kv, tm = D.sums(iv)
+        del iv
+        if rng is None:
+            rng = radar_range_km(grid)
+        out = {}
+        for res, F in (("kvart", kv), ("timme", tm)):
+            m = D.load_gauges(day_s, res, grid)
+            out.update({f"{res}_{k}": getattr(m, k) for k in ("station", "r", "c", "t", "mm")})
+            out[f"{res}_a"] = F[m.t, m.r, m.c]
+            out[f"{res}_rng"] = rng[m.r, m.c]
+        out["shape"] = np.array(shp)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(p, **out)
+        print(day_s, "punkter", f"{time.time() - t:.0f} s", len(out["timme_mm"]), flush=True)
+        del kv, tm
+        gc.collect()
+
+
+# ---------------------------------------------------------------- träningen på punkterna
+
+class Punktdag:
+    """Mätarna och radarn i mätarnas rutor för en träningsdag, med grupperna som i domaren."""
+
+    def __init__(self, path: Path):
+        z = np.load(path)
+        shape = tuple(int(x) for x in z["shape"])
+        folds = D.fold_map(shape)
+        fd = fold_dist(shape)
+        self.res = {}
+        for res in ("kvart", "timme"):
+            r, c = z[f"{res}_r"], z[f"{res}_c"]
+            self.res[res] = dict(
+                t=z[f"{res}_t"], mm=z[f"{res}_mm"].astype(float), a=z[f"{res}_a"].astype(float),
+                rng=z[f"{res}_rng"].astype(float), xy=np.c_[c, r].astype(float) * D.RES_KM,
+                fold=folds[r, c], dist=fd[:, r, c])
+
+
+def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True):
+    """A2 i varje mätare i gruppen k ur mätarna som syns när grupp k bedöms. Ger (g, a, a2)."""
+    H, Q = pd.res["timme"], pd.res[res]
+    G, A, P = [], [], []
+    nper = D.NPER[res]
+    for k in range(D.FOLDS):
+        seen_h = H["dist"][k] > D.BUFFER_KM
+        seen_q = Q["dist"][k] > D.BUFFER_KM
+        for t in range(nper):
+            hour = t if res == "timme" else t // 4
+            tgt = (Q["t"] == t) & (Q["fold"] == k) & np.isfinite(Q["a"])
+            if not tgt.any():
+                continue
+            win = seen_h & (H["t"] <= hour) & (H["t"] > hour - p["WIN"])
+            gs = seen_q & (Q["t"] == t)
+            rt = stor_kvot(Q["xy"][tgt], H["xy"][win], H["mm"][win], H["a"][win], p)
+            rg = stor_kvot(Q["xy"][gs], H["xy"][win], H["mm"][win], H["a"][win], p)
+            a2 = analys_punkter(Q["a"][tgt], Q["xy"][tgt], Q["rng"][tgt], rt, Q["xy"][gs], Q["mm"][gs],
+                                Q["a"][gs], Q["rng"][gs], rg, None, p, torrmask)
+            G.append(Q["mm"][tgt]); A.append(Q["a"][tgt]); P.append(a2)
+    return np.concatenate(G), np.concatenate(A), np.concatenate(P)
+
+
+def _score(g, a):
+    ok = np.isfinite(a)
+    g, a = g[ok], a[ok]
+    out = {"MAE": float(np.abs(a - g).mean()), "kvot": float(a.sum() / g.sum()),
+           "rmse_sqrt": float(np.sqrt(((np.sqrt(a) - np.sqrt(g)) ** 2).mean()))}
+    for thr in (0.5, 1.0, 5.0):
+        fa, ob = a >= thr, g >= thr
+        out[f"CSI{thr:g}"] = float((fa & ob).sum() / max(1, (fa | ob).sum()))
+    return out
+
+
+def score_params(pdays, res, p, torrmask=True):
+    G, A, P = [], [], []
+    for pd in pdays:
+        g, a, a2 = _predict_day(pd, res, p, torrmask)
+        G.append(g); A.append(a); P.append(a2)
+    g, a, a2 = np.concatenate(G), np.concatenate(A), np.concatenate(P)
+    thr = D.ECHO[res]
+    s2, s0 = _score(g, a2), _score(g, a)
+    s2["falskt"] = float((a2[g == 0] > thr).mean())
+    s0["falskt"] = float((a[g == 0] > thr).mean())
+    return s2, s0
+
+
+GRID = {
+    "L_STOR": [75.0, 150.0, 300.0],
+    "ALFA": [0.5, 2.0, 8.0],
+    "WIN": [1, 3, 6],
+    "L": [10.0, 20.0, 40.0, 80.0],
+    "SB": None,  # skalas per upplösning nedan
+    "C": [0.0, 1.0, 4.0],
+    "SO": None,
+    "R_TORR": [20.0, 40.0, 80.0],
+}
+
+
+def _objective(s):
+    # MAE är huvudmåttet; avståndet från kvoten 1 straffas så att en torr rättning inte vinner på MAE
+    return s["MAE"] * (1.0 + 0.5 * abs(np.log(s["kvot"])))
+
+
+def cmd_trana(a):
+    files = sorted((OUT / "punkter").glob("*.npz"))
+    tr = set(D.days("traning"))
+    files = [f for f in files if f.stem in tr]
+    if a.dagar:
+        files = files[: a.dagar]
+    pdays = [Punktdag(f) for f in files]
+    print(len(pdays), "träningsdagar", flush=True)
+    path = OUT / "trana.json"
+    result = json.loads(path.read_text()) if path.exists() else {}
+    for res in a.res:
+        p = dict(PARAMS[res])
+        keys = ("L", "SB", "SO", "L_STOR", "ALFA", "WIN", "C", "R_TORR")
+        if res == "kvart":
+            # kvarten tar stora skalans val från timmen (samma timmätare) och väljer bara sina egna fel
+            keys = ("L", "SB", "SO", "R_TORR")
+            if "timme" in result:
+                p.update({k: result["timme"]["params"][k] for k in ("L_STOR", "ALFA", "WIN", "C")})
+        sc = 1.0 if res == "timme" else 0.5
+        grid = dict(GRID, SB=[0.2 * sc, 0.4 * sc, 0.8 * sc, 1.6 * sc], SO=[0.1 * sc, 0.3 * sc, 0.6 * sc])
+        s2, s0 = score_params(pdays, res, p)
+        best = _objective(s2)
+        log = [{"p": dict(p), "s": s2}]
+        print(res, "A0:", json.dumps(s0), flush=True)
+        print(res, "start:", json.dumps(s2), flush=True)
+        for sweep in range(1):
+            changed = False
+            for key in keys:
+                for v in grid[key]:
+                    if v == p[key]:
+                        continue
+                    q = dict(p, **{key: v})
+                    s = score_params(pdays, res, q)[0]
+                    log.append({"p": q, "s": s})
+                    o = _objective(s)
+                    if o < best - 1e-5:
+                        best, p, changed = o, q, True
+                        print(res, "bättre", key, v, json.dumps(s), flush=True)
+            if not changed:
+                break
+        s2, _ = score_params(pdays, res, p)
+        s_nomask, _ = score_params(pdays, res, p, torrmask=False)
+        p1 = dict(p, ALFA=1e9)  # utan rättningen i stor skala (kvoten 1)
+        s_nostor, _ = score_params(pdays, res, p1)
+        result[res] = {"params": p, "A2": s2, "A0": s0, "utan_torrmask": s_nomask, "utan_stor_skala": s_nostor,
+                       "logg": log}
+        print(res, "valt:", json.dumps(p), json.dumps(s2), flush=True)
+        path.write_text(json.dumps(result, indent=1, ensure_ascii=False))
+
+
+# ---------------------------------------------------------------- A2 på hela rutnätet
+
+def _up(coarse: np.ndarray, shape, step: int = STEP) -> np.ndarray:
+    """Bilinjärt från rutorna 0, step, 2·step, ... till hela rutnätet."""
+    import cv2
+    h, w = shape
+    mx, my = np.meshgrid(np.arange(w, dtype=np.float32) / step, np.arange(h, dtype=np.float32) / step)
+    return cv2.remap(np.ascontiguousarray(coarse, dtype=np.float32), mx, my, cv2.INTER_LINEAR,
+                     borderMode=cv2.BORDER_REPLICATE)
+
+
+class A2:
+    """A1 rättad mot mätarna: kvot i stor skala, optimal interpolation i kvadratrotsskala, torrmask."""
+
+    namn = "A2"
+    matare = True
+
+    def __init__(self, kvart1: np.ndarray, timme1: np.ndarray, rng_km: np.ndarray, params=None):
+        self.kv1, self.tm1 = kvart1, timme1
+        self.shape = timme1.shape[1:]
+        self.params = params or PARAMS
+        self.rng_full = rng_km
+        h, w = self.shape
+        rr, cc = np.mgrid[0:h:STEP, 0:w:STEP]
+        self.cshape = rr.shape
+        self.cxy = np.c_[cc.ravel(), rr.ravel()].astype(float) * D.RES_KM
+        self.crng = rng_km[::STEP, ::STEP].ravel().astype(float)
+        rr, cc = np.mgrid[0:h:4 * STEP, 0:w:4 * STEP]  # kvoten i stor skala på ett glesare rutnät
+        self.kshape = rr.shape
+        self.kxy = np.c_[cc.ravel(), rr.ravel()].astype(float) * D.RES_KM
+
+    def _period(self, F1, m: D.Matare, sel, ratio_c, ratio_g, p):
+        """A2 på hela rutnätet för en period: F1 A1 (H, W), m.subset(sel) periodens mätare."""
+        g = m.subset(sel)
+        xy = np.c_[g.c, g.r].astype(float) * D.RES_KM
+        a = F1[g.r, g.c].astype(float)
+        out = np.maximum(_up(ratio_c, self.shape, 4 * STEP) * np.nan_to_num(F1, nan=0.0), 0.0)
+        ok = np.isfinite(a)
+        if ok.any():
+            bg = np.sqrt(np.maximum(ratio_g[ok] * a[ok], 0.0))
+            d = np.sqrt(g.mm[ok]) - bg
+            sbg = sigma_b(self.rng_full[g.r[ok], g.c[ok]].astype(float), p)
+            v = oi_vikter(xy[ok], sbg, d, p)
+            inc = oi_tillskott(self.cxy, sigma_b(self.crng, p), xy[ok], sbg, v, p).reshape(self.cshape)
+            out = np.maximum(np.sqrt(out) + _up(inc, self.shape), 0.0) ** 2
+        if len(g):
+            # torrmasken på det glesa rutnätet (närmaste mätare och närmaste våta mätare), upp med närmaste
+            d_any = cKDTree(xy).query(self.cxy, distance_upper_bound=p["R_TORR"] + 1)[0]
+            wet = g.mm > 0
+            d_wet = cKDTree(xy[wet]).query(self.cxy, distance_upper_bound=p["R_TORR"] + 1)[0] if wet.any() \
+                else np.full(len(self.cxy), np.inf)
+            dry_c = ((d_any <= p["R_TORR"]) & (d_wet > p["R_TORR"])).reshape(self.cshape)
+            h, w = self.shape
+            dry = np.repeat(np.repeat(dry_c, STEP, 0), STEP, 1)[:h, :w]
+            dry &= np.nan_to_num(F1, nan=0.0) < p["TORR"]
+            out[dry] = 0.0
+        return np.where(np.isfinite(F1), out, np.nan).astype(np.float32)
+
+    def falt(self, dag, matare, hours=range(24)):
+        mq, mh = matare
+        kv = np.full(self.kv1.shape, np.nan, np.float32)
+        tm = np.full(self.tm1.shape, np.nan, np.float32)
+        a_h = self.tm1[mh.t, mh.r, mh.c].astype(float)
+        xy_h = np.c_[mh.c, mh.r].astype(float) * D.RES_KM
+        for hour in hours:
+            for res in ("timme", "kvart"):
+                p = self.params[res]
+                win = (mh.t <= hour) & (mh.t > hour - p["WIN"])
+                ratio_c = stor_kvot(self.kxy, xy_h[win], mh.mm[win], a_h[win], p).reshape(self.kshape)
+                m = mh if res == "timme" else mq
+                periods = [hour] if res == "timme" else range(4 * hour, 4 * hour + 4)
+                F = self.tm1 if res == "timme" else self.kv1
+                for t in periods:
+                    sel = m.t == t
+                    xy = np.c_[m.c[sel], m.r[sel]].astype(float) * D.RES_KM
+                    ratio_g = stor_kvot(xy, xy_h[win], mh.mm[win], a_h[win], p)
+                    (tm if res == "timme" else kv)[t] = self._period(F[t].astype(np.float32), m, sel, ratio_c, ratio_g, p)
+        return kv, tm
+
+
+def _load_val(day_s):
+    rd = D.Radardag(day_s)
+    dag = D.build_dag(day_s, rd)
+    grid = rd.grid
+    del rd
+    gc.collect()
+    z = np.load(a1_path(day_s))
+    return dag, grid, z["kvart"].astype(np.float32), z["timme"].astype(np.float32)
+
+
+def make_a2(kv1, tm1, grid, params=None):
+    return A2(kv1, tm1, radar_range_km(grid), params)
+
+
+def cmd_kor(a):
+    i, n = (int(x) for x in a.bit.split("/"))
+    todo = [a.dag] if a.dag else D.days("validering")[i::n]
+    for day_s in todo:
+        assert day_s in D.days("validering")
+        target = D.OUT / "A2" / f"{day_s}.json"
+        if target.exists() or not a1_path(day_s).exists():
+            continue
+        t = time.time()
+        dag, grid, kv1, tm1 = _load_val(day_s)
+        t1 = time.time()
+        res = D.evaluate(make_a2(kv1, tm1, grid), dag)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(res))
+        print(day_s, "A2", f"läst {t1 - t:.0f} s, A2 och domaren {time.time() - t1:.0f} s", flush=True)
+        del dag, kv1, tm1
+        gc.collect()
+
+
+def cmd_tid(a):
+    day_s = a.dag or "2023-08-08"
+    dag, grid, kv1, tm1 = _load_val(day_s)
+    s = make_a2(kv1, tm1, grid)
+    hour = 14
+    t = time.time()
+    s.falt(dag, (dag.kvart, dag.timme), hours=[hour])
+    dt = time.time() - t
+    print(f"{day_s} timme {hour}: en timme och dess fyra kvartar på hela rutnätet {dt:.2f} s "
+          f"({len(dag.timme.t[dag.timme.t == hour])} timmätare, {(dag.kvart.t // 4 == hour).sum()} kvartsvärden)")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("cmd", choices=["a1falt", "punkter", "trana", "kor", "tid"])
+    ap.add_argument("--bit", default="0/1")
+    ap.add_argument("--dag")
+    ap.add_argument("--res", nargs="+", default=["timme", "kvart"])
+    ap.add_argument("--dagar", type=int, default=0, help="trana: bara de första dagarna (provkörning)")
+    a = ap.parse_args()
+    {"a1falt": cmd_a1falt, "punkter": cmd_punkter, "trana": cmd_trana, "kor": cmd_kor, "tid": cmd_tid}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    main()

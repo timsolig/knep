@@ -1,0 +1,42 @@
+===== 2026-11-06T16:48:49Z försök 1 =====
+Baslinjerna går i två bakgrundsprocesser (cirka 12 min per dag och process, klara runt 18:35). Jag väntar på att de blir klara och skriver sedan tabellen och domen i rapporten.
+
+Den första halvan går igen med rättningen. Den andra processen kör fortfarande den gamla koden; jag väntar på besked från processerna.
+
+Båda halvorna går nu med rättningen. Jag väntar på att de blir klara.
+
+Jag väntar på att den sista processen blir klar.
+
+Domaren är klar, och A0 och A1 är körda på alla 16 valideringsdagar. Enligt domen är A1 **inte bättre** än A0: den är bättre per kvart och per timme, men ger mindre regn på lovartsidan, och det fäller den. `uv run pytest` ger 150 godkända, och allt är committat på `natt/2026-11-06`. Rapporten ligger i `experiments/natt/rapporter/2026-11-06/2-domare.md` och slutar med `Status: klar`.
+
+**Domaren** (`experiments/analys/domare.py`, 12 tester i `tests/test_analys_domare.py`):
+- Ett system är en klass med `falt(dag, matare)` som ger kvarts- och timfälten i mm på radarns rutnät.
+- Korsvalideringen delar rutnätet i block om 100 km som går till 5 grupper. Två block som gränsar till varandra hör aldrig till samma grupp. Ett system som använder mätare får bara mätare utanför gruppen och mer än 25 km från den, och varje grupps rutor tas ur körningen som inte såg gruppen.
+- Måtten följer uppdraget, med 95 %-intervall från bootstrap över dagarna mot baslinjen.
+- p7 och p14 har orimliga mätarvärden (upp till 498 071 mm). Värden över 100 mm per timme och 60 mm per kvart tas därför bort.
+
+**Rättning av domaren under körningen:** två flaggor för "sämre" byggde på händelser från en enda dag, och intervallet blev en punkt (−0,200 till −0,200). Ett mått bedöms nu bara om det har underlag från minst 5 dagar. Regeln gäller alla system lika, och domen redovisas både med och utan den.
+
+**A1 mot A0:**
+
+| | A0 | A1 |
+|---|---|---|
+| CSI 0,5 per kvart | 0,287 | 0,303 |
+| CSI 1 per kvart | 0,179 | 0,196 |
+| Summakvot mot mätarna, timme | 0,890 | 0,889 |
+| Summakvot på lovartsidan, timme | 0,671 | 0,653 |
+
+- **Mängden**: inte sämre. Summakvoten är densamma och MAE lite bättre.
+- **Falska ekon**: inte sämre vid mätarna. A1 har dock i medel 3,9 fler rutor per dag med eko under torra timmar (intervallet går över 0). Interpoleringen smetar troligen ut fast klotter, så klottret bör tas bort ur A0 innan A1 räknas.
+- **Träffen per kvart**: bättre. CSI 0,5, CSI 1 och FSS 0,5 har intervallet helt på den bättre sidan, och vinsten är ungefär dubbelt så stor per kvart som per timme. FSS vid 5 mm blir lite sämre.
+- **Terrängen**: A1 ger 2 till 3 % mindre regn på lovartsidan, med intervallet helt på fel sida. Underskottet kommer mest från Hans (2023-08-08) och 2021-10-20. Det ser ut att vara precis det uppdraget varnar för: interpoleringen flyttar regn som står still vid sluttningen.
+- Radarn ger bara cirka 50 % av mätarnas mängd över 400 m. Där har A2 mest att vinna.
+
+**Begränsningar:**
+- Rörelsefältet räknades var 15:e minut i stället för var 5:e som i drift, för att hinna. A1 här är alltså inte exakt A1 i drift.
+- "Alla mätare inom 25 km torra" skiljer sig knappt från "mätaren torr", eftersom nätet är så glest. Kartmåttet är det som ser klotter utanför mätarna.
+- Träningsdagarna kördes inte. De behövs först när något ska väljas eller tränas.
+- Båda körningarna dödades en gång av minnet när nästa dag lästes. Felet är rättat, och de dagar som redan var klara hoppades över vid omstarten.
+- Underlaget ligger i `/data/analys/domare/` och tar 90 MB.
+
+Testdelen lästes aldrig, och inget i `src/` ändrades.
