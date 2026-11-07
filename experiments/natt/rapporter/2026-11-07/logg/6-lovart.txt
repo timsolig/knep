@@ -1,0 +1,35 @@
+===== 2026-11-07T00:03:59Z försök 1 =====
+You've hit your 5-hour limit · resets 1am (Europe/London)
+
+You've hit your 5-hour limit · resets 1am (Europe/London)
+
+Uppgift 6 är klar som **delvis**. Jag hittade orsaken och rättningen finns som ett val med standardvärdet av, men ingen variant blev godkänd mot A1. Rapporten ligger i `experiments/natt/rapporter/2026-11-07/6-lovart.md` och allt är committat på `natt/2026-11-06`. Inget är pushat och ingen PR är öppnad.
+
+**Var och varför underskottet uppstår.** Jag tittade på 2023-08-08 och 2021-10-20:
+- A1 flyttar inget regn bort från sluttningen. Den totala mängden i lovartzonen och i hela området är densamma som i A0 inom 0,2 %. Jämnar man ut fälten över 4 km är skillnaden vid mätarna borta.
+- Underskottet är att topparna jämnas ut där regnet rör sig fort (4 till 16 km per 5 min). Vid starka toppar i A0 ger A1 12 till 13 % mindre, vid svagt regn lika mycket eller mer.
+- Regnet vid lovartmätarna står oftast inte still. I 71 till 79 % av fallen stämmer bilden 15 min senare bättre när den förra flyttas längs rörelsen än när den står kvar.
+- Underskottet kommer från några få mätare där A0 redan ligger över mätaren. Vid två av de tre största ligger A1 närmare mätaren. Domarens summakvot gynnar då A0, eftersom radarn i stort ger för lite på lovartsidan.
+
+**Rättningen.** I `src/knep/analys/a1.py` finns valet `stay`: den del av regnet som finns på samma plats i båda bilderna ligger kvar och bara resten interpoleras. Utan valet blir resultatet exakt som förut, vilket ett test kontrollerar. Jag provade två varianter: A1M, där den delen ligger kvar överallt, och A1L1, där den ligger kvar efter hur starkt lyftet uppför sluttningen är. Det finns tre nya tester, och `uv run pytest` ger 166 godkända.
+
+**Träningen.** Bara 5 av de 28 träningsdagarna hann bli klara. Två processer dog av minnesbrist eftersom driften själv tar cirka 0,9 GB, så jag körde sedan bara en process åt gången för att inte riskera driften. Ingen variant klarade regeln jag satte innan jag läste resultaten (inget mått sämre mot vare sig A0 eller A1), så ingen frystes.
+
+**Valideringen (16 dagar), A1L1 som information:**
+
+| | summakvot lovart per kvart | domen |
+|---|---|---|
+| A1 mot A0 | −0,020 (sämre) | inte bättre |
+| A1L1 mot A0 | +0,016 (bättre) | bättre, inget mått sämre |
+| A1L1 mot A1 | +0,035 | inte bättre: sämre över 400 m och i falska ekon per kvart på lovartsidan |
+
+A1L1 tar alltså bort underskottet på lovartsidan och blir godkänd mot A0, vilket A1 inte är. Priset är något mindre regn över 400 m och fler falska ekon per kvart på lovartsidan. Valideringen är nu sedd för A1L1, så ett senare val mellan A1 och A1L1 måste göras på alla träningsdagar och avgöras på testdelen.
+
+A2 och filtret kördes inte om, eftersom ingen variant valdes. Filtret verkar dessutom på A0 och påverkas inte av ändringen i A1.
+
+Nästa steg:
+- Kör klart träningen på alla 28 dagar.
+- Pröva att låta regnet ligga kvar bara där det faktiskt står still, mätt som i diagnosen.
+- Ta ställning till om domarens summakvot ska ändras, eftersom den gynnar för höga toppar så länge radarn ger för lite.
+
+`experiments/natt/ko.txt` och `rapporter/2026-11-07/logg/` var ändrade redan innan jag började, och jag har lämnat dem orörda.
