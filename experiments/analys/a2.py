@@ -85,6 +85,13 @@ KMAX = 4.0
 FRYSTA: dict[str, dict] = {
     "A2S": {"K_SVAG": 0.1},
     "A2T": {"K_SVAG": 0.125, "SVAG_TAK": True},
+    # A2T med kontrollen av mätarna i indata (uppgiften a2t-kontroll-matare, 2026-11-07), vald på
+    # träningen (a2.py varianter_qc, ren och med 1 % syntetiska fel) och fryst innan valideringen kördes:
+    # per upplösning lägst mål med de syntetiska felen bland varianterna som inte höjer falskt över 400 m
+    # eller på lovart, har högst 0,5 % högre mål på rena data och kastar högst 2 %. Skyddet över 400 m gav
+    # samma värden som utan; vid lika valdes skyddet.
+    "A2TK": {"K_SVAG": 0.125, "SVAG_TAK": True, "QC_T": 3.0, "QC_R": 50.0, "QC_SKYDD400": True,
+             "timme": {"QC_T": 2.5, "QC_R": 50.0, "QC_SKYDD400": True}},
 }
 
 # kontrollen av mätarna (uppgiften a2t-kontroll-matare): av som standard (QC_T saknas eller 0). Se kontroll().
@@ -701,7 +708,7 @@ def cmd_varianter_qc(a):
     for res in a.res:
         rows = result.get(res, {})
         for namn, ch in VARIANTER_QC[i::n]:
-            if namn in rows:
+            if namn in rows or (a.bara and namn not in a.bara):
                 continue
             t = time.time()
             kast = {}
@@ -1002,6 +1009,7 @@ def main():
                                     "tid", "kontroll", "varianter_qc"])
     ap.add_argument("--qc", nargs=3, default=["4", "50", "1"], help="kontroll: T R skydd400 (1/0)")
     ap.add_argument("--ph", nargs=3, help="varianter_qc: kontrollen av timmätarna i kvarten, T R skydd400")
+    ap.add_argument("--bara", nargs="+", help="varianter_qc: bara de här varianterna")
     ap.add_argument("--syntet", type=float, default=0.0, help="varianter_qc: andel syntetiska fel i indata")
     ap.add_argument("--bit", default="0/1")
     ap.add_argument("--dag")

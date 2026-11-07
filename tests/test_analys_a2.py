@@ -168,6 +168,10 @@ def test_gauge_check_off_by_default_gives_identical_fields():
     for namn in ("A2", "A2S", "A2T"):
         for r in ("kvart", "timme"):
             assert a2.system_params(namn)[r].get("QC_T", 0.0) == 0.0
+    tk, t = a2.system_params("A2TK"), a2.system_params("A2T")
+    assert tk["kvart"]["QC_T"] > 0 and tk["timme"]["QC_T"] > 0
+    assert {k: v for k, v in tk["kvart"].items() if not k.startswith("QC_")} == t["kvart"]
+    assert {k: v for k, v in tk["timme"].items() if not k.startswith("QC_")} == t["timme"]
 
 
 def _ring(n=12, rad=15.0):
