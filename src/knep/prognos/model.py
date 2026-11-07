@@ -201,7 +201,9 @@ class Chain:
                  motion_frames: int = 3, target: str = "advected", motion_step: int = 4,
                  match: bool = True, location: bool = True, interp: str = "linear", sharpen: float = 0.0,
                  blend: float = 1.0, ramp: tuple[float, float] | None = None, inflow: float = 0.0,
-                 stay: tuple[float, float, float, float] | None = None, terrain: np.ndarray | None = None):
+                 stay: tuple[float, float, float, float] | None = None, terrain: np.ndarray | None = None,
+                 loc_top: float = 0.0, loc_rematch: bool = False):
+        self.loc_top, self.loc_rematch = loc_top, loc_rematch  # platskartan och toppen, se located
         self.models = extremes.load(ext_model) if ext_model and Path(ext_model).exists() else None  # dict med models och recal
         self.prob_steps = prob_steps  # räkna sannolikheterna bara för de första stegen (spar tid)
         self.motion_gap, self.motion_frames, self.motion_step = motion_gap, motion_frames, motion_step
@@ -272,6 +274,30 @@ class Chain:
             raw = w[:, None, None] * raw + (1 - w[:, None, None]) * out[-1]
         return raw, tgt
 
+    def located(self, m: np.ndarray, db: np.ndarray, tgt: np.ndarray) -> np.ndarray:
+        """Den matchade bilden m med platskartan (db i dB). Med loc_top > 0 (mm/h) höjer en positiv
+        korrektion inte en ruta över max(m, loc_top), så att de högsta intensiteterna inte förstärks;
+        med loc_rematch klipps de korrigerade rutorna över 1 mm/h rangvis mot målets fördelning (ingen
+        ruta blir högre än målets värde med samma rang), så att platskartan inte gör toppen högre än
+        målet men fortfarande kan dämpa och flytta var de högsta värdena ligger. Båda av i drift."""
+        out = m * 10 ** (db / 10)
+        if self.loc_top > 0:
+            out = np.where(db > 0, np.minimum(out, np.maximum(m, self.loc_top)), out)
+        if self.loc_rematch:
+            ok = np.isfinite(out) & (out >= 1.0)
+            tv = np.isfinite(tgt) & (tgt >= 1.0)
+            if ok.any() and tv.any():
+                n, tvals = int(ok.sum()), np.sort(tgt[tv])
+                # bara toppen: så många rutor som målet har över 1 mm/h, högst lika många som out har
+                k = min(n, tvals.size)
+                order = np.argsort(out[ok], kind="stable")
+                vals = out[ok].copy()
+                idx = order[n - k:]
+                vals[idx] = np.minimum(vals[idx], tvals[tvals.size - k:])
+                out = out.copy()
+                out[ok] = vals
+        return out.astype(np.float32)
+
     def matched(self, raw: np.ndarray, tgt: np.ndarray) -> np.ndarray:
         return cdf_match(raw, tgt, self.sharpen) if self.match else raw
 
@@ -299,7 +325,7 @@ class Chain:
             m = self.matched(raw[k], tgt[k])
             if k == 5:
                 matched30 = m
-            rain[k] = m * 10 ** (corr * min(1.0, (k + 1) / 6) / 10)
+            rain[k] = self.located(m, corr * min(1.0, (k + 1) / 6), tgt[k])
         rain[:, ~np.isfinite(analysis)] = np.nan
         # tillståndet: analysen nu och den matchade 30-minutersprognosen (före platskartan, som i experimenten)
         state.obs[now.isoformat()] = analysis.astype(np.float32)

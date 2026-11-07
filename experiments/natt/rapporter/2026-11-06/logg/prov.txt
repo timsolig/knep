@@ -1,0 +1,8 @@
+Permission deny rule (../knep/.claude/settings.local.json): Bash(git push * main:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and will likely never match. Use Bash(git push * main*) for wildcard matching.
+Alla steg gick som du väntade dig:
+
+1. **Python:** `knep` gick att importera och kommandot skrev `python ok 3.12.16`.
+2. **`df -h /data`:** /data ligger på rotfilsystemet, som har 6,3G ledigt av 29G (78 % använt).
+3. **`git push`:** nekades. Jag försökte inte pusha på något annat sätt.
+4. **`deploy/prov.txt`:** nekades, eftersom katalogen är spärrad. Filen skapades inte.
+5. **Rapporten:** sparad i `experiments/natt/rapporter/2026-11-06/prov.md` med en rad per steg.
