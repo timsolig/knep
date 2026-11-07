@@ -154,6 +154,84 @@ def kontroll(xy, mm, bg, rng_km, over400, p) -> np.ndarray:
     return low | high
 
 
+# ---------------------------------------------------------------- kontrollen per station och dygn
+
+# uppgiften a2-texter-och-stationskontroll (0007): en station kastas för ett helt dygn (både kvart och
+# timme) när den i många perioder säger emot både radarn och grannarna på ett sätt som verkligt regn
+# inte gör. Av som standard (nyckeln QCS saknas eller N är 0). Parametrarna per upplösning:
+#   R, NMIN  grannarna inom R km (utan stationen själv), minst NMIN med värde i perioden
+#   N        antalet perioder under dygnet med ett av felen nedan som kastar stationen
+#   VAT, A_TORR  "våt mot torrt": stationen har minst VAT mm, radarn i stationens ruta högst A_TORR mm
+#            och alla grannar 0 mm
+#   A_VAT, N_VAT "noll mot vått": stationen har 0 mm, radarn minst A_VAT mm och grannarnas median
+#            minst N_VAT mm
+#   SKYDD400 med True räknas "våt mot torrt" aldrig över 400 m (där radarn missar låg nederbörd)
+QCS_STD = {"R": 50.0, "NMIN": 2, "SKYDD400": False,
+           "N": {"kvart": 12, "timme": 4},
+           "VAT": {"kvart": 0.2, "timme": 0.5}, "A_TORR": {"kvart": 0.01, "timme": 0.02},
+           "A_VAT": {"kvart": 0.5, "timme": 2.0}, "N_VAT": {"kvart": 0.3, "timme": 1.0}}
+
+
+def qcs_params(ch: dict | None) -> dict | None:
+    """QCS_STD med ändringarna ch (värden per upplösning som dict eller ett tal för båda)."""
+    if not ch:
+        return None
+    q = {k: (dict(v) if isinstance(v, dict) else v) for k, v in QCS_STD.items()}
+    for k, v in ch.items():
+        if isinstance(q.get(k), dict) and not isinstance(v, dict):
+            q[k] = {"kvart": v, "timme": v}
+        elif isinstance(q.get(k), dict):
+            q[k].update(v)
+        else:
+            q[k] = v
+    return q
+
+
+def stationsfel(station, t, mm, a, xy, over400, q, res) -> tuple[dict, dict]:
+    """Antalet perioder per station med "våt mot torrt" och "noll mot vått" (se QCS_STD) för en
+    upplösning under ett dygn. Ger två dict station -> antal."""
+    torr, noll = {}, {}
+    ok = np.isfinite(mm) & np.isfinite(a)
+    R, nmin = q["R"], q["NMIN"]
+    for tt in np.unique(t[ok]):
+        idx = np.flatnonzero(ok & (t == tt))
+        if len(idx) < nmin + 1:
+            continue
+        g, aa = mm[idx], a[idx]
+        tree = cKDTree(xy[idx])
+        nb = tree.query_ball_point(xy[idx], R)
+        n_nb = np.array([len(x) - 1 for x in nb])
+        mx = np.array([max((g[j] for j in x if j != i), default=np.nan) for i, x in enumerate(nb)])
+        med = np.array([np.median([g[j] for j in x if j != i]) if len(x) > 1 else np.nan
+                        for i, x in enumerate(nb)])
+        enough = n_nb >= nmin
+        f_torr = enough & (g >= q["VAT"][res]) & (aa <= q["A_TORR"][res]) & (mx <= 0)
+        if q.get("SKYDD400", False):
+            f_torr &= ~np.asarray(over400, bool)[idx]
+        f_noll = enough & (g <= 0) & (aa >= q["A_VAT"][res]) & (med >= q["N_VAT"][res])
+        for s in station[idx[f_torr]]:
+            torr[int(s)] = torr.get(int(s), 0) + 1
+        for s in station[idx[f_noll]]:
+            noll[int(s)] = noll.get(int(s), 0) + 1
+    return torr, noll
+
+
+def stationsdygn(rader: dict, q) -> set[int]:
+    """Stationerna som kastas för dygnet. rader: upplösning -> dict med station, t, mm, a, xy, over400
+    (bara de mätare systemet ser). En station kastas om den har minst N perioder av något av felen i
+    någon upplösning."""
+    if not q:
+        return set()
+    out = set()
+    for res, r in rader.items():
+        if q["N"][res] <= 0:
+            continue
+        torr, noll = stationsfel(r["station"], r["t"], r["mm"], r["a"], r["xy"], r["over400"], q, res)
+        out |= {s for s, n in torr.items() if n >= q["N"][res]}
+        out |= {s for s, n in noll.items() if n >= q["N"][res]}
+    return out
+
+
 # ---------------------------------------------------------------- geometri
 
 def radar_range_km(grid) -> np.ndarray:
@@ -412,6 +490,27 @@ def _kontroll_timme(H, seen_h, ph):
     return flag
 
 
+def _rader(pd: Punktdag, res: str, sel=None) -> dict:
+    Q = pd.res[res]
+    sel = np.ones(len(Q["mm"]), bool) if sel is None else sel
+    return {"station": Q["station"][sel], "t": Q["t"][sel], "mm": Q["mm_in"][sel], "a": Q["a"][sel],
+            "xy": Q["xy"][sel], "over400": _over400(Q, sel)}
+
+
+def _stationsdygn_punkter(pd: Punktdag, k, q) -> set[int]:
+    """Kontrollen per station och dygn bland mätarna som syns när grupp k bedöms (k = None: alla)."""
+    key = (k, json.dumps(q, sort_keys=True), id(pd.res["kvart"]["mm_in"]), id(pd.res["timme"]["mm_in"]))
+    cache = pd.__dict__.setdefault("_qcs", {})
+    if key not in cache:
+        rader = {}
+        for res in ("kvart", "timme"):
+            Q = pd.res[res]
+            sel = np.ones(len(Q["mm"]), bool) if k is None else Q["dist"][k] > D.BUFFER_KM
+            rader[res] = _rader(pd, res, sel)
+        cache[key] = stationsdygn(rader, q)
+    return cache[key]
+
+
 def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True, full=False, ph=None, rec=None):
     """A2 i varje mätare i gruppen k ur mätarna som syns när grupp k bedöms. Ger (g, a, a2), och med
     full=True också kvoten k i målen och målens index i pd.res[res].
@@ -423,9 +522,15 @@ def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True, full=False, ph=
         ph = p
     G, A, P, K, I = [], [], [], [], []
     nper = D.NPER[res]
+    qcs = p.get("QCS")
     for k in range(D.FOLDS):
         seen_h = H["dist"][k] > D.BUFFER_KM
         seen_q = Q["dist"][k] > D.BUFFER_KM
+        if qcs:
+            kast = _stationsdygn_punkter(pd, k, qcs)
+            if kast:
+                seen_h = seen_h & ~np.isin(H["station"], list(kast))
+                seen_q = seen_q & ~np.isin(Q["station"], list(kast))
         hflag = _kontroll_timme(H, seen_h, ph)
         if hflag.any():
             seen_h = seen_h & ~hflag
@@ -617,6 +722,143 @@ def syntetiska_fel(pd: Punktdag, frac=0.01, seed=0):
         mm[x5], syn[x5] = 5 * mm[x5], 2
         mm[fast], syn[fast] = SYN_FAST[res], 3
         Q["mm_in"], Q["syn"] = mm, syn
+
+
+SYN_DYGN = {0: "riktig", 1: "fast", 2: "noll", 3: "vat"}
+SYN_FALSK = {"kvart": 0.3, "timme": 1.2}  # falskt regn hos en för våt station (mm per period)
+
+
+def syntetiska_dygn(pd: Punktdag, frac=0.03, seed=0):
+    """Fel som varar ett helt dygn i indata (mm_in) hos cirka frac av dagens stationer, en tredjedel var:
+    fastnar på ett värde (SYN_FAST i varje period), visar noll hela dygnet, eller är för våt (×3 i regn
+    och SYN_FALSK i 30 % av de torra perioderna). Samma station har samma fel i kvart och timme.
+    pd.syn_dygn: station -> typ. Domaren bedömer fortfarande mot mm."""
+    rng = np.random.default_rng([seed, 7, int(datetime.fromisoformat(pd.day).timestamp()) // 86400])
+    st = np.union1d(pd.res["kvart"]["station"], pd.res["timme"]["station"])
+    m = int(round(frac * len(st)))
+    pick = rng.choice(st, size=m, replace=False)
+    typ = {int(s): 1 + i % 3 for i, s in enumerate(pick)}
+    for res in ("kvart", "timme"):
+        Q = pd.res[res]
+        mm = Q["mm"].copy()
+        syn = np.zeros(len(mm), np.int8)
+        for s, ty in typ.items():
+            i = np.flatnonzero(Q["station"] == s)
+            if ty == 1:
+                mm[i] = SYN_FAST[res]
+            elif ty == 2:
+                mm[i] = 0.0
+            else:
+                wet = Q["mm"][i] > 0
+                mm[i[wet]] *= 3.0
+                dry = i[~wet]
+                mm[dry[rng.random(len(dry)) < 0.3]] = SYN_FALSK[res]
+            syn[i] = ty
+        Q["mm_in"], Q["syn"] = mm, syn
+    pd.syn_dygn = typ
+
+
+def _qcs_v(N, Nh, R, skydd, los=False):
+    ch = {"N": {"kvart": N, "timme": Nh}, "R": R, "SKYDD400": skydd}
+    if los:  # "noll mot vått" redan vid svagare regn
+        ch.update({"A_VAT": {"kvart": 0.25, "timme": 1.0}, "N_VAT": {"kvart": 0.2, "timme": 0.5}})
+    return ch
+
+
+# varianterna av kontrollen per station och dygn (namn, ändringar i QCS_STD). Med R = 50 km har mätarna
+# i median bara en granne per kvart (qcs_diag.py), så R är 75 eller 100 km.
+VARIANTER_QCS = [
+    (f"N={N}/{Nh} R={R:g}{' skydd400' if s else ''}{' noll-los' if los else ''}", _qcs_v(N, Nh, R, s, los))
+    for N, Nh in ((8, 3), (12, 4), (24, 6)) for R in (75.0, 100.0) for s in (False, True) for los in (False, True)
+]
+
+
+def cmd_stationer(a):
+    """Kontrollen per station och dygn med alla mätare (som i drift) på träningsdagarna, för alla
+    varianter: kastade stationsdygn på rena data (med listan) och med de syntetiska dygnsfelen
+    (hittade per typ, och bland de skadliga: Σ|fel| över dygnet minst 2 mm i kvartarna)."""
+    pdays = _train_pdays(a)
+    result = {}
+    # rena data
+    for namn, ch in VARIANTER_QCS:
+        q = qcs_params(ch)
+        n_sd, lista = 0, []
+        for pd in pdays:
+            st = np.union1d(pd.res["kvart"]["station"], pd.res["timme"]["station"])
+            n_sd += len(st)
+            kast = _stationsdygn_punkter(pd, None, q)
+            for s in sorted(kast):
+                rad = {"dag": pd.day, "station": s}
+                for res in ("kvart", "timme"):
+                    Q = pd.res[res]
+                    i = Q["station"] == s
+                    rad[res] ={"perioder": int(i.sum()), "summa": float(np.nansum(Q["mm"][i])),
+                                "radar": float(np.nansum(Q["a"][i])),
+                                "over400": bool(_over400(Q, i).any()) if i.any() else False}
+                # antalen fel ur alla sedda mätare
+                for res in ("kvart", "timme"):
+                    torr, noll = stationsfel(**_rader(pd, res), q=q, res=res)
+                    rad[res]["vat_mot_torrt"] = torr.get(s, 0)
+                    rad[res]["noll_mot_vatt"] = noll.get(s, 0)
+                lista.append(rad)
+        result[namn] = {"andring": ch, "stationsdygn": n_sd, "kastade": len(lista),
+                        "andel": len(lista) / n_sd, "lista": lista}
+    # med syntetiska fel
+    for pd in pdays:
+        syntetiska_dygn(pd, a.syntet or 0.03)
+    for namn, ch in VARIANTER_QCS:
+        q = qcs_params(ch)
+        cnt = {t: [0, 0] for t in SYN_DYGN.values()}
+        skad = {t: [0, 0] for t in SYN_DYGN.values() if t != "riktig"}
+        for pd in pdays:
+            kast = _stationsdygn_punkter(pd, None, q)
+            st = np.union1d(pd.res["kvart"]["station"], pd.res["timme"]["station"])
+            Q = pd.res["kvart"]
+            for s in st:
+                ty = SYN_DYGN[pd.syn_dygn.get(int(s), 0)]
+                cnt[ty][0] += 1
+                cnt[ty][1] += int(int(s) in kast)
+                if ty != "riktig":
+                    i = Q["station"] == s
+                    if np.nansum(np.abs(Q["mm_in"][i] - Q["mm"][i])) >= 2.0:
+                        skad[ty][0] += 1
+                        skad[ty][1] += int(int(s) in kast)
+        r = result[namn]
+        r["syntet"] = {t: {"n": n, "kastade": k, "andel": k / max(1, n)} for t, (n, k) in cnt.items()}
+        r["syntet_skadliga"] = {t: {"n": n, "hittade": k, "andel": k / max(1, n)} for t, (n, k) in skad.items()}
+        ns, ks = sum(v[0] for v in skad.values()), sum(v[1] for v in skad.values())
+        r["hittade_skadliga"] = ks / max(1, ns)
+        print(namn, "kastade rena", r["kastade"], f"({r['andel']:.3%})", "hittade skadliga", f"{r['hittade_skadliga']:.1%}",
+              json.dumps(r["syntet"]), flush=True)
+    (OUT / "stationer.json").write_text(json.dumps(result, ensure_ascii=False, indent=1))
+
+
+def cmd_varianter_qcs(a):
+    """Varianterna av kontrollen per station och dygn i korsvalideringen på träningspunkterna, ovanpå
+    A2T, utan och med de syntetiska dygnsfelen (--syntet)."""
+    pdays = _train_pdays(a)
+    if a.syntet:
+        for pd in pdays:
+            syntetiska_dygn(pd, a.syntet)
+    i, n = (int(x) for x in a.bit.split("/"))
+    tag = ("syntet" if a.syntet else "ren") + (f"_prov{a.dagar}" if a.dagar else "")
+    path = OUT / f"varianter_qcs_{tag}_{i}.json"
+    result = json.loads(path.read_text()) if path.exists() else {}
+    alla = [("A2T", None)] + VARIANTER_QCS
+    for res in a.res:
+        rows = result.get(res, {})
+        for namn, ch in alla[i::n]:
+            if namn in rows or (a.bara and namn not in a.bara):
+                continue
+            t = time.time()
+            p = dict(_a2t(res))
+            if ch:
+                p["QCS"] = qcs_params(ch)
+            s = score_full(pdays, res, p)
+            rows[namn] = {"andring": ch, **s}
+            print(res, namn, f"{time.time() - t:.0f} s", json.dumps(rows[namn], ensure_ascii=False), flush=True)
+            result[res] = rows
+            path.write_text(json.dumps(result, ensure_ascii=False, indent=1))
 
 
 def _qc(T, R, skydd):
@@ -908,6 +1150,18 @@ class A2:
         mq, mh = matare
         kv = np.full(self.kv1.shape, np.nan, np.float32)
         tm = np.full(self.tm1.shape, np.nan, np.float32)
+        qcs = self.params["kvart"].get("QCS")
+        self.kastade_dygn = set()
+        if qcs:
+            # kontrollen per station och dygn: stationen tas bort ur både kvart och timme för dygnet
+            rader = {}
+            for res, m, F in (("kvart", mq, self.kv1), ("timme", mh, self.tm1)):
+                rader[res] = {"station": m.station, "t": m.t, "mm": m.mm, "a": F[m.t, m.r, m.c].astype(float),
+                              "xy": np.c_[m.c, m.r].astype(float) * D.RES_KM, "over400": self._over400(dag, m)}
+            self.kastade_dygn = stationsdygn(rader, qcs)
+            if self.kastade_dygn:
+                ks = list(self.kastade_dygn)
+                mq, mh = mq.subset(~np.isin(mq.station, ks)), mh.subset(~np.isin(mh.station, ks))
         a_h = self.tm1[mh.t, mh.r, mh.c].astype(float)
         xy_h = np.c_[mh.c, mh.r].astype(float) * D.RES_KM
         ph = self.params["timme"]
@@ -971,7 +1225,11 @@ def system_params(namn: str) -> dict:
         return PARAMS
     ch = dict(FRYSTA[namn])
     th = ch.pop("timme", {})  # ändringar för timmen (bara kontrollen av mätarna)
-    return {"timme": dict(PARAMS["timme"], **th), "kvart": dict(PARAMS["kvart"], **ch)}
+    qcs = qcs_params(ch.pop("QCS", None))  # kontrollen per station och dygn gäller båda
+    out = {"timme": dict(PARAMS["timme"], **th), "kvart": dict(PARAMS["kvart"], **ch)}
+    if qcs:
+        out["timme"]["QCS"] = out["kvart"]["QCS"] = qcs
+    return out
 
 
 def cmd_kor(a):
@@ -995,6 +1253,40 @@ def cmd_kor(a):
         gc.collect()
 
 
+def cmd_kor_traning(a):
+    """A2T eller en variant genom domaren på de träningsdagar där A1:s fält finns sparat
+    (OUT/a1falt_traning), för FSS på träningen. --variant: en variant i VARIANTER_QCS ovanpå A2T,
+    sparas som A2TSv<index>."""
+    if a.variant is not None:
+        namn_v, ch = VARIANTER_QCS[a.variant]
+        params = system_params("A2T")
+        q = qcs_params(ch)
+        params = {r: dict(v, QCS=q) for r, v in params.items()}
+        namn = f"A2TSv{a.variant}"
+    else:
+        namn, params = a.namn, system_params(a.namn)
+    for f in sorted((OUT / "a1falt_traning").glob("*.npz")):
+        day_s = f.stem
+        assert day_s in D.days("traning")
+        target = D.OUT / namn / f"{day_s}.json"
+        if target.exists():
+            continue
+        t = time.time()
+        rd = D.Radardag(day_s)
+        dag = D.build_dag(day_s, rd)
+        grid = rd.grid
+        del rd
+        gc.collect()
+        z = np.load(f)
+        s = make_a2(z["kvart"].astype(np.float32), z["timme"].astype(np.float32), grid, params)
+        res = D.evaluate(s, dag)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(res))
+        print(day_s, namn, f"{time.time() - t:.0f} s", flush=True)
+        del dag, s, z
+        gc.collect()
+
+
 def cmd_tid(a):
     day_s = a.dag or "2023-08-08"
     dag, grid, kv1, tm1 = _load_val(day_s)
@@ -1010,11 +1302,13 @@ def cmd_tid(a):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["a1falt", "punkter", "terrang", "diagnos", "varianter", "trana", "kor",
-                                    "tid", "kontroll", "varianter_qc"])
+                                    "tid", "kontroll", "varianter_qc", "stationer", "varianter_qcs",
+                                    "kor_traning"])
     ap.add_argument("--qc", nargs=3, default=["4", "50", "1"], help="kontroll: T R skydd400 (1/0)")
     ap.add_argument("--ph", nargs=3, help="varianter_qc: kontrollen av timmätarna i kvarten, T R skydd400")
     ap.add_argument("--bara", nargs="+", help="varianter_qc: bara de här varianterna")
     ap.add_argument("--syntet", type=float, default=0.0, help="varianter_qc: andel syntetiska fel i indata")
+    ap.add_argument("--variant", type=int, help="kor_traning: index i VARIANTER_QCS")
     ap.add_argument("--bit", default="0/1")
     ap.add_argument("--dag")
     ap.add_argument("--namn", default="A2", help="kor: A2 eller en fryst variant i FRYSTA")
@@ -1023,7 +1317,8 @@ def main():
     a = ap.parse_args()
     {"a1falt": cmd_a1falt, "punkter": cmd_punkter, "terrang": cmd_terrang, "diagnos": cmd_diagnos,
      "varianter": cmd_varianter, "trana": cmd_trana, "kor": cmd_kor, "tid": cmd_tid,
-     "kontroll": cmd_kontroll, "varianter_qc": cmd_varianter_qc}[a.cmd](a)
+     "kontroll": cmd_kontroll, "varianter_qc": cmd_varianter_qc, "stationer": cmd_stationer,
+     "varianter_qcs": cmd_varianter_qcs, "kor_traning": cmd_kor_traning}[a.cmd](a)
 
 
 if __name__ == "__main__":
