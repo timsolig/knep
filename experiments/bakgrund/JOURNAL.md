@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0003 · 2026-11-07 10:50 · a2t-till-src · klar
+- Varför: A2T är den enda analysen som slår både A0 och A1 enligt domaren, och att flytta den till src som ett avstängt val är nästa steg mot facit och sidan utan att valideringen behöver ses igen.
+- Resultat: A2T finns nu som en liten, avstängd modul i `src/knep/analys/a2.py` som ger bit för bit samma fält som experimentet (`np.array_equal`, största skillnad 0 mm per kvart och per timme) på 8 syntetiska fall och på alla 24 timmar och 96 kvartar för tre träningsdagar, domaren ger exakt samma tal på 2020-07-24, och en timme med sina fyra kvartar tar 1,1 till 1,3 s på hela rutnätet på Pi:n med cirka 57 MB extra minne.
+- Rapport: [rapporter/2026-11-07/0003-a2t-till-src.md](rapporter/2026-11-07/0003-a2t-till-src.md), 33 min
+
 ### 0002 · 2026-11-07 10:15 · a2t-kontroll-matare · klar
 - Varför: A2T är den första analysen som slår både A0 och A1, och kontrollen av mätarna är det som står kvar innan den kan bli facit i verifieringen och föreslås som avstängt val i src/.
 - Resultat: Kontrollen jämför varje mätare med grannarna inom R km och med A2T:s bakgrund och kastar den bara när båda säger emot. Med valda T = 3 och R = 50 km per kvart och T = 2,5 och R = 50 km per timme kastas 0,09 % av kvartarna och 0,11 % av timmarna på träningen, och ingen över 400 m. A2TK slår fortfarande A1 och A0 enligt domaren, men den kan inte ersätta A2T. Mot A2T är den bättre i MAE men sämre med intervallet helt på fel sida i bland annat summakvoten (kvart 0,846 mot 0,851, −0,006, −0,009 till −0,002) och FSS 1 per kvart (0,389 mot 0,392, −0,003, −0,006 till −0,001), eftersom 9 av 10 kastade perioder är för våta mätare, alltså verkliga skurtoppar.
