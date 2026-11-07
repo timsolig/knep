@@ -363,6 +363,7 @@ class Punktdag:
     def __init__(self, path: Path):
         z = np.load(path)
         shape = tuple(int(x) for x in z["shape"])
+        self.day = path.stem
         folds = D.fold_map(shape)
         fd = fold_dist(shape)
         self.res = {}
@@ -476,11 +477,36 @@ def score_params(pdays, res, p, torrmask=True):
     return s2, s0
 
 
-def _collect(pdays, res, p):
+def _kast_add(kast, pd, rec):
+    """Räknar kastade bland indata ur rec (se _predict_day) per upplösning och delmängd."""
+    for res, idx, fl in rec:
+        Q = pd.res[res]
+        d = kast.setdefault(res, {})
+        subs = {"alla": np.ones(len(idx), bool)}
+        for s in ("over400", "lovart"):
+            if s in Q:
+                subs[s] = Q[s][idx]
+        if "syn" in Q:
+            for code, namn in SYN_TYPER.items():
+                subs[f"syn_{namn}"] = Q["syn"][idx] == code
+        for s, m in subs.items():
+            n, f = d.get(s, (0, 0))
+            d[s] = (n + int(m.sum()), f + int((fl & m).sum()))
+
+
+def _kast_final(kast):
+    return {res: {s: {"n": n, "kastade": f, "andel": f / n if n else float("nan")} for s, (n, f) in d.items()}
+            for res, d in kast.items()}
+
+
+def _collect(pdays, res, p, ph=None, kast=None):
     """Alla mål på dagarna: g, a (bakgrunden), a2, k och delmängderna (över 400 m, lovart)."""
     out = {k: [] for k in ("g", "a", "a2", "k", "over400", "lovart")}
     for pd in pdays:
-        g, a, a2, k, idx = _predict_day(pd, res, p, full=True)
+        rec = [] if kast is not None else None
+        g, a, a2, k, idx = _predict_day(pd, res, p, full=True, ph=ph, rec=rec)
+        if rec:
+            _kast_add(kast, pd, rec)
         Q = pd.res[res]
         out["g"].append(g); out["a"].append(a); out["a2"].append(a2); out["k"].append(k)
         for s in ("over400", "lovart"):
@@ -488,9 +514,12 @@ def _collect(pdays, res, p):
     return {k: np.concatenate(v) for k, v in out.items()}
 
 
-def score_full(pdays, res, p):
-    """Målet och måtten som i score_params, och falskt vid torr mätare för alla, över 400 m och lovart."""
-    c = _collect(pdays, res, p)
+def score_full(pdays, res, p, ph=None, kast=None):
+    """Målet och måtten som i score_params, och falskt vid torr mätare för alla, över 400 m och lovart.
+
+    ph: timmens parametrar för kontrollen av timmätarna när kvarten räknas. kast: dict som får
+    andelen kastade bland indata (alla, över 400 m, lovart och per typ av syntetiskt fel)."""
+    c = _collect(pdays, res, p, ph, kast)
     s = _score(c["g"], c["a2"])
     s["mal"] = float(_objective(s))
     thr = D.ECHO[res]
@@ -551,6 +580,136 @@ VARIANTER = (
     + [(f"K_SVAG={k:g} tak TORR2={v:g} R={r:g}", {"K_SVAG": k, "SVAG_TAK": True, "TORR2": v, "R_TORR2": r})
        for k in (0.125, 0.2) for v in (0.1, 0.2) for r in (40.0, 80.0)]
 )
+
+
+# ---------------------------------------------------------------- kontrollen av mätarna på träningen
+
+SYN_TYPER = {0: "riktig", 1: "noll", 2: "x5", 3: "fast"}
+SYN_FAST = {"kvart": 0.5, "timme": 2.0}  # det fasta värdet (mm per period)
+
+
+def syntetiska_fel(pd: Punktdag, frac=0.01, seed=0):
+    """Sätter cirka frac av mätarperioderna i indata (mm_in) till 0 i regn, ×5 i regn eller ett fast
+    värde (en tredjedel var), kvart och timme var för sig. Regn är minst ekotröskeln. Domaren bedömer
+    fortfarande mot mm."""
+    rng = np.random.default_rng([seed, int(datetime.fromisoformat(pd.day).timestamp()) // 86400])
+    for res in ("kvart", "timme"):
+        Q = pd.res[res]
+        n = len(Q["mm"])
+        m = int(round(frac * n / 3))
+        syn = np.zeros(n, np.int8)
+        mm = Q["mm"].copy()
+        wet = np.flatnonzero(Q["mm"] >= D.ECHO[res])  # regn: minst ekotröskeln (0,125 mm per kvart, 0,5 per timme)
+        pick = rng.choice(wet, size=min(2 * m, len(wet)), replace=False)
+        noll, x5 = pick[: len(pick) // 2], pick[len(pick) // 2:]
+        rest = np.setdiff1d(np.arange(n), pick)
+        fast = rng.choice(rest, size=min(m, len(rest)), replace=False)
+        mm[noll], syn[noll] = 0.0, 1
+        mm[x5], syn[x5] = 5 * mm[x5], 2
+        mm[fast], syn[fast] = SYN_FAST[res], 3
+        Q["mm_in"], Q["syn"] = mm, syn
+
+
+def _qc(T, R, skydd):
+    return {"QC_T": T, "QC_R": R, "QC_SKYDD400": skydd}
+
+
+# varianterna av kontrollen (namn, ändringar i PARAMS för upplösningen ovanpå A2T)
+VARIANTER_QC = (
+    [("A2T", {})]
+    + [(f"T={T:g} R={R:g}{' skydd400' if s else ''}", _qc(T, R, s))
+       for T in (2.0, 2.5, 3.0, 4.0) for R in (25.0, 50.0) for s in (True, False)]
+)
+
+
+def _a2t(res):
+    return dict(system_params("A2T")[res])
+
+
+def cmd_kontroll(a):
+    """Diagnosen: kontrollen med alla mätare (som i drift) på träningsdagarna, för en variant
+    (--qc T R skydd). Kastade perioder per upplösning, över 400 m, lovart, typ och station."""
+    pdays = _train_pdays(a)
+    T, R, skydd = float(a.qc[0]), float(a.qc[1]), a.qc[2] in ("1", "ja", "True")
+    result = {}
+    for res in a.res:
+        p = dict(_a2t(res), **_qc(T, R, skydd))
+        ph = dict(_a2t("timme"), **_qc(T, R, skydd))
+        n_in = n_fl = n400 = f400 = nlov = flov = nlow = 0
+        stn, stn_all, perdag, stn_dagar = {}, {}, {}, {}
+        for pd in pdays:
+            H, Q = pd.res["timme"], pd.res[res]
+            alla_h = np.ones(len(H["mm"]), bool)
+            fl_day = np.zeros(len(Q["mm"]), bool)
+            for t in range(D.NPER[res]):
+                hour = t if res == "timme" else t // 4
+                gs = (Q["t"] == t) & np.isfinite(Q["a"])
+                if gs.sum() < 3:
+                    continue
+                win = alla_h & (H["t"] <= hour) & (H["t"] > hour - ph["WIN"])
+                rg = stor_kvot(Q["xy"][gs], H["xy"][win], H["mm"][win], H["a"][win], p)
+                bg = svag_kvot(rg, Q["a"][gs], p) * Q["a"][gs]
+                fl = kontroll(Q["xy"][gs], Q["mm"][gs], bg, Q["rng"][gs], _over400(Q, gs), p)
+                idx = np.flatnonzero(gs)
+                fl_day[idx[fl]] = True
+                nlow += int((fl & (Q["mm"][gs] < bg)).sum())
+            ok = np.isfinite(Q["a"])
+            n_in += int(ok.sum()); n_fl += int(fl_day.sum())
+            o4, lv = Q.get("over400", np.zeros(len(ok), bool)), Q.get("lovart", np.zeros(len(ok), bool))
+            n400 += int((ok & o4).sum()); f400 += int((fl_day & o4).sum())
+            nlov += int((ok & lv).sum()); flov += int((fl_day & lv).sum())
+            perdag[pd.day] = int(fl_day.sum())
+            for s in Q["station"][fl_day]:
+                stn[int(s)] = stn.get(int(s), 0) + 1
+            for s in np.unique(Q["station"][fl_day]):
+                stn_dagar[int(s)] = stn_dagar.get(int(s), 0) + 1
+            for s in Q["station"][ok]:
+                stn_all[int(s)] = stn_all.get(int(s), 0) + 1
+        ofta = sorted(stn.items(), key=lambda x: -x[1])[:15]
+        result[res] = {
+            "perioder": n_in, "kastade": n_fl, "andel": n_fl / n_in,
+            "over400": {"perioder": n400, "kastade": f400, "andel": f400 / max(1, n400)},
+            "lovart": {"perioder": nlov, "kastade": flov, "andel": flov / max(1, nlov)},
+            "for_torra": nlow, "for_vata": n_fl - nlow,
+            "stationer_kastade": len(stn),
+            "ofta": [{"station": s, "kastade": k, "perioder": stn_all[s], "andel": k / stn_all[s],
+                      "dagar": stn_dagar[s]} for s, k in ofta],
+            "stationer_fler_an_3_dagar": sum(v > 3 for v in stn_dagar.values()),
+            "per_dag": perdag,
+        }
+        print(res, json.dumps({k: v for k, v in result[res].items() if k != "per_dag"}, ensure_ascii=False),
+              flush=True)
+    name = f"kontroll_T{T:g}_R{R:g}_{'skydd' if skydd else 'utan'}.json"
+    (OUT / name).write_text(json.dumps(result, ensure_ascii=False, indent=1))
+
+
+def cmd_varianter_qc(a):
+    """Varianterna av kontrollen på träningspunkterna (korsvalideringen som i trana), utan och med
+    syntetiska fel (--syntet). Varje upplösning för sig ovanpå A2T; --ph T R skydd lägger dessutom
+    till kontrollen av timmätarna när kvarten räknas (för kombinationen)."""
+    pdays = _train_pdays(a)
+    if a.syntet:
+        for pd in pdays:
+            syntetiska_fel(pd, a.syntet)
+    i, n = (int(x) for x in a.bit.split("/"))
+    tag = ("syntet" if a.syntet else "ren") + ("_ph" if a.ph else "") + (f"_prov{a.dagar}" if a.dagar else "")
+    path = OUT / f"varianter_qc_{tag}_{i}.json"
+    result = json.loads(path.read_text()) if path.exists() else {}
+    ph = None
+    if a.ph:
+        ph = dict(_a2t("timme"), **_qc(float(a.ph[0]), float(a.ph[1]), a.ph[2] in ("1", "ja", "True")))
+    for res in a.res:
+        rows = result.get(res, {})
+        for namn, ch in VARIANTER_QC[i::n]:
+            if namn in rows:
+                continue
+            t = time.time()
+            kast = {}
+            s = score_full(pdays, res, dict(_a2t(res), **ch), ph=ph if res == "kvart" else None, kast=kast)
+            rows[namn] = {"andring": ch, **s, "kast": _kast_final(kast)}
+            print(res, namn, f"{time.time() - t:.0f} s", json.dumps(rows[namn], ensure_ascii=False), flush=True)
+            result[res] = rows
+            path.write_text(json.dumps(result, ensure_ascii=False, indent=1))
 
 
 def _train_pdays(a):
@@ -840,7 +999,10 @@ def cmd_tid(a):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["a1falt", "punkter", "terrang", "diagnos", "varianter", "trana", "kor",
-                                    "tid"])
+                                    "tid", "kontroll", "varianter_qc"])
+    ap.add_argument("--qc", nargs=3, default=["4", "50", "1"], help="kontroll: T R skydd400 (1/0)")
+    ap.add_argument("--ph", nargs=3, help="varianter_qc: kontrollen av timmätarna i kvarten, T R skydd400")
+    ap.add_argument("--syntet", type=float, default=0.0, help="varianter_qc: andel syntetiska fel i indata")
     ap.add_argument("--bit", default="0/1")
     ap.add_argument("--dag")
     ap.add_argument("--namn", default="A2", help="kor: A2 eller en fryst variant i FRYSTA")
@@ -848,7 +1010,8 @@ def main():
     ap.add_argument("--dagar", type=int, default=0, help="trana: bara de första dagarna (provkörning)")
     a = ap.parse_args()
     {"a1falt": cmd_a1falt, "punkter": cmd_punkter, "terrang": cmd_terrang, "diagnos": cmd_diagnos,
-     "varianter": cmd_varianter, "trana": cmd_trana, "kor": cmd_kor, "tid": cmd_tid}[a.cmd](a)
+     "varianter": cmd_varianter, "trana": cmd_trana, "kor": cmd_kor, "tid": cmd_tid,
+     "kontroll": cmd_kontroll, "varianter_qc": cmd_varianter_qc}[a.cmd](a)
 
 
 if __name__ == "__main__":
