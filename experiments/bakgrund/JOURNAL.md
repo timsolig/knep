@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0001 · 2026-11-07 08:17 · a2-falska-ekon · klar
+- Varför: A2 slår redan A0 i 15 mått och A1 i 14 och fälls mot A1 bara av falska ekon per kvart i terrängen, så att rätta det är den kortaste vägen till en analys som slår båda baslinjerna och till ett facit för verifieringen.
+- Resultat: A2T (ingen uppskalning och tak över svagt eko under 0,125 mm per kvart) slår A1 enligt domaren på valideringen utan att något mått blir sämre, och tar bort det som fällde A2: falskt vid torr mätare per kvart över 400 m går från A2:s 0,016 till 0,0118 mot A1:s 0,0133 (+0,0015, +0,0005 till +0,0025) och på lovartsidan till 0,0144 mot 0,0155 (+0,0011, +0,0001 till +0,0023); priset är en lägre summakvot i terrängen per kvart än A2 (0,575 mot 0,632 över 400 m, fortfarande långt över A1:s 0,475).
+- Rapport: [rapporter/2026-11-07/0001-a2-falska-ekon.md](rapporter/2026-11-07/0001-a2-falska-ekon.md), 128 min
+
 ## Före loopen
 
 Bakgrundskörningarna med en fast kö (`experiments/natt/`).
