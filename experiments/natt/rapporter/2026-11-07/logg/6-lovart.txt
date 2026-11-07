@@ -33,3 +33,20 @@ Nästa steg:
 - Ta ställning till om domarens summakvot ska ändras, eftersom den gynnar för höga toppar så länge radarn ger för lite.
 
 `experiments/natt/ko.txt` och `rapporter/2026-11-07/logg/` var ändrade redan innan jag började, och jag har lämnat dem orörda.
+===== 2026-11-07T02:08:02Z försök 2 =====
+Försök 2 av uppgift 6 är klart med status **delvis**. Ingen ny variant av A1 klarar valregeln, så A1 i drift är oförändrad och det nya valet står kvar som av. Rapporten är uppdaterad i `experiments/natt/rapporter/2026-11-07/6-lovart.md` och allt är committat på `natt/2026-11-06`. Inget är pushat och ingen PR är öppnad.
+
+**Vad jag gjorde**
+- **En ny, snävare variant, A1S.** Den håller bara kvar regn där bilden på plats stämmer bättre med nästa bild än bilden flyttad längs rörelsen. Funktionen heter `still_fraction` och ligger i `src/knep/analys/a1.py`, med ett nytt test.
+- **Fler träningsdagar.** De gick från 5 till 15 av 28, med A0, A1, A1S och A1L1 på alla 15 och alla årstider med. Bakgrundskörningar nekades i den här sessionen. Därför körde jag en dag per anrop i förgrunden, med två processer, och tiden räckte inte till alla dagar. Över 3 GB minne var ledigt hela tiden.
+
+**Resultat på 15 träningsdagar**
+- **A1 mot A0:** A1 är bättre utan något sämre mått. Den har inget underskott på lovartsidan (summakvoten per timme är 0,731 mot 0,733). Underskottet som domaren fann på valideringen är alltså inget systematiskt fel i A1. Det kommer från 2023-08-08 och 2021-10-20.
+- **A1S mot A1:** inte bättre. Den ändrar nästan ingenting. Den ger 2,3 färre rutor per dag med eko under torra timmar, men är något sämre över 400 m (kvoten över 1 mm per timme −0,003, FSS 0,5 −0,0002).
+- **A1L1 mot A1:** inte bättre. Den höjer summakvoten på lovartsidan med 0,03, men är sämre över 400 m, i MAE på lovartsidan och i falska ekon per kvart. Det är samma mönster som på valideringen i försök 1, och antalet sämre mått växte från 5 till 15 dagar.
+
+Det försiktigaste är att låta A1 vara som den är. Jag körde ingen variant på valideringen i det här försöket, eftersom ingen blev vald. A2 och filtret kördes inte heller om. A2 bygger på A1:s fält, som är oförändrade, och filtret verkar på A0. `uv run pytest` ger 167 godkända.
+
+Status blir delvis därför att 13 träningsdagar fortfarande saknas och ingen rättning blev godkänd. Nästa steg är att ta ställning till domarens summakvot på lovartsidan. Den belönar för höga toppar vid enstaka mätare, så länge radarn i stort ger för lite regn där.
+
+Loggfilen `logg/6-lovart.txt` var ändrad av körningen, och den har jag lämnat orörd.
