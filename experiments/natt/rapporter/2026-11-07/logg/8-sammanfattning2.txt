@@ -1,0 +1,15 @@
+===== 2026-11-07T05:01:12Z försök 1 =====
+Uppgift 8 är klar. Sammanfattningen av uppgift 6 och 7 finns i `experiments/natt/rapporter/2026-11-07/sammanfattning.md` och rapporten i `8-sammanfattning2.md` (`Status: klar`). Båda är committade som `ce8b906`. `uv run pytest` gick igenom med 168 godkända tester. Det enda som inte är committat är loggfilen `logg/8-sammanfattning2.txt`, som körskriptet skriver och committar själv.
+
+**Vad sammanfattningen säger:**
+- **Uppgift 6, A1 på lovartsidan:** A1 tappar inget regn på sluttningen. Underskottet beror på att A1 jämnar ut toppar i regn som rör sig fort, och det finns inte på de 15 träningsdagar som hann köras (13 av 28 saknas).
+  - Av varianterna gör A1S nästan ingenting.
+  - A1L1 höjer summakvoten på lovartsidan med +0,03, med intervallet helt över 0. Men den blir sämre än A1 över 400 m och ger fler falska ekon per kvart.
+  - Ingen variant valdes, så A1 står kvar som i drift.
+- **Uppgift 7, inflödet:** `Inflode25Topp10` tar bort överskottet i ytan ≥ 10 mm/h. Men den gör blockmaxets 90-percentil säkert sämre vid 30 min, 1 h och 2 h (+0,05 till +0,07), så domen blev inte bättre. Den gäller bara de 7 av 16 valideringsdygn som hann köras.
+- **Rekommendationen:** driften ändras inte. De nya valen (`stay` i A1, `loc_top` och `loc_rematch` i kedjan) har standard av, och testerna visar att resultatet då är exakt som förut.
+- **Det som återstår viktigast:** domarens summakvot ger fördel åt för höga toppar vid enstaka mätare så länge radarn i stort är för torr. Det måste avgöras innan man vet om A1:s underskott på valideringen alls är ett fel.
+
+Sammanfattningen har också domarens tabeller med intervall, körtiderna och kommandona för testdelen, som inte kördes. Testdelen är spärrad i koden, så kommandona kräver en liten upplåsning som bara ska göras när du har bestämt det. Det rekommenderade att köra är baslinjerna A0, A1 och kedjan, och om du vill även A1L1 mot A1. Jag har stämt av att kommandona och radreferenserna (rad 172 och 278 i `lovart.py`) stämmer med koden.
+
+Inget pushades och ingen PR öppnades.
