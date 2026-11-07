@@ -77,7 +77,15 @@ KMAX = 4.0
 # PARAMS["kvart"], valda på träningspunkterna (a2.py varianter) och frysta innan valideringen kördes.
 # Timmen är oförändrad. K_SVAG: ingen uppskalning (k = min(k, 1)) där A1 är under K_SVAG mm.
 # TORR2, R_TORR2: A2 = 0 där A1 är under TORR2 mm och alla sedda mätare inom R_TORR2 km är torra.
-FRYSTA: dict[str, dict] = {}
+# SVAG_TAK: dessutom A2 högst A1 där 0 < A1 < K_SVAG (varken kvoten eller OI lyfter svagt eko).
+# Valet (26 varianter, /data/analys/a2/varianter_*.json): alla varianter som sänker falskt över 400 m och
+# på lovart höjer målet. A2S är den med lägst mål bland dem som sänker falskt i båda; A2T den med lägst mål
+# bland dem som sänker falskt över 400 m och på lovart med minst 0,002 (två tredjedelar av A2:s underskott
+# mot A1 på valideringen enligt uppgift 3).
+FRYSTA: dict[str, dict] = {
+    "A2S": {"K_SVAG": 0.1},
+    "A2T": {"K_SVAG": 0.125, "SVAG_TAK": True},
+}
 
 
 # ---------------------------------------------------------------- geometri
