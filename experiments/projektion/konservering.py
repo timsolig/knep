@@ -89,6 +89,10 @@ Inflode25 = _v("Inflode25", inflow_km=25)
 Inflode75 = _v("Inflode75", inflow_km=75)
 Inflode250 = _v("Inflode250", inflow_km=250)
 NarmastRamp3Inflode75 = _v("NarmastRamp3Inflode75", inflow_km=75, interp="nearest", ramp=(180, 240))
+# uppgift 7 natten 2026-11-07: Inflode25 där platskartan inte förstärker de högsta intensiteterna
+Inflode25Topp5 = _v("Inflode25Topp5", inflow_km=25, loc_top=5.0)  # positiv korrektion lyfter högst till 5 mm/h
+Inflode25Topp10 = _v("Inflode25Topp10", inflow_km=25, loc_top=10.0)
+Inflode25Rang = _v("Inflode25Rang", inflow_km=25, loc_rematch=True)  # rangvis klippt mot målet
 Referens = _v("Referens")  # samma som kedja_om, för att kontrollera att Variant.observe är rätt
 
 

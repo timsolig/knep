@@ -157,6 +157,20 @@ def test_fill_outside_and_inflow():
     assert np.nanmin(base[-1][:, 10:13]) == 0.0 and np.nanmin(inn[-1][:, 10:13]) > 3.0
 
 
+def test_location_top_options():
+    """Platskartan med loc_top och loc_rematch: av ger driftens m * 10^(db/10), på förstärks inte toppen."""
+    m = np.array([[0.0, 2.0, 8.0, 20.0]], np.float32)
+    db = np.array([[3.0, 3.0, 3.0, -3.0]], np.float32)
+    tgt = np.array([[0.0, 2.0, 8.0, 20.0]], np.float32)
+    np.testing.assert_allclose(model.Chain().located(m, db, tgt), m * 10 ** (db / 10), rtol=1e-6)
+    top = model.Chain(loc_top=5.0).located(m, db, tgt)
+    assert np.isclose(top[0, 1], 2.0 * 10 ** 0.3)  # under 5 mm/h som förut
+    assert np.isclose(model.Chain(loc_top=5.0).located(m * 0 + 4.0, db * 0 + 3.0, tgt)[0, 0], 5.0)  # lyfts till 5
+    assert top[0, 2] == 8.0 and np.isclose(top[0, 3], 20.0 * 10 ** -0.3)  # inte högre, men dämpas
+    rang = model.Chain(loc_rematch=True).located(m, db, tgt)
+    assert np.all(np.sort(rang[rang >= 1]) <= np.sort(tgt[tgt >= 1])[-np.sum(rang >= 1):] + 1e-5)
+
+
 def test_chain_stay_keeps_terrain_rain():
     """Med stay står en andel still där vinden blåser uppför; utan terräng och fel flyttas allt."""
     obs = np.zeros((7, 20, 40), np.float32)
