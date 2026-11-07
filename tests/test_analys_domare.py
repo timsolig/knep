@@ -192,6 +192,19 @@ def test_sums_from_intervals():
     assert h[0, 1, 1] == pytest.approx(1.0) and h[0, 0, 0] == pytest.approx(1.0)
 
 
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
+def test_sums_hourly_equals_sums(dtype):
+    rng = np.random.default_rng(3)
+    iv = rng.gamma(0.5, 2.0, (288, 4, 5))
+    iv[rng.random(iv.shape) < 0.2] = np.nan
+    q0, h0 = domare.sums(iv.astype(dtype))
+    calls = []
+    q1, h1 = domare.sums_hourly(lambda i: calls.append(i) or iv[i], dtype)
+    assert calls == list(range(288))
+    np.testing.assert_array_equal(q0, q1)
+    np.testing.assert_array_equal(h0, h1)
+
+
 def test_lovart_mask_follows_slope():
     elev = np.tile(np.linspace(0, 2000, W, dtype=np.float32), (H, 1))  # stiger österut
     lat = np.full((H, W), 65.0)

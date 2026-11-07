@@ -208,13 +208,10 @@ def make_system(name: str, kw: dict):
             rd = self.rd
             flt = Filter(rd.grid, **kw)
             k0 = domare.Radardag.PRE + 1
-            iv = np.empty((288, *fr.shape[1:]), np.float32)
-            for i in range(288):
-                k = k0 + i
-                # bilden gäller de fem minuterna före rd.times[k]
-                iv[i] = flt.apply(fr[k], rd.times[k])
+            # bilden gäller de fem minuterna före rd.times[k]; en timme i taget för minnets skull
+            out = domare.sums_hourly(lambda i: flt.apply(fr[k0 + i], rd.times[k0 + i]), np.float32)
             self.removed = flt.removed
-            return domare.sums(iv)
+            return out
     AF.__name__ = name
     return AF
 

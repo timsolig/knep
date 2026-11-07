@@ -623,6 +623,18 @@ def sums(intervals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return agg(3), agg(12)
 
 
+def sums_hourly(interval, dtype=np.float32) -> tuple[np.ndarray, np.ndarray]:
+    """Samma tal som sums(np.stack([interval(i) for i in range(288)]).astype(dtype)), men en timme
+    (12 intervall) i taget, så att alla 288 intervallen aldrig ligger i minnet samtidigt.
+    interval(i) anropas i ordning i = 0..287."""
+    q, h = [], []
+    for j in range(24):
+        a, b = sums(np.stack([interval(12 * j + i) for i in range(12)]).astype(dtype))
+        q.append(a)
+        h.append(b)
+    return np.concatenate(q), np.concatenate(h)
+
+
 class A0:
     """Radaranalysen som i drift utan reserver och volymkorrektion: SMHI:s komposit med lagrangesk
     utfyllnad vid bortfall (composite.fill_gaps), varje bild gäller de fem minuterna före den."""
@@ -663,11 +675,9 @@ class A1(A0):
         from knep.analys import a1
         fr = self.frames()
         k0 = Radardag.PRE + 1
-        iv = np.empty((288, *fr.shape[1:]), np.float16)  # halva minnet; 0,1 % noggrannhet räcker
-        for i in range(288):
-            k = k0 + i
-            iv[i] = a1.interval_mean(fr[k - 1], fr[k], self.rd.motion_at(k).astype(np.float64))
-        return sums(iv)
+        # float16 som förut (0,1 % noggrannhet räcker), en timme i taget för minnets skull
+        return sums_hourly(lambda i: a1.interval_mean(fr[k0 + i - 1], fr[k0 + i],
+                                                      self.rd.motion_at(k0 + i).astype(np.float64)), np.float16)
 
 
 SYSTEMS = {"A0": A0, "A1": A1}
