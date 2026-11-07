@@ -82,7 +82,7 @@ def test_variants_off_by_default_give_identical_fields():
     q1, h1 = a2.A2(kv, tm, rng, params=off).falt(dag, (dag.kvart, dag.timme), hours=[2, 3])
     assert np.array_equal(q0, q1, equal_nan=True) and np.array_equal(h0, h1, equal_nan=True)
     assert a2.system_params("A2") is a2.PARAMS
-    for namn in a2.FRYSTA:  # de frysta varianterna ändrar bara kvarten
+    for namn in ("A2S", "A2T"):  # de frysta varianterna mot falska ekon ändrar bara kvarten
         assert a2.system_params(namn)["timme"] == a2.PARAMS["timme"]
 
 
@@ -153,3 +153,79 @@ def test_cross_validated_a2_runs_through_the_judge():
     assert q.shape == kv.shape and h.shape == tm.shape
     res = domare.evaluate_fields(dag, q, h)
     assert res["timme/alla"]["n"] > 0
+
+
+def test_gauge_check_off_by_default_gives_identical_fields():
+    dag = make_dag(seed=5)
+    kv, tm = _fields(dag, scale=0.6)
+    rng = np.full((H, W), 60.0, np.float32)
+    base = a2.system_params("A2T")
+    off = {r: dict(base[r], QC_T=0.0, QC_R=25.0) for r in base}
+    q0, h0 = a2.A2(kv, tm, rng, params=base).falt(dag, (dag.kvart, dag.timme), hours=[2, 3])
+    q1, h1 = a2.A2(kv, tm, rng, params=off).falt(dag, (dag.kvart, dag.timme), hours=[2, 3])
+    assert np.array_equal(q0, q1, equal_nan=True) and np.array_equal(h0, h1, equal_nan=True)
+    assert "QC_T" not in a2.PARAMS["kvart"] and "QC_T" not in a2.PARAMS["timme"]
+    for namn in ("A2", "A2S", "A2T"):
+        for r in ("kvart", "timme"):
+            assert a2.system_params(namn)[r].get("QC_T", 0.0) == 0.0
+
+
+def _ring(n=12, rad=15.0):
+    """En mätare i mitten och n grannar på en ring med radien rad km."""
+    ang = np.linspace(0, 2 * np.pi, n, endpoint=False)
+    return np.r_[[[0.0, 0.0]], np.c_[rad * np.cos(ang), rad * np.sin(ang)]]
+
+
+def test_gauge_check_flags_zero_in_rain_and_lone_peak():
+    p = dict(a2.PARAMS["kvart"], QC_T=3.0, QC_R=40.0)
+    xy = _ring()
+    n = len(xy)
+    rng = np.full(n, 50.0)
+    low = np.zeros(n, bool)
+    # 0 i regn: grannarna och radarn våta
+    mm = np.full(n, 1.0)
+    mm[0] = 0.0
+    assert a2.kontroll(xy, mm, np.full(n, 1.0), rng, low, p).tolist() == [True] + [False] * (n - 1)
+    # 0 där radarn är torr men grannarna våta: radarn stöder mätaren, den kastas inte
+    bg = np.full(n, 1.0)
+    bg[0] = 0.0
+    assert not a2.kontroll(xy, mm, bg, rng, low, p).any()
+    # en orimlig topp där grannarna och radarn är torra
+    mm = np.zeros(n)
+    mm[0] = 5.0
+    assert a2.kontroll(xy, mm, np.zeros(n), rng, low, p)[0]
+    # samma topp över 400 m: skyddad (radarn missar låg nederbörd i fjällen), utom utan skyddet
+    hi = low.copy()
+    hi[0] = True
+    assert not a2.kontroll(xy, mm, np.zeros(n), rng, hi, p).any()
+    assert a2.kontroll(xy, mm, np.zeros(n), rng, hi, dict(p, QC_SKYDD400=False))[0]
+    # utan grannar inom QC_R kastas ingenting
+    assert not a2.kontroll(xy * 10, mm, np.zeros(n), rng, low, p).any()
+    # av som standard
+    assert not a2.kontroll(xy, mm, np.zeros(n), rng, low, a2.PARAMS["kvart"]).any()
+
+
+def test_gauge_check_in_field_removes_zero_in_rain():
+    n = 13
+    xy = _ring(12, 6.0) / domare.RES_KM  # i rutor
+    r, c = np.round(75 + xy[:, 1]).astype(int), np.round(75 + xy[:, 0]).astype(int)
+    st = np.arange(n)
+    q = np.full((n, 96), 1.0)
+    q[0] = 0.0  # mätaren i mitten visar 0 hela dygnet
+    h = q.reshape(n, 24, 4).sum(axis=2)
+    kvm = domare.Matare(np.repeat(st, 96), np.repeat(r, 96), np.repeat(c, 96), np.tile(np.arange(96), n), q.ravel())
+    tmm = domare.Matare(np.repeat(st, 24), np.repeat(r, 24), np.repeat(c, 24), np.tile(np.arange(24), n), h.ravel())
+    dag = domare.Dag("2000-01-01", (H, W), kvm, tmm, np.zeros((H, W), np.float32), None)
+    kv = np.full((96, H, W), 1.0, np.float32)  # radarn våt överallt
+    tm = kv.reshape(24, 4, H, W).sum(axis=1)
+    rng = np.full((H, W), 50.0, np.float32)
+    base = a2.system_params("A2T")
+    qc = {res: dict(base[res], QC_T=3.0) for res in base}
+    s0, s1 = a2.A2(kv, tm, rng, params=base), a2.A2(kv, tm, rng, params=qc)
+    q0, h0 = s0.falt(dag, (dag.kvart, dag.timme), hours=[5])
+    q1, h1 = s1.falt(dag, (dag.kvart, dag.timme), hours=[5])
+    t = 20
+    assert q0[t, r[0], c[0]] < 0.8 and h0[5, r[0], c[0]] < 3.2  # utan kontroll drar mätaren ner fältet
+    assert q1[t, r[0], c[0]] > 0.9 and h1[5, r[0], c[0]] > 3.6  # med kontrollen är den borta
+    assert ("kvart", 0, t) in s1.kastade and ("timme", 0, 5) in s1.kastade
+    assert all(x[1] == 0 for x in s1.kastade)

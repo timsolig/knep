@@ -87,6 +87,63 @@ FRYSTA: dict[str, dict] = {
     "A2T": {"K_SVAG": 0.125, "SVAG_TAK": True},
 }
 
+# kontrollen av mätarna (uppgiften a2t-kontroll-matare): av som standard (QC_T saknas eller 0). Se kontroll().
+QC_STD = {"QC_R": 40.0, "QC_NMIN": 2, "QC_SMIN": None, "QC_SKYDD400": True}
+
+
+# ---------------------------------------------------------------- kontrollen av mätarna
+
+def kontroll(xy, mm, bg, rng_km, over400, p) -> np.ndarray:
+    """Mätare som kastas för perioden (bool per mätare), bara bland mätarna som systemet ser.
+
+    I kvadratrotsskala jämförs varje mätare med en skattning ur grannarna inom QC_R km (utan mätaren
+    själv, Gaussvikter med längden QC_R/2, minst QC_NMIN grannar) och med bakgrunden bg (A1 efter
+    kvoten). e_n = √g − grannarna och e_b = (√g − √bg) / √(1 + C·(radaravstånd/100)²), så att radarn
+    litas mindre på långt från radarn. Spridningen σ är 1,4826 · MAD av e över periodens mätare där
+    någon sida är våt, men minst QC_SMIN (√mm; standard SO). Mätaren kastas om e_n och e_b har samma
+    tecken och båda är över QC_T · σ: för torr mot både grannarna och radarn (0 i regn) eller för våt
+    mot både grannarna och radarn. Med QC_SKYDD400 kastas en för våt mätare aldrig över 400 m, där
+    radarn missar låg nederbörd (det A2 ska fånga). Utan grannar kastas ingenting.
+    QC_T = 0 (standard) stänger av kontrollen."""
+    T = p.get("QC_T", 0.0)
+    n = len(mm)
+    out = np.zeros(n, bool)
+    if T <= 0 or n < 3:
+        return out
+    q = dict(QC_STD, **{k: v for k, v in p.items() if k.startswith("QC_")})
+    R, smin = q["QC_R"], q["QC_SMIN"] if q["QC_SMIN"] is not None else p["SO"]
+    ok = np.isfinite(mm) & np.isfinite(bg)
+    s = np.sqrt(np.maximum(mm, 0.0))
+    sb = np.sqrt(np.maximum(np.nan_to_num(bg), 0.0))
+    tree = cKDTree(xy)
+    sp = tree.sparse_distance_matrix(tree, R, output_type="coo_matrix")
+    i, j, d = sp.row, sp.col, sp.data
+    keep = (i != j) & ok[i] & ok[j]
+    i, j, d = i[keep], j[keep], d[keep]
+    w = np.exp(-0.5 * (d / (0.5 * R)) ** 2)
+    wsum = np.bincount(i, w, n)
+    cnt = np.bincount(i, minlength=n)
+    nb = np.bincount(i, w * s[j], n) / np.maximum(wsum, 1e-12)
+    valid = ok & (cnt >= q["QC_NMIN"])
+    if not valid.any():
+        return out
+    e_n = s - nb
+    e_b = (s - sb) / np.sqrt(1.0 + p["C"] * (rng_km / 100.0) ** 2)
+
+    def sig(e, act):
+        a = e[act]
+        if len(a) < 10:
+            return smin
+        return max(1.4826 * float(np.median(np.abs(a - np.median(a)))), smin)
+
+    sn = sig(e_n, valid & ((mm > 0) | (nb > 0)))
+    sbb = sig(e_b, valid & ((mm > 0) | (sb > 0)))
+    low = valid & (e_n < -T * sn) & (e_b < -T * sbb)
+    high = valid & (e_n > T * sn) & (e_b > T * sbb)
+    if q["QC_SKYDD400"]:
+        high &= ~np.asarray(over400, bool)
+    return low | high
+
 
 # ---------------------------------------------------------------- geometri
 
@@ -314,7 +371,9 @@ class Punktdag:
             self.res[res] = dict(
                 t=z[f"{res}_t"], mm=z[f"{res}_mm"].astype(float), a=z[f"{res}_a"].astype(float),
                 rng=z[f"{res}_rng"].astype(float), xy=np.c_[c, r].astype(float) * D.RES_KM,
-                fold=folds[r, c], dist=fd[:, r, c])
+                fold=folds[r, c], dist=fd[:, r, c], station=z[f"{res}_station"])
+            # indata till A2 (kan bytas mot värden med syntetiska fel); domaren bedömer mot mm
+            self.res[res]["mm_in"] = self.res[res]["mm"]
         tp = terr_path(path.stem)
         if tp.exists():
             zt = np.load(tp)
@@ -323,15 +382,49 @@ class Punktdag:
                 self.res[res]["lovart"] = zt[f"{res}_lovart"].astype(bool)
 
 
-def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True, full=False):
+def _over400(Q, sel):
+    return Q["over400"][sel] if "over400" in Q else np.zeros(int(np.count_nonzero(sel)), bool)
+
+
+def _kontroll_timme(H, seen_h, ph):
+    """Timmätare som kontrollen kastar (bool per rad i H), bland de sedda, med timmens kvot."""
+    flag = np.zeros(len(H["mm"]), bool)
+    if ph is None or ph.get("QC_T", 0.0) <= 0:
+        return flag
+    for hour in range(24):
+        gs = seen_h & (H["t"] == hour)
+        if gs.sum() < 3:
+            continue
+        win = seen_h & (H["t"] <= hour) & (H["t"] > hour - ph["WIN"])
+        rg = stor_kvot(H["xy"][gs], H["xy"][win], H["mm_in"][win], H["a"][win], ph)
+        bg = svag_kvot(rg, H["a"][gs], ph) * H["a"][gs]
+        flag[np.flatnonzero(gs)] = kontroll(H["xy"][gs], H["mm_in"][gs], bg, H["rng"][gs], _over400(H, gs), ph)
+    return flag
+
+
+def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True, full=False, ph=None, rec=None):
     """A2 i varje mätare i gruppen k ur mätarna som syns när grupp k bedöms. Ger (g, a, a2), och med
-    full=True också kvoten k i målen och målens index i pd.res[res]."""
+    full=True också kvoten k i målen och målens index i pd.res[res].
+
+    ph: timmens parametrar för kontrollen av timmätarna (i kvoten och, för timmen, i OI); för timmen
+    gäller p. rec: lista som får (res, index i pd.res[res] för indata, kastade) per grupp och period."""
     H, Q = pd.res["timme"], pd.res[res]
+    if res == "timme":
+        ph = p
     G, A, P, K, I = [], [], [], [], []
     nper = D.NPER[res]
     for k in range(D.FOLDS):
         seen_h = H["dist"][k] > D.BUFFER_KM
         seen_q = Q["dist"][k] > D.BUFFER_KM
+        hflag = _kontroll_timme(H, seen_h, ph)
+        if hflag.any():
+            seen_h = seen_h & ~hflag
+            if res == "timme":
+                seen_q = seen_h
+        if rec is not None and res == "timme" and ph.get("QC_T", 0.0) > 0:
+            for t in range(nper):
+                gs0 = (H["dist"][k] > D.BUFFER_KM) & (H["t"] == t)
+                rec.append(("timme", np.flatnonzero(gs0), hflag[gs0]))
         for t in range(nper):
             hour = t if res == "timme" else t // 4
             tgt = (Q["t"] == t) & (Q["fold"] == k) & np.isfinite(Q["a"])
@@ -339,9 +432,18 @@ def _predict_day(pd: Punktdag, res: str, p: dict, torrmask=True, full=False):
                 continue
             win = seen_h & (H["t"] <= hour) & (H["t"] > hour - p["WIN"])
             gs = seen_q & (Q["t"] == t)
-            rt = stor_kvot(Q["xy"][tgt], H["xy"][win], H["mm"][win], H["a"][win], p)
-            rg = stor_kvot(Q["xy"][gs], H["xy"][win], H["mm"][win], H["a"][win], p)
-            a2 = analys_punkter(Q["a"][tgt], Q["xy"][tgt], Q["rng"][tgt], rt, Q["xy"][gs], Q["mm"][gs],
+            rg = stor_kvot(Q["xy"][gs], H["xy"][win], H["mm_in"][win], H["a"][win], p)
+            if res == "kvart" and p.get("QC_T", 0.0) > 0:
+                bg = svag_kvot(rg, Q["a"][gs], p) * Q["a"][gs]
+                fl = kontroll(Q["xy"][gs], Q["mm_in"][gs], bg, Q["rng"][gs], _over400(Q, gs), p)
+                if rec is not None:
+                    rec.append(("kvart", np.flatnonzero(gs), fl))
+                if fl.any():
+                    gs = gs.copy()
+                    gs[np.flatnonzero(gs)[fl]] = False
+                    rg = rg[~fl]
+            rt = stor_kvot(Q["xy"][tgt], H["xy"][win], H["mm_in"][win], H["a"][win], p)
+            a2 = analys_punkter(Q["a"][tgt], Q["xy"][tgt], Q["rng"][tgt], rt, Q["xy"][gs], Q["mm_in"][gs],
                                 Q["a"][gs], Q["rng"][gs], rg, None, p, torrmask)
             G.append(Q["mm"][tgt]); A.append(Q["a"][tgt]); P.append(a2)
             K.append(rt); I.append(np.flatnonzero(tgt))
@@ -619,12 +721,40 @@ class A2:
                 out[dry2] = 0.0
         return np.where(np.isfinite(F1), out, np.nan).astype(np.float32)
 
+    def _over400(self, dag, m):
+        elev = getattr(dag, "elev", None)
+        if elev is None:
+            return np.zeros(len(m), bool)
+        return elev[m.r, m.c] > D.HIGH_M
+
+    def _kontroll(self, dag, m, sel, a, ratio_g, p):
+        """Kontrollen av periodens mätare m.subset(sel) (se kontroll()); ger de kastade."""
+        g = m.subset(sel)
+        xy = np.c_[g.c, g.r].astype(float) * D.RES_KM
+        bg = svag_kvot(ratio_g, a, p) * a
+        return kontroll(xy, g.mm, bg, self.rng_full[g.r, g.c].astype(float), self._over400(dag, g), p)
+
     def falt(self, dag, matare, hours=range(24)):
         mq, mh = matare
         kv = np.full(self.kv1.shape, np.nan, np.float32)
         tm = np.full(self.tm1.shape, np.nan, np.float32)
         a_h = self.tm1[mh.t, mh.r, mh.c].astype(float)
         xy_h = np.c_[mh.c, mh.r].astype(float) * D.RES_KM
+        ph = self.params["timme"]
+        self.kastade = []  # (res, station, period) för kontrollen
+        if ph.get("QC_T", 0.0) > 0:
+            # timmätarna som kontrollen kastar tas bort ur kvoten och ur timmens OI
+            flag = np.zeros(len(mh), bool)
+            for hour in range(24):
+                sel = mh.t == hour
+                if sel.sum() < 3:
+                    continue
+                win = (mh.t <= hour) & (mh.t > hour - ph["WIN"])
+                rg = stor_kvot(xy_h[sel], xy_h[win], mh.mm[win], a_h[win], ph)
+                flag[np.flatnonzero(sel)] = self._kontroll(dag, mh, sel, a_h[sel], rg, ph)
+            self.kastade += [("timme", s, t) for s, t in zip(mh.station[flag], mh.t[flag])]
+            mh = mh.subset(~flag)
+            a_h, xy_h = a_h[~flag], xy_h[~flag]
         for hour in hours:
             for res in ("timme", "kvart"):
                 p = self.params[res]
@@ -637,6 +767,15 @@ class A2:
                     sel = m.t == t
                     xy = np.c_[m.c[sel], m.r[sel]].astype(float) * D.RES_KM
                     ratio_g = stor_kvot(xy, xy_h[win], mh.mm[win], a_h[win], p)
+                    if res == "kvart" and p.get("QC_T", 0.0) > 0 and sel.sum() >= 3:
+                        a = F[t][m.r[sel], m.c[sel]].astype(float)
+                        fl = self._kontroll(dag, m, sel, a, ratio_g, p)
+                        if fl.any():
+                            idx = np.flatnonzero(sel)[fl]
+                            self.kastade += [("kvart", s, t) for s in m.station[idx]]
+                            sel = sel.copy()
+                            sel[idx] = False
+                            ratio_g = ratio_g[~fl]
                     (tm if res == "timme" else kv)[t] = self._period(F[t].astype(np.float32), m, sel, ratio_c, ratio_g, p)
         return kv, tm
 
@@ -656,10 +795,13 @@ def make_a2(kv1, tm1, grid, params=None):
 
 
 def system_params(namn: str) -> dict:
-    """Parametrarna för A2 (PARAMS) eller en fryst variant i FRYSTA (ändringar för kvarten)."""
+    """Parametrarna för A2 (PARAMS) eller en fryst variant i FRYSTA (ändringar för kvarten, och för
+    timmen under nyckeln "timme")."""
     if namn == "A2":
         return PARAMS
-    return {"timme": dict(PARAMS["timme"]), "kvart": dict(PARAMS["kvart"], **FRYSTA[namn])}
+    ch = dict(FRYSTA[namn])
+    th = ch.pop("timme", {})  # ändringar för timmen (bara kontrollen av mätarna)
+    return {"timme": dict(PARAMS["timme"], **th), "kvart": dict(PARAMS["kvart"], **ch)}
 
 
 def cmd_kor(a):
