@@ -65,6 +65,7 @@ def test_parametrarna_ar_a2t():
         assert mine["K_SVAG"] == ref.get("K_SVAG", 0.0)
         assert p[res].get("QC_T", 0.0) == 0 and p[res].get("TORR2", 0.0) == 0
     assert p["kvart"]["SVAG_TAK"] and src.STEG == exp.STEP and src.KMAX == exp.KMAX
+    assert src.RES_KM == D.RES_KM  # parametrarna valdes med 2,0 km per ruta, inte rutnätets 2,015
 
 
 @pytest.mark.parametrize("seed,hour,kw", [

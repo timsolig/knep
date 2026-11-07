@@ -31,6 +31,9 @@ from scipy.spatial.distance import cdist
 STEG = 4      # OI-tillskottet räknas på var 4:e ruta
 STEG_K = 16   # kvoten i stor skala på var 16:e ruta
 KMAX = 4.0    # kvoten klipps till [1/KMAX, KMAX]
+# avstånden räknas med 2,0 km per ruta som i domaren och experimentet (RES_KM), där parametrarna valdes,
+# fast SMHI:s rutnät har 2,015 km; längdskalorna nedan gäller alltså i den enheten
+RES_KM = 2.0
 
 # A2T, frysta värden ur system_params("A2T") i experiments/analys/a2.py (PARAMS och FRYSTA["A2T"]),
 # valda på träningsdagarna; se rapporterna 2026-11-06/3-a2.md och 2026-11-07/0001-a2-falska-ekon.md.
@@ -111,9 +114,10 @@ def _upp(grov, shape, steg):
 
 
 class A2T:
-    """A2T på ett rutnät. rng_km är avståndet till närmaste radar (radaravstand_km), res_km rutans sida."""
+    """A2T på ett rutnät. rng_km är avståndet till närmaste radar (radaravstand_km), res_km rutans sida
+    i avståndens enhet (se RES_KM)."""
 
-    def __init__(self, rng_km: np.ndarray, res_km: float = 2.0):
+    def __init__(self, rng_km: np.ndarray, res_km: float = RES_KM):
         self.shape = rng_km.shape
         self.rng = rng_km
         self.res = res_km
@@ -128,7 +132,7 @@ class A2T:
 
     @classmethod
     def fran_grid(cls, grid) -> "A2T":
-        return cls(radaravstand_km(grid), abs(grid.transform.a) / 1000.0)
+        return cls(radaravstand_km(grid))
 
     def _xy(self, m: Matare):
         return np.c_[m.kol, m.rad].astype(float) * self.res
