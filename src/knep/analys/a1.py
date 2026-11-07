@@ -32,18 +32,49 @@ log = logging.getLogger("knep.analys.a1")
 SUB = 5  # tider per 5-minutersintervall, en per minut
 
 
-def interval_mean(f0: np.ndarray, f1: np.ndarray, motion: np.ndarray, sub: int = SUB) -> np.ndarray:
-    """Medelintensiteten under intervallet från bilden f0 till bilden f1, i mm/h.
+def paths(motion: np.ndarray, sub: int = SUB) -> tuple[list, list]:
+    """Förflyttningarna för ett intervall: framåt från f0 till τ och bakåt från f1 till τ (i τ:s ordning).
 
-    motion: (2, H, W) i pixlar per intervall. NaN i en bild räknas som att den bilden inte vet.
-    """
+    Beror bara på rörelsen, så de kan räknas en gång och delas av flera fält (interpolate)."""
+    tau = (np.arange(sub, dtype=float) + 0.5) / sub
+    fwd = list(advect.displacements(motion, list(tau)))
+    # bakåt från f1: tiderna 1 − τ i stigande ordning, och sedan tillbaka i τ:s ordning
+    bwd = list(advect.displacements(-motion, list(1.0 - tau[::-1])))[::-1]
+    return fwd, bwd
+
+
+def stay_fraction(motion: np.ndarray, terrain: np.ndarray, k_lift: float, sigma: float = 2.0) -> np.ndarray:
+    """Andelen av det gemensamma fältet som står still: 1 − exp(−k_lift · max(u·∇h, 0)).
+
+    u·∇h är lyftet i m per intervall (rörelsen i pixlar per intervall gånger höjdgradienten i m per
+    pixel, terrängen utjämnad med Gauss sigma pixlar), som Chain.stay i prognosen."""
+    from scipy.ndimage import gaussian_filter
+    gy, gx = np.gradient(gaussian_filter(np.asarray(terrain, np.float32), sigma))
+    lift = np.maximum(motion[0] * gx + motion[1] * gy, 0.0)
+    return (1.0 - np.exp(-k_lift * lift)).astype(np.float32)
+
+
+def interpolate(f0: np.ndarray, f1: np.ndarray, pth: tuple[list, list], stay: np.ndarray | float | None = None) -> np.ndarray:
+    """Medelintensiteten under intervallet ur förflyttningarna pth (paths), i mm/h.
+
+    stay (valfritt, standard av): andelen s per pixel av den del som finns på samma plats i båda
+    bilderna, c = s · min(f0, f1), som ligger kvar på platsen i stället för att flyttas; bara resten
+    (f0 − c och f1 − c) interpoleras längs rörelsen. Regn som står still vid en sluttning smetas då
+    inte ut längs rörelsen, medan en cell som flyttar sig (liten överlappning) flyttas som förut."""
+    fwd, bwd = pth
+    sub = len(fwd)
     tau = (np.arange(sub, dtype=float) + 0.5) / sub
     v0, v1 = np.isfinite(f0), np.isfinite(f1)
     a, b = np.where(v0, f0, 0.0).astype(np.float32), np.where(v1, f1, 0.0).astype(np.float32)
-    fa, ma = advect.extrapolate([a, v0.astype(np.float32)], motion, list(tau), outval=0.0)
-    # bakåt från f1: tiderna 1 − τ i stigande ordning, och sedan tillbaka i τ:s ordning
-    fb, mb = advect.extrapolate([b, v1.astype(np.float32)], -motion, list(1.0 - tau[::-1]), outval=0.0)
-    fb, mb = fb[::-1], mb[::-1]
+    c = None
+    if stay is not None:
+        c = (np.asarray(stay, np.float32) * np.where(v0 & v1, np.minimum(a, b), 0.0)).astype(np.float32)
+        a, b = a - c, b - c
+    m0, m1 = v0.astype(np.float32), v1.astype(np.float32)
+    fa = np.stack([advect.warp(a, mx, my, o, 1, 0.0) for mx, my, o in fwd])
+    ma = np.stack([advect.warp(m0, mx, my, o, 1, 0.0) for mx, my, o in fwd])
+    fb = np.stack([advect.warp(b, mx, my, o, 1, 0.0) for mx, my, o in bwd])
+    mb = np.stack([advect.warp(m1, mx, my, o, 1, 0.0) for mx, my, o in bwd])
     w0 = (1.0 - tau)[:, None, None] * ma
     w1 = tau[:, None, None] * mb
     w = w0 + w1
@@ -52,8 +83,20 @@ def interval_mean(f0: np.ndarray, f1: np.ndarray, motion: np.ndarray, sub: int =
     ok = np.isfinite(f)
     n = ok.sum(axis=0)
     out = np.where(n > 0, np.where(ok, f, 0.0).sum(axis=0) / np.maximum(n, 1), np.nan)
+    if c is not None:
+        out = np.where(np.isfinite(out), out, np.where(c > 0, 0.0, np.nan)) + c
     out = np.where(v0 | v1, out, np.nan)  # utanför täckningen i båda bilderna: NaN, som A0
     return np.maximum(out, 0.0).astype(np.float32)
+
+
+def interval_mean(f0: np.ndarray, f1: np.ndarray, motion: np.ndarray, sub: int = SUB,
+                  stay: np.ndarray | float | None = None) -> np.ndarray:
+    """Medelintensiteten under intervallet från bilden f0 till bilden f1, i mm/h.
+
+    motion: (2, H, W) i pixlar per intervall. NaN i en bild räknas som att den bilden inte vet.
+    stay: se interpolate (None, standard, flyttar allt som förut).
+    """
+    return interpolate(f0, f1, paths(motion, sub), stay)
 
 
 def _path(state_dir: Path, t: datetime) -> Path:
