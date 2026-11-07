@@ -24,6 +24,7 @@ Planeraren läser den här filen före varje uppgift. Användaren äger **Princi
 - EUMETSAT: realtidslicensen verkar godkänd, men den allmänna licensen saknas fortfarande (2026-11-06). Arkivet går inte att hämta förrän den är godkänd.
 - Analysens domare: summakvoten belönar för höga toppar vid enstaka mätare så länge radarn i stort är för torr (det fällde F1 och gav A1 dess "underskott" på lovartsidan). Ska den kompletteras, till exempel med kvoten för perioder då mätaren har regn, och baslinjerna köras om? Bakgrunden ändrar inte domaren utan ditt beslut. (2026-11-07)
 - Testdelen: vill du att baslinjerna (A0, A1, kedjan) och F4 körs på testdelen? Kommandona och den lilla upplåsningen står i `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md` och `2026-11-07/sammanfattning.md`. (2026-11-07)
+- A2T (A2 utan uppskalning och med tak över svagt eko per kvart) slår både A0 och A1 enligt domaren på valideringen (`rapporter/2026-11-07/0001-a2-falska-ekon.md`). Rekommendationen är att först lägga till kontrollen av mätarna och sedan flytta den till `src/knep/analys/` som ett avstängt val; att visa den som A2 på sidan eller använda den som facit i verifieringen beslutar du. (2026-11-07)
 - F4:s klotterkarta som modellfil (`--klotter`): godkänd av domaren mot A0 men med liten vinst vid mätarna. Rekommendationen är att träna om den på alla 28 träningsdagar och köra testdelen före ett släpp. (2026-11-07)
 
 ## Ändringar
