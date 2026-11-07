@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0006 · 2026-11-07 15:30 · kedjans-underskott-1h · klar
+- Varför: Uppgift 0005 visade att kedjan har för lite regn i mätarnas rutor vid +1 h och att försprånget mot persistensen mot mätarna är minst där, och att köra kedjan utan platskarta och utan fördelningsmatchning på de redan sparade analyserna pekar ut vilken del av kedjan som ska rättas.
+- Resultat: varken platskartan eller fördelningsmatchningen förklarar underskottet; utan platskartan blir kedjans kvot mot mätarna vid +1 h 0,920 och utan matchningen 0,919 mot kedjans 0,914 (skillnad +0,006, 95 % −0,015 till +0,043, och +0,005, −0,002 till +0,011), alltså under en tiondel av avståndet till 0,98; det mesta av "underskottet" är att radarn själv har kvoten 0,941 mot mätarna just de målen (kedjan är 0,971 av radarn vid mätarna), och resten av förlusten under första timmen sitter vid täckningens rand (kvoten mot radarn 0,778 vid +60 min inom 50 km från randen, 0,980 inne i området).
+- Rapport: [rapporter/2026-11-07/0006-kedjans-underskott-1h.md](rapporter/2026-11-07/0006-kedjans-underskott-1h.md), 108 min
+
 ### 0005 · 2026-11-07 13:39 · prognos-mot-a2t-facit · klar
 - Varför: A2T finns nu i src och i cykeln, och att räkna kedjan och persistensen mot A2T i stället för radarn svarar både på varför Tim-KNEP är svag mot persistensen vid +1 h (mål 4) och på om A2T duger som facit i verifieringen (mål 1).
 - Resultat: på 15 träningsdagar (90 utgåvor) slår kedjan persistensen vid alla ledtider mot alla tre facit, men försprånget vid +1 h krymper när radarn byts mot A2T (CSI 1 mm +0,257 till +0,196, FSS 1 mm/10 km +0,253 till +0,204, MAE −0,084 till −0,066 mm) och mest mot mätarna (CSI 1 mm +0,105, 95 % +0,066 till +0,136, mindre än vid +2 h med +0,142); klottermasken (F4) ändrar skillnaden med högst 0,01, så klottret ger persistensen nästan ingenting på de här dagarna.
