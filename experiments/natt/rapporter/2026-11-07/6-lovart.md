@@ -1,6 +1,6 @@
 # Uppgift 6: A1:s underskott på lovartsidan
 
-(utkast, fylls i under körningen)
+Kort: underskottet är ingen förlust av regn utan en utjämning av toppar i regn som rör sig fort. Valet `stay` i A1 (standard av) håller kvar den del av fältet som finns på samma plats i båda bilderna, antingen överallt (A1M) eller där lyftet är stort (A1L1). Ingen variant klarade regeln på träningen (5 dagar), så ingen frystes. A1L1 är på valideringen bättre än A0 utan något sämre mått, vilket A1 inte är, men sämre än A1 över 400 m och i falska ekon per kvart på lovartsidan.
 
 ## Före uppgiften
 
@@ -68,11 +68,35 @@ Domen på träningen:
 - **A1L1**: den enda som rättar summakvoten på lovartsidan (mot A0 med intervallet helt över 0), men mot A1 sämre i summakvoten och MAE över 400 m och i falska ekon per timme (båda måtten), och mot A0 sämre i FSS 1 över 400 m.
 - **Valet: ingen variant klarar regeln**, så ingen frystes som ersättare till A1. Det försiktigaste är att A1 står kvar som den är och valet `stay` stannar av.
 
-VALIDERING_HAR
+## Valideringen (16 dagar)
+
+Eftersom ingen variant valdes finns inget fryst system att bedöma. Jag körde ändå **A1L1** genom domaren på valideringen, som information: den är den enda variant som på träningen rättade det uppgiften gäller (summakvoten på lovartsidan), och utan den siffran går det inte att säga om riktningen håller. A1M kördes inte på valideringen; tiden räckte till en variant. Tabellerna: `/data/analys/domare/tabell_A1L1_mot_{A0,A1}_validering.json` (A1 mot A0 räknades om ur samma filer och är identisk med uppgift 2).
+
+| mått (skillnad i godhet, 95 %) | A1 − A0 | A1L1 − A0 | A1L1 − A1 |
+|---|---|---|---|
+| timme lovart, kvot summa (A0 0,671, A1 0,653, A1L1 0,677) | **−0,028 (−0,051 till −0,006)** | +0,009 (−0,005 till +0,026) | **+0,037 (+0,024 till +0,049)** |
+| kvart lovart, kvot summa (0,604, 0,592, 0,613) | **−0,020 (−0,039 till −0,001)** | **+0,016 (+0,002 till +0,033)** | **+0,035 (+0,022 till +0,048)** |
+| timme över 400 m, kvot summa (0,524, 0,505, 0,494) | −0,036 (−0,154 till +0,042) | −0,059 (−0,193 till +0,017) | **−0,022 (−0,042 till −0,005)** |
+| timme lovart, MAE | **+0,006** | +0,004 (−0,001 till +0,008) | −0,002 (−0,006 till +0,001) |
+| kvart alla, CSI 0,5 (0,287, 0,303, 0,301) | **+0,015** | **+0,013 (+0,007 till +0,021)** | −0,002 (−0,005 till +0,001) |
+| kvart alla, CSI 1 (0,179, 0,196, 0,189) | **+0,017** | **+0,011 (+0,000 till +0,020)** | **−0,006 (−0,009 till −0,003)** |
+| kvart alla, MAE | **+0,003** | **+0,002** | **−0,0007** |
+| timme alla, MAE | **+0,005** | **+0,003** | **−0,002** |
+| hopp per kvart, kvot mot mätarna (0,884, 0,809, 0,832; ingår inte i domen) | −0,089 (−0,109 till −0,003) | −0,061 (−0,077 till +0,024) | +0,029 (+0,023 till +0,034) |
+| kartmåttet (36,6, 40,4, 37,2 rutor per dag) | −3,9 (−9,5 till +1,0) | −0,7 (−5,9 till +3,8) | **+3,2 (+1,1 till +5,9)** |
+
+Domen på valideringen:
+
+- **A1 mot A0: inte bättre** (sämre i summakvoten på lovartsidan, kvart och timme), som i uppgift 2.
+- **A1L1 mot A0: bättre**, inget sämre. Bättre i MAE, CSI 0,5 och 1 och FSS 0,5 (kvart och timme), FSS 1 per kvart och CSI 5 per timme. Underskottet på lovartsidan är borta (kvart +0,016 med intervallet över 0, timme +0,009). Kartmåttet är nästan som A0:s (37,2 mot 36,6), så utsmetningen av klottret som A1 ger (40,4) försvinner till största delen.
+- **A1L1 mot A1: inte bättre.** Bättre i summakvoten per kvart, kvoten över 1 mm per timme och FSS 0,5 per timme, och på lovartsidan (+0,037), men sämre i summakvoten över 400 m (kvart och timme), FSS 1 per kvart och FSS 0,5 per timme över 400 m och i falska ekon per kvart på lovartsidan (båda måtten). Av A1:s vinst per kvart mot A0 behåller A1L1 ungefär 60 till 87 %.
+
+Vad det betyder: att hålla kvar den gemensamma delen där lyftet är stort tar bort underskottet på lovartsidan och gör A1 godkänd mot A0, men till priset av mindre regn över 400 m (där mätarnas mängd redan är dubbelt så stor som radarns) och fler falska ekon per kvart på lovartsidan. Det stämmer med diagnosen: det mesta regnet på lovartsidan rör sig, så att låta det stå still där lyftet är stort håller kvar också sådant som borde ha flyttats (falska ekon per kvart), och över 400 m sänks summan troligen därför att en del av det som hålls kvar är regn som i A1 hade flyttats in över mätarna högre upp. Det har jag inte hunnit kontrollera. Domen mot A1 är densamma på träningen och valideringen, så valet (ingen variant) står sig. Valideringen är nu sedd för A1L1; ett senare val mellan A1 och A1L1 ska därför göras på fler träningsdagar och bedömas på testdelen, inte på valideringen igen.
 
 ## Körningen
 
 - Diagnosen: cirka 80 s per dag.
+- Valideringen av A1L1: 16 dagar med en process på 50 min (3,4 min per dag).
 - Varianterna: varje variant kostar cirka 2,3 min per dag med en process (förflyttningarna räknas en gång per rörelsefält och delas), plus cirka 1 min för att läsa bilderna och räkna A0. Med två processer och fyra varianter blev det 18 min per dag.
 - **Två processer dog av minnet (kod 137).** Driftens process tar själv cirka 0,9 GB, och varje process med fyra varianter tog cirka 1,2 GB. Därefter körde jag bara en process åt gången, så att minnesbristen inte kunde drabba driften. Det är skälet till att träningen bara hann 5 dagar. Inget i driften påverkades såvitt jag kan se (driftens process fanns kvar under hela körningen).
 - Ny data: summorna per dag (några kB per dag och variant) och två provfält i `/data/analys/lovart/` (cirka 30 MB). `/data/analys` är under 1 GB.
@@ -92,8 +116,10 @@ A2 (uppgift 3) och filtret F4 (uppgift 4) slutade båda som klara. A2 räknas p�
 ## Nästa steg
 
 1. **Domaren och summakvoten på lovartsidan.** Underskottet är ingen förlust av regn utan en utjämning av toppar, och vid de mätare som bidrar mest ligger A1 närmare mätaren. Summakvoten belönar för höga toppar så länge radarn i stort är för torr. Ett mått för mängden som inte belönar det (till exempel kvoten bara för perioder där mätaren har regn, eller kvoten efter A2:s rättning i stor skala) bör beslutas för sig, och baslinjerna köras om. Det föreslogs redan i uppgift 5.
-2. **Träningen på alla 28 dagar** med en process (cirka 3,5 min per dag och variant), så att valet inte vilar på 5 dagar.
+2. **Träningen på alla 28 dagar** med en process (cirka 3,5 min per dag och variant), så att valet inte vilar på 5 dagar. `lovart.py kor A1 A1M A1L1 --del traning` hoppar över de dagar som redan finns. Därefter avgör testdelen mellan A1 och A1L1, efter beslut av användaren.
 3. **Ett snävare val**: stå stilla bara där regnet faktiskt står stilla, mätt på samma sätt som diagnosen (korrelationen på plats mot längs rörelsen över senaste kvarten), i stället för ur lyftet eller överallt. Diagnosen visar att det bara gäller 21 till 29 % av fallen på lovartsidan, så både A1M och A1L1 håller sannolikt kvar för mycket.
 4. Om en variant väljs: koppla valet till `cli.py` (terrängen på radarns rutnät behövs för lyftet) och kör om A2 på dess fält.
 
-STATUS_RAD
+Varför delvis: orsaken är funnen och rättningen finns som ett val med tester, men ingen variant blev godkänd mot A1, träningen hann bara 5 av 28 dagar, och A2 kördes inte om.
+
+Status: delvis
