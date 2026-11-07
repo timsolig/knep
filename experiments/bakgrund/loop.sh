@@ -182,8 +182,12 @@ pusha() {
   gren=$(cat "$STATE/gren")
   sparr || return 1
   G push -q -u origin "$gren" 2>>"$STATE/logg.txt" || { logg "push misslyckades"; return 1; }
-  if [ "$(gh_i pr view "$gren" --json state -q .state 2>/dev/null)" = OPEN ]; then
-    gh_i pr edit "$gren" --body "$(pr_text)" >/dev/null 2>>"$STATE/logg.txt" || logg "kunde inte uppdatera PR:en"
+  local nr
+  nr=$(gh_i pr view "$gren" --json number,state -q 'select(.state=="OPEN").number' 2>/dev/null)
+  if [ -n "$nr" ]; then
+    # Via REST: gh pr edit fäller på GitHubs nedlagda Projects (classic) och uppdaterar ingenting.
+    gh_i api -X PATCH "repos/{owner}/{repo}/pulls/$nr" -f body="$(pr_text)" >/dev/null 2>>"$STATE/logg.txt" \
+      || logg "kunde inte uppdatera PR:en"
   else
     gh_i pr create --base main --head "$gren" --title "Bakgrunden: ${gren#bakgrund/}" --body "$(pr_text)" \
       >>"$STATE/logg.txt" 2>&1 && logg "öppnade en PR för $gren"
