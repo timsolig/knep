@@ -59,6 +59,7 @@ def legend(minutes: int = 5):
 # radaranalysen bakåt på sidan, i underkatalogen hist/
 HISTORY_HOURS, HISTORY_DIR = 12, "hist"
 A1_DIR = "a1"  # A1, analysen interpolerad längs rörelsen (analys/a1.py), ritad som hist/
+A2_DIR = "a2"  # A2T, A1 rättad mot regnmätarna (analys/a2_cykel.py), bara kvart och timme
 
 UNITS = {5: "mm/h", 15: "mm per 15 min", 60: "mm per timme"}
 STEP = timedelta(minutes=5)
@@ -177,22 +178,26 @@ class Renderer:
                 path = d / f"{prefix}{end:%Y%m%dT%H%M}.png"
                 if not path.exists():
                     self.png(f, path)
-        oldest = now - timedelta(hours=hours)
-        lists = {5: [], 15: [], 60: []}
-        for p in sorted(d.glob("*.png")):
-            m = re.fullmatch(r"([qh]?)(\d{8}T\d{4})", p.stem)
-            if not m:
-                continue
-            t = datetime.strptime(m.group(2), "%Y%m%dT%H%M").replace(tzinfo=UTC)
-            minutes = {"": 5, "q": 15, "h": 60}[m.group(1)]
-            if t - timedelta(minutes=minutes) < oldest or t > now:
-                p.unlink()
-                continue
-            entry = {"time": _iso(t), "kind": "obs", "file": f"{directory}/{p.name}"}
-            if minutes > 5:
-                entry["start"] = _iso(t - timedelta(minutes=minutes))
-            lists[minutes].append(entry)
-        return {"hours": hours, "frames": lists[5], "frames15": lists[15], "frames60": lists[60]}
+        return _listing(d, directory, now, hours)
+
+    def periods(self, out: Path, items: list[tuple], now: datetime, hours: float = HISTORY_HOURS,
+                directory: str = A2_DIR) -> dict:
+        """Kvarts- och timsummor bakåt som inte byggs ur 5-minutersbilder (A2, analys/a2_cykel.py).
+
+        items: (periodens slut, minuter 15 eller 60, fält i mm/h, märke). Filen heter som i history med
+        märket efter: q20261107T1015_n512.png. Ett nytt märke för samma period ersätter det gamla, så
+        sidan aldrig ser en gammal bild ur cachen. Listan har samma form som history."""
+        d = out / directory
+        d.mkdir(parents=True, exist_ok=True)
+        for end, minutes, f, tag in items:
+            prefix = {15: "q", 60: "h"}[minutes]
+            path = d / f"{prefix}{end:%Y%m%dT%H%M}_{tag}.png"
+            if not path.exists():
+                self.png(f, path)
+            for old in d.glob(f"{prefix}{end:%Y%m%dT%H%M}_*.png"):
+                if old != path:
+                    old.unlink()
+        return _listing(d, directory, now, hours)
 
     def write(self, out: Path, analysis: datetime, frames: list[tuple], extra: dict | None = None) -> None:
         """Skriv PNG per ruta och upplösning, värdefilen och sist manifest.json, så att sidan aldrig
@@ -252,3 +257,24 @@ class Renderer:
         tmp = out / "manifest.json.tmp"
         tmp.write_text(json.dumps(manifest, indent=1))
         tmp.replace(out / "manifest.json")
+
+
+def _listing(d: Path, directory: str, now: datetime, hours: float) -> dict:
+    """Bilderna bakåt i d som listor per upplösning; de som är äldre än hours (eller efter now) tas bort.
+    Ett märke efter tiden (Renderer.periods) är tillåtet."""
+    oldest = now - timedelta(hours=hours)
+    lists = {5: [], 15: [], 60: []}
+    for p in sorted(d.glob("*.png")):
+        m = re.fullmatch(r"([qh]?)(\d{8}T\d{4})(?:_\w+)?", p.stem)
+        if not m:
+            continue
+        t = datetime.strptime(m.group(2), "%Y%m%dT%H%M").replace(tzinfo=UTC)
+        minutes = {"": 5, "q": 15, "h": 60}[m.group(1)]
+        if t - timedelta(minutes=minutes) < oldest or t > now:
+            p.unlink()
+            continue
+        entry = {"time": _iso(t), "kind": "obs", "file": f"{directory}/{p.name}"}
+        if minutes > 5:
+            entry["start"] = _iso(t - timedelta(minutes=minutes))
+        lists[minutes].append(entry)
+    return {"hours": hours, "frames": lists[5], "frames15": lists[15], "frames60": lists[60]}

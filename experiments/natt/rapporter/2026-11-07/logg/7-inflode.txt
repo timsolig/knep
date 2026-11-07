@@ -1,0 +1,27 @@
+===== 2026-11-07T04:16:15Z försök 1 =====
+Sökningen går i bakgrunden. Jag fortsätter när den första varianten är klar.
+
+Väntar på varianten Rang (klar omkring 04:30).
+
+Bevakningen löpte ut; väntslingan i bakgrunden täcker det. Väntar vidare.
+
+Väntar på de första valideringsdygnen.
+
+Väntar på dygn 7 och 8 (omkring 04:53).
+
+Det var bara reservväckningen; snabbkörningen är redan klar och avbruten med avsikt. Valideringen går och jag väntar på dygn 7 och 8.
+
+Uppgift 7 är klar som **delvis**: varianten är byggd, vald och bedömd, men slår inte kedjan, och valideringen hann bara 7 av 16 dygn.
+
+- **Ändringen:** två nya val i `model.Chain`. `loc_top` gör att platskartan inte lyfter en ruta över `max(m, loc_top)`. `loc_rematch` klipper de korrigerade rutorna rangvis mot målets fördelning. Båda är av som standard och ger då exakt driftens kedja. Det finns ett test för det, och `uv run pytest` gick igenom (168 tester).
+- **Valet på träningsdagarna** (läget `snabb`): `Inflode25Topp10` (`loc_top=10`) valdes och frystes. Den tog bort överskottet i ytan ≥ 10 mm/h vid 15 min utan några sämre celler. `Inflode25Rang` fälldes av blockmaxet. `Inflode25Topp5` avbröt jag för att valideringen skulle hinna köras, så den är inte bedömd.
+- **Valideringen** (7 dygn från maj till oktober, mot `kedja`): domen blev inte bättre.
+  - Överskottet i ytan ≥ 10 mm/h är borta och vid 15 min nu säkert bättre: −0,035.
+  - Vinsterna i volym, yta ≥ 5 mm/h och spärrarna (CSI, FSS och hoppen) finns kvar.
+  - Det som fäller den är blockmaxets 90-percentil, som kedjan redan underskattar: den blir säkert sämre vid 30 min, 1 h och 2 h (+0,05 till +0,07). Klippningen sänker alltså kärnornas topp, inte bara ytan runt dem.
+  - Dygnsordningen bestämde jag innan körningen. De 9 övriga dygnen är inte körda, så domen gäller bara de 7.
+- **Körtiden per utgåva på Pi:n** (2 km, 5 h): prognosen tar 16,9 s för `Topp10` och 19,1 s för `Inflode25`. Klippningen kostar alltså inget mätbart.
+
+Rapporten föreslår som nästa steg att klippa ytan men låta kärnans max vara kvar, och att göra urvalet för toppmått på 2 km, eftersom försämringen i blockmaxet inte syntes på 4 km. Driften är inte ändrad. Allt är committat på grenen utom loggfilen `logg/7-inflode.txt`, som körskriptet skriver själv.
+
+Rapporten ligger i `experiments/natt/rapporter/2026-11-07/7-inflode.md`.

@@ -25,7 +25,7 @@ from pathlib import Path
 import requests
 
 from . import analys, compare, models, prognos, render, runs, verify
-from .analys import a1, gauges, radar
+from .analys import a1, a2_cykel, gauges, radar
 
 NO_NEW_DATA = 75
 log = logging.getLogger("knep")
@@ -67,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--bias", type=Path, default=Path("models/bias.npz"), help="volymkorrektion mot regnmätarna")
     p.add_argument("--no-bias", action="store_true", help="ingen volymkorrektion och ingen insamling")
     p.add_argument("--fallback", action="store_true", help="fyll radarbortfall med OPERA-kompositen")
+    p.add_argument("--klotter", type=Path, default=None,
+                   help="karta över fast klotter (analys/klotter.py); filtret är av utan den")
     p.add_argument("--reference", action="store_true", help="kör referensmodellen i stället för kedjan")
     p.add_argument("--keep-cache", action="store_true", help="rensa inte gamla radarbilder")
     p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")
@@ -75,7 +77,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--runs", type=float, default=runs.HOURS,
                    help="timmar med tidigare utgåvor (timsummor varje timme, runs/), 0 stänger av")
     p.add_argument("--no-gauges", action="store_true", help="hämta inte regnmätarna till sidan (gauges.json)")
-    p.add_argument("--no-verify", action="store_true", help="ingen verifiering mot radarn och mätarna (verif.json)")
+    p.add_argument("--a2", action="store_true",
+                   help="A2T, A1 rättad mot regnmätarna ur gauges.json, kvart och timme bakåt till a2/ (levels.a2)")
+    p.add_argument("--a2-matare", type=Path, default=None,
+                   help="katalog med mätararkivet p7.npz och p14.npz i stället för gauges.json, för historiska körningar")
+    p.add_argument("--no-verify",action="store_true", help="ingen verifiering mot radarn och mätarna (verif.json)")
     args = p.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -93,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
             return NO_NEW_DATA
 
     a = analys.bygg(t0, args.history, args.cache, state_dir, session, fallback=args.fallback,
-                    bias_path=None if args.no_bias else args.bias, collect=not args.time)
+                    bias_path=None if args.no_bias else args.bias, collect=not args.time,
+                    klotter_path=args.klotter)
     if a is None:
         return 1
     steps = round(args.hours * 60 / 5)
@@ -125,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         extra["history"] = rend.history(args.out, [(t, f) for t, kind, f, *_ in frames if kind == "obs"], t0, args.back)
         log.info("analys bakåt: %d bilder på %.1f s", len(extra["history"]["frames"]), time.monotonic() - started)
         started = time.monotonic()
+        a1_frames = None
         try:  # A1 får aldrig stoppa prognosen
             a1_frames = a1.update(state_dir, a.times, a.rain, p.motion)
             extra["levels"] = {"a0": "history", "a2": None,
@@ -132,6 +140,12 @@ def main(argv: list[str] | None = None) -> int:
             log.info("A1: %d intervall på %.1f s", len(a1_frames), time.monotonic() - started)
         except Exception as e:  # noqa: BLE001
             log.warning("A1: %s", e)
+        if args.a2 and a1_frames is not None:
+            try:  # A2 får aldrig stoppa prognosen
+                doc = a2_cykel.las_arkiv(args.a2_matare, t0) if args.a2_matare else a2_cykel.las_gauges_json(args.out)
+                extra["levels"]["a2"] = a2_cykel.kor(state_dir, args.out, rend, a1_frames, t0, args.back, doc)
+            except Exception as e:  # noqa: BLE001
+                log.warning("A2: %s", e)
     if args.runs > 0:
         try:  # utgåvan sparas första cykeln i timmen; ett fel här får inte stoppa prognosen
             if runs.due(args.out, t0):

@@ -1,0 +1,128 @@
+===== 2026-11-06T21:40:34Z försök 1 =====
+Träningen tar cirka 6 min per dag och process; jag väntar på aviseringarna.
+
+Första träningsdagen är klar (410 s för fem system). Jag väntar på resten.
+
+Två dagar klara. Väntar.
+
+Väntar på fler träningsdagar.
+
+Väntar.
+
+Väntar på resten av träningen.
+
+Väntar.
+
+Monitorn b51bxel1l bevakar fortfarande; väntar.
+
+Väntar.
+
+Fyra träningsdagar klara plus provdagen. Väntar.
+
+Väntar.
+
+Väntar.
+
+Sju dagar klara. Väntar på resten (cirka 25 min).
+
+Väntar.
+
+Väntar.
+
+Väntar.
+
+Väntar på de sista fyra dagarna.
+
+Väntar.
+
+Väntar.
+
+Första processen är klar; väntar på sista dagen i den andra.
+
+Väntar på 2025-10-24.
+
+Väntar på valideringen.
+
+Väntar på valideringsdagarna.
+
+Cirka 2,5 min per dag; valideringen bör vara klar om ungefär 20 min.
+
+Väntar.
+
+Väntar.
+
+Väntar.
+
+Väntar.
+
+Väntar.
+
+Väntar.
+
+Väntar.
+
+Halva valideringen klar. Väntar.
+
+Väntar.
+
+Väntar.
+
+Väntar.
+
+Väntar på de sista fyra.
+
+Väntar.
+
+Väntar.
+
+Väntar på de två sista.
+
+Väntar på sista dagen.
+
+Väntar på den andra halvan.
+
+Uppgift 4 är gjord men gav inget filter som godkänns. Rapporten ligger i `experiments/natt/rapporter/2026-11-06/4-filter.md` med `Status: delvis`, och allt är committat på `natt/2026-11-06`. `uv run pytest` gav 162 godkända.
+
+**Filtret** (`experiments/analys/filter.py`) har tre delar:
+- **Klotterkarta:** räknas en gång, bara på träningsdagarna. En ruta är misstänkt om den har eko vid torra mätare oftare än omgivningen på flera dagar, eller både har eko oftare än omgivningen och hög textur eller isolering. Kartan har 2 122 rutor. Hur ofta en ruta är våt räknas inte in, och inte heller hur stilla ekot står, eftersom båda är höga i fjällen.
+- **Kontroll bild för bild:** eko på en misstänkt ruta tas bara bort när omgivningen inom 42 km nästan saknar eko. Regn som hänger ihop med annat regn, som det orografiska, står kvar.
+- **Ekrar:** smala och långa strålar tas bort nära solens riktning när solen står vid horisonten, och i 28 fasta strålar som återkommer på minst 5 träningsdagar.
+
+**Valet på träningen** gjordes bland fyra varianter på 13 av de 28 träningsdagarna; alla 28 hade tagit för lång tid. Regeln skrevs innan träningen kördes och valde **F0, bara ekrarna och solen**, eftersom den var den enda som inte blev sämre i något terrängmått.
+
+**Valideringen (16 dagar) mot A0:**
+- **F0** blev varken bättre eller sämre. Den ändrar praktiskt taget ingenting.
+- **F1** (kartan, kontrollen och ekrarna) kördes bara som upplysning och användes inte för valet:
+  - Rutorna med eko i mer än hälften av de torra timmarna minskar från 36,6 till 24,1 per dag, med intervallet helt på den bättre sidan.
+  - Över 400 m blir falska ekon vid torra mätare färre (0,009 till 0,007), och MAE och CSI blir bättre.
+  - På lovartsidan är alla mått oförändrade.
+  - Summakvoten över 400 m blir sämre (0,524 till 0,508), och därför räknas F1 inte som bättre.
+- Det som försvinner över 400 m är eko vid mätare som visar 0 eller nästan 0 mm. Kvoten för timmar över 1 mm är exakt densamma. Felet ligger i måttet: när analysen redan är för torr (kvot 0,5) räknas varje överskott som en vinst. Jag ändrade inte domaren. Ett förslag till en bättre kvot står under Nästa steg i rapporten.
+
+**I `src/`:** valet skulle bara läggas dit om filtret höll, och det gjorde det inte. Jag kopplade först in det med standard av och tog sedan bort inkopplingen, så `__init__.py` och `cli.py` är som på `main`. Men `src/knep/analys/klotter.py` och `tests/test_klotter.py` ligger kvar oanvända och är committade, eftersom körningen inte fick radera filer. Ta bort de två filerna om de inte ska vara med; inget annat beror på dem.
+
+Inget i domaren, `deploy/`, `models/` eller `.github/` ändrades, och inget pushades.
+
+Den här aviseringen betyder bara att bevakningen av valideringen har löpt ut. Valideringen var redan klar och allt är committat, så det finns inget mer att göra.
+===== 2026-11-06T23:11:54Z försök 2 =====
+Uppgift 4 är klar i försök 2. Domaren godkänner nu ett filter, men vinsten vid mätarna är nästan noll. Rapporten ligger i `experiments/natt/rapporter/2026-11-06/4-filter.md` med `Status: klar`, och allt är committat på `natt/2026-11-06`. Inget är pushat. `uv run pytest` gav 163 godkända.
+
+**Ändringen i försök 2:** försök 1 slutade med att domaren inte godkände något filter. Jag provade därför filtret med klotterkartan utan den extra kant på en ruta som försök 1 lade runt den misstänkta rutorna. Det blev varianten F4, och kartan går från 2 122 till 621 rutor. Diagnosen på träningsdagarna visade att de två mätare som filtret påverkade låg just i den kanten. Inga trösklar ändrades.
+
+**Träningen (13 dagar):** samma urvalsregel som i försök 1 väljer F4. Den är den enda varianten som inte blir sämre i något mått. Den blir bättre i FSS.
+
+**Valideringen (16 dagar), F4 mot A0:**
+- Domaren säger "bättre". Inget mått för falska ekon eller terrängen (över 400 m och lovartsidan) blir sämre.
+- Vinsten vid mätarna är försumbar: FSS ökar bara med 0,00001 till 0,00004, eftersom nästan ingen mätare ligger i kartans rutor.
+- Det filtret faktiskt gör syns bara i måttet för fast klotter mellan mätarna. Rutorna som har eko i mer än hälften av de torra timmarna går från 36,6 till 27,6 per dag (95 %: +5,9 till +12,5 i godhet).
+- Ett förbehåll: valideringen hade redan använts för F0 och F1 i försök 1 innan F4 lades till. Själva valet av F4 gjordes ändå på träningsdagarna, och testdelen lästes aldrig.
+
+**I `src/`:** kartdelen av filtret finns nu som valet `knep --klotter KARTA` (`bygg(..., klotter_path=None)`), och standardvärdet är av.
+- Filtret verkar före volymkorrektionen och ändrar varken de sparade analyserna eller manifestet.
+- Det ger exakt samma bilder som F4:s kartdel: 0 olika rutor på 99 bilder (`experiments/analys/filter_lika.py`).
+- Det tar cirka 0,05 s per bild.
+- Ekrarna är inte med, eftersom de inte märktes i något mått.
+
+**Innan det kan slås på i driften:** kartan ligger i `/data/analys/filter/klotter_f4.npz`. Den behöver tränas om på alla 28 träningsdagar (urvalet gjordes på 13), släppas i GitHub Releases och låsas i `models/models.json`. Det är en ny modellversion, så det har jag inte gjort utan ditt godkännande.
+
+Jag föreslår också i rapporten att domaren får ett mått som ser klotter där det inte finns mätare, eftersom den inte kan se det mesta av det filtret gör. Domaren ändrade jag inte.

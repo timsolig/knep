@@ -1,0 +1,63 @@
+===== 2026-11-06T18:47:31Z försök 1 =====
+You've hit your 5-hour limit · resets 7:50pm (Europe/London)
+
+You've hit your 5-hour limit · resets 7:50pm (Europe/London)
+
+A2 finns nu i `experiments/analys/a2.py` och är bedömd med domaren på de 16 valideringsdagarna. Domen är att den slår A0 men inte A1. Rapporten ligger i `experiments/natt/rapporter/2026-11-06/3-a2.md` och slutar med `Status: delvis`. Allt är committat på `natt/2026-11-06`, och `uv run pytest` ger 154 godkända.
+
+**Metoden**, för varje timme och kvart:
+1. **Stor skala:** A1 rättas med en jämn kvot mot timmätarna från de senaste 6 timmarna. Kvoten är krympt mot 1 där mätarna är få eller torra, och bara timmar som har gått används, så att den går att köra i realtid.
+2. **Optimal interpolation:** det som återstår interpoleras i kvadratrotsskala. Felet i radarn växer med avståndet till närmaste radar. SMHI:s komposit har ingen kvalitetskarta, så avståndet är den enda kvaliteten som används.
+3. **Torrmask:** regn tas bort bara där både A1 och alla mätare inom 80 km är torra.
+
+**Parametrarna** valdes på de 28 träningsdagarna med domarens korsvalidering. Valet gjordes vid mätarna och med A0 som bakgrund i stället för A1, eftersom A1 kostar 4 till 8 minuter per dag. De frystes innan valideringen kördes.
+
+**Resultat på valideringen:**
+
+| | A2 | A1 | A0 |
+|---|---|---|---|
+| MAE per timme (mm) | 0,214 | 0,228 | 0,233 |
+| CSI 1 mm per timme | 0,470 | 0,429 | 0,423 |
+| FSS 1 mm per timme | 0,685 | 0,635 | 0,634 |
+| Summakvot per timme, över 400 m | 0,68 | 0,51 | 0,52 |
+| Summakvot per timme, lovartsidan | 0,82 | 0,65 | 0,67 |
+| Falskt eko per kvart vid torr mätare, över 400 m | 0,016 | 0,013 | 0,015 |
+| Rutor med eko i över hälften av de torra timmarna, per dag | 47 | 40 | 37 |
+
+- **Mot A0: bättre.** 15 mått för mängd och träff är bättre med intervallet helt på rätt sida, och inget mått för falska ekon eller terrängen blir sämre.
+- **Mot A1: inte bättre.** Mängd och träff är bättre i 14 mått, men falska ekon per kvart vid torra mätare över 400 m och på lovartsidan blir sämre, med intervallet helt på fel sida. Fler rutor har eko under torra timmar, men det skiljer inte enligt regeln. Min förklaring, som jag inte har prövat: kvoten är över 1 i fjällen och lyfter då även svaga fasta ekon över tröskeln. Det talar för att artefakterna ska bort ur A0 innan A1 och A2 räknas.
+- **Terrängen** är där A2 gör mest nytta: över 400 m och på lovartsidan stiger CSI och FSS med cirka 0,1. Underskottet är ändå stort, eftersom korsvalideringen håller en bedömd mätare minst 25 km från alla mätare som A2 får se.
+
+**Tid på Pi:n:** en timme med sina fyra kvartar tar 2,6 till 2,8 s på hela rutnätet, mätt medan träningen körde i en annan process. Det räcker med god marginal för en körning en gång i timmen.
+
+**Det som inte blev klart:**
+- **Kvartens felvarianser och torrmaskens radie** valdes inte. Jag satte en för kort timeout på träningen, och den stoppades efter att ha valt kvartens längdskala (40 km). Felvarianserna är därför satta till halva timmens värden och radien till timmens. Nästa steg är att köra `a2.py trana --res kvart` (cirka 20 min) och sedan valideringen igen med `a2.py kor` (cirka 30 min).
+- **Mätarna kontrolleras inte** mot sina grannar, så ett fel i en mätare sprids nu upp till cirka 40 km. Det behövs innan A2 blir facit.
+
+Ny data är 266 MB under `/data/analys/a2/`, och det mesta är A1:s sparade fält, så att A2 kan köras om utan att A1 räknas igen. Inget i `src/`, `deploy/`, `models/` eller domaren ändrades. Loggfilen `logg/3-a2.txt` ligger kvar ocommittad, som den var när jag började.
+===== 2026-11-06T21:19:25Z försök 2 =====
+Jag väntar på händelser från träningen.
+
+Träningen har startat (utgångsläget: MAE 0,0554, kvot 0,876). Jag väntar på resten.
+
+Jag väntar fortfarande på kvartens träning.
+
+Uppgift 3 (A2) är klar och rapporten har nu `Status: klar`. Domen från försök 1 gäller: A2 slår A0 men inte A1.
+
+**Det här försöket:** försök 1 tog slut innan kvartens felvarianser (SB, SO) och torrmaskens radie (R_TORR) hade valts. Nu har sökningen gått klart på de 28 träningsdagarna (cirka 15 minuter). Den behöll alla värden som valideringen redan hade körts med (L 40 km, SB 0,8, SO 0,15, R_TORR 80 km). Inget annat värde sänkte målet med mer än tröskeln. Därför behövde valideringen inte köras om, och den bygger fortfarande bara på parametrar som är valda på träningen. På träningen beror målet nästan bara på L, och vinsten kommer mest från rättningen i stor skala.
+
+**Resultaten på valideringen (16 dagar):**
+- **Mot A0 är A2 bättre.** 15 mått för mängd och träff är bättre med intervallet helt på rätt sida, och inget mått för falska ekon eller terrängen blir sämre.
+- **Mot A1 är A2 inte bättre.** Mängd och träff är bättre, men falska ekon per kvart vid torra mätare blir sämre över 400 m och på lovartsidan, med intervallet helt på fel sida.
+- **I terrängen gör A2 mest nytta.** Över 400 m går summakvoten per timme från 0,5 till 0,68, och CSI och FSS stiger med cirka 0,1.
+- **Tiden på Pi:n** är 2,6 till 2,8 s för en timme med dess fyra kvartar på hela rutnätet.
+
+**Nästa steg**, som rapporten beskriver: ta bort de falska ekona per kvart i terrängen, kontrollera mätarna mot sina grannar innan A2 blir facit, och använda en kvalitetskarta i felvariansen.
+
+`uv run pytest` ger 154 godkända. Det enda som ändrades är kommentaren vid `PARAMS` i `experiments/analys/a2.py` och rapporten, och loggfilen är också med i commiten. Allt är committat på `natt/2026-11-06` (3ac8d3e). Jag har inte pushat något.
+
+Två saker med körningen:
+- **Säkerhetskopian av `trana.json` blev inte gjord**, eftersom kopieringen nekades. Kvartens del i filen är nu skriven över, men den var ofullständig och siffrorna finns kvar i rapporten.
+- **Träningens utdata ligger i en tillfällig fil** utanför `/data`, eftersom det nekades att skriva loggen till `/data`. Det som behövs ur den står i rapporten.
+
+Bevakningen av kvartens träning har gått ut av sig själv. Den behövs inte längre, eftersom träningen redan var klar och resultatet är skrivet i rapporten och committat (3ac8d3e). Det finns inget mer att göra i uppgift 3.

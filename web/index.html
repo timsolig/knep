@@ -459,7 +459,10 @@
     <p>Fliken <b>Analys</b> visar nederbörden de senaste tolv timmarna i tre steg bredvid varandra. <b>A0</b> är radarbilderna som de är:
        en bild var femte minut, och varje bild får gälla de fem minuterna före den, så en skur som rör sig snabbt blir ett pärlband i kvarts- och timsummorna.
        <b>A1</b> fyller i tiden mellan bilderna minut för minut längs regnets rörelse, så att spåret hänger ihop. <b>A2</b> rättas mot regnmätarna
-       och blir klar först när mätarna har kommit, 1 till 2,5 timmar efter timmen; den byggs fortfarande.
+       <span class="intro-a2-nej">och blir klar först när mätarna har kommit, 1 till 2,5 timmar efter timmen; den byggs fortfarande.</span><span class="intro-a2-ja" hidden>(A2T):
+       A1:s mängd rättas både i stort och nära varje mätare, och svagt eko tas bort där mätarna är torra.
+       Den blir klar först när mätarna har kommit, 1 till 2,5 timmar efter timmen, räknas om när fler mätare kommer in
+       och finns bara som summa per kvart och timme, inte var femte minut.</span>
        Slå på <b>Mätare</b> för att jämföra stegen med vad som faktiskt kom ner.</p>
     <h4><span class="sw" style="background:var(--met)"></span>Verifiering</h4>
     <p>Fliken <b>Verifiering</b> visar hur modellerna har träffat de senaste 7 eller 30 dygnen, mot radarn och mot SMHI:s regnmätare:
@@ -546,6 +549,8 @@ const LEVEL_INFO = {
   a2: { name: 'A2 mot mätarna', color: '#8250df', what: 'rättad mot regnmätarna' },
 };
 const isLevel = k => LEVEL_KEYS.includes(k);
+// A2 räknas bara i cykler med valet --a2; utan bilder i levels.a2 ser sidan ut som förut
+const hasA2 = m => !!(m?.levels?.a2 && ['frames', 'frames15', 'frames60'].some(k => m.levels.a2[k]?.length));
 const MEPS = [[49.75632, -18.17334], [75.23955, 54.29416]];  // kartorna avgränsas till MEPS-området, där SNOW finns
 const NORDEN = [[55.0, 6.0], [69.5, 30.0]];  // det som ska synas från början
 const LEVELS = [0.1, 0.5, 1, 2, 4, 8, 16, 32];  // som render.LEVELS: klass k är minst LEVELS[k - 1] mm/h
@@ -756,6 +761,7 @@ function srcFor(p, f, layer = live.layer) {
 function levelSrc(p, f) {
   const m = live.manifest, x = levelList(m, p.key, live.res).find(y => y.time === f.time);
   if (x) return { file: x.file, bounds: m.bounds, hist: true, text: LEVEL_INFO[p.key].what };
+  if (p.key === 'a2' && live.res === '5' && hasA2(m)) return { missing: 'bara kvart och timme, välj 15 min eller 1 h' };
   if (p.key === 'a2') return { missing: m.levels?.a2 ? 'inte klar än, mätarna kommer 1 till 2,5 h efter timmen' : 'byggs, rättningen mot mätarna finns inte än' };
   if (p.key === 'a1' && !m.levels?.a1) return { missing: 'finns inte i den här analysen' };
   return { missing: 'saknas för tiden' };
@@ -918,6 +924,7 @@ async function liveLoad() {
   const keep = oldList[live.idx] || null;
   live.manifest = m;
   live.values = null;
+  introA2();
   if (live.issue) {  // samma utgåva i det nya manifestet, med facit för timmar som har passerat sedan
     const run = (m.runs || []).find(r => r.issued === live.issue.issued);
     if (run) { live.issue = run; live.issueList = issueFrames(m, run); } else { live.issue = null; live.issueList = null; issueMode(); }
@@ -2224,12 +2231,22 @@ function located(e) {
 }
 
 // förklaringen: visas första gången, och med ? uppe till höger
-const INTRO = 4;  // höj när förklaringen ändras, så att den visas igen
+// INTRO är förklaringen med A2 (manifestet har bilder i levels.a2); utan A2 är den som förut, INTRO - 1
+const INTRO = 5;  // höj när förklaringen ändras, så att den visas igen
+const introVer = () => hasA2(live.manifest) ? INTRO : INTRO - 1;
+const introHere = () => !location.hash.startsWith('#handelser') && !location.hash.startsWith('#verifiering');
 function introOpen() { try { $('intro').showModal(); } catch (e) { $('intro').setAttribute('open', ''); } }
+function introA2() {  // texten om A2 när manifestet har kommit, och förklaringen igen första gången A2 finns
+  const ja = hasA2(live.manifest);
+  document.querySelectorAll('.intro-a2-ja').forEach(e => { e.hidden = !ja; });
+  document.querySelectorAll('.intro-a2-nej').forEach(e => { e.hidden = ja; });
+  if (ja && !$('intro').open && store.get('intro', 0) < INTRO && introHere()) introOpen();
+}
+const introSeen = () => store.set('intro', Math.max(store.get('intro', 0), introVer()));
 $('help').addEventListener('click', introOpen);
-$('intro-close').addEventListener('click', () => { $('intro').close(); store.set('intro', INTRO); });
-$('intro').addEventListener('close', () => store.set('intro', INTRO));
-if (store.get('intro', 0) < INTRO && !location.hash.startsWith('#handelser') && !location.hash.startsWith('#verifiering')) introOpen();
+$('intro-close').addEventListener('click', () => { $('intro').close(); introSeen(); });
+$('intro').addEventListener('close', introSeen);
+if (store.get('intro', 0) < INTRO - 1 && introHere()) introOpen();
 
 // kartorna finns från början, så att sidan inte hoppar när manifestet kommer
 for (const k of ['ours', 'met', 'snow']) makePane(k);
