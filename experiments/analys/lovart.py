@@ -127,8 +127,10 @@ def cmd_diag(a):
 # ---------------------------------------------------------------- varianterna av A1 genom domaren
 
 # namn -> (sätt, parameter). "min": hela den gemensamma delen min(f0, f1) står still; "lyft": andelen
-# 1 − exp(−k · lyft) av den står still (knep.analys.a1.stay_fraction); None: A1 som i drift.
-VARIANTS = {"A1": None, "A1M": ("min", 1.0), "A1L1": ("lyft", 1.0), "A1L03": ("lyft", 0.3)}
+# 1 − exp(−k · lyft) av den står still (knep.analys.a1.stay_fraction); "still": andelen där bilden på
+# plats stämmer bättre än den flyttade (knep.analys.a1.still_fraction, Gauss k px; försök 2);
+# None: A1 som i drift.
+VARIANTS = {"A1": None, "A1M": ("min", 1.0), "A1L1": ("lyft", 1.0), "A1L03": ("lyft", 0.3), "A1S": ("still", 3.0)}
 
 
 class Strom:
@@ -197,6 +199,8 @@ def cmd_kor(a):
                         cache[2][s] = a1.stay_fraction(mot, elev, v[1])
             for s in targets:
                 v = VARIANTS[s]
+                if v is not None and v[0] == "still":  # beror på bilderna, räknas per intervall
+                    cache[2][s] = a1.still_fraction(fr[k - 1], fr[k], mot, v[1])
                 stay = None if v is None else (v[1] if v[0] == "min" else cache[2][s])
                 strom[s].add(i, a1.interpolate(fr[k - 1], fr[k], cache[1], stay))
             if i == 11:

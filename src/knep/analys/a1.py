@@ -54,6 +54,23 @@ def stay_fraction(motion: np.ndarray, terrain: np.ndarray, k_lift: float, sigma:
     return (1.0 - np.exp(-k_lift * lift)).astype(np.float32)
 
 
+def still_fraction(f0: np.ndarray, f1: np.ndarray, motion: np.ndarray, sigma: float = 3.0) -> np.ndarray:
+    """Andelen som står still där regnet faktiskt står still: (e_L − e_E) / (e_L + e_E), högst 1, minst 0.
+
+    e_E är det lokala kvadratfelet (Gauss sigma pixlar) mellan f1 och f0 på plats, e_L mellan f1 och f0
+    flyttad ett helt intervall längs rörelsen. Där bilden på plats stämmer bättre än den flyttade står
+    den gemensamma delen still, där rörelsen stämmer bättre flyttas allt som utan valet."""
+    from scipy.ndimage import gaussian_filter
+    a = np.nan_to_num(np.asarray(f0, np.float32))
+    b = np.nan_to_num(np.asarray(f1, np.float32))
+    adv = np.nan_to_num(advect.extrapolate(a, motion, [1.0], outval=0.0)[0]).astype(np.float32)
+    ee = gaussian_filter((b - a) ** 2, sigma)
+    el = gaussian_filter((b - adv) ** 2, sigma)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        s = np.where(ee + el > 1e-6, (el - ee) / (el + ee), 0.0)
+    return np.clip(s, 0.0, 1.0).astype(np.float32)
+
+
 def interpolate(f0: np.ndarray, f1: np.ndarray, pth: tuple[list, list], stay: np.ndarray | float | None = None) -> np.ndarray:
     """Medelintensiteten under intervallet ur förflyttningarna pth (paths), i mm/h.
 

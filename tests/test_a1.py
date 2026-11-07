@@ -83,6 +83,17 @@ def test_stay_fraction_bara_uppfor():
     assert np.allclose(down, 0.0)
 
 
+def test_still_fraction_skiljer_stilla_fran_rorligt():
+    """Regn som står still trots rörelsefältet får andelen 1, en cell som flyttar sig med rörelsen 0."""
+    mot = _motion(6.0)
+    f = _blob(60, r=2.0)
+    s = a1.still_fraction(f, f, mot)
+    assert s[20, 60] > 0.95
+    g0, g1 = _blob(60, r=2.0), _blob(66, r=2.0)
+    assert a1.still_fraction(g0, g1, mot)[20, 55:75].max() < 0.05
+    assert np.allclose(a1.still_fraction(np.zeros((H, W)), np.zeros((H, W)), mot), 0.0)
+
+
 def test_update_sparar_hoppar_over_och_rensar(tmp_path):
     t = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
     step = timedelta(minutes=5)
