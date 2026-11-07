@@ -1,6 +1,8 @@
 # Uppgift 6: A1:s underskott på lovartsidan
 
-Kort: underskottet är ingen förlust av regn utan en utjämning av toppar i regn som rör sig fort. Valet `stay` i A1 (standard av) håller kvar den del av fältet som finns på samma plats i båda bilderna, antingen överallt (A1M) eller där lyftet är stort (A1L1). Ingen variant klarade regeln på träningen (5 dagar), så ingen frystes. A1L1 är på valideringen bättre än A0 utan något sämre mått, vilket A1 inte är, men sämre än A1 över 400 m och i falska ekon per kvart på lovartsidan.
+Kort: underskottet är ingen förlust av regn utan en utjämning av toppar i regn som rör sig fort. Valet `stay` i A1 (standard av) håller kvar den del av fältet som finns på samma plats i båda bilderna, antingen överallt (A1M), där lyftet är stort (A1L1) eller, från försök 2, där bilden på plats faktiskt stämmer bättre än den flyttade (A1S). Ingen variant klarade regeln på träningen, varken på 5 dagar (försök 1) eller på 15 dagar (försök 2), så ingen frystes och A1 står kvar som i drift. På de 15 träningsdagarna har A1 inget underskott på lovartsidan alls; underskottet på valideringen kommer från två dagar. A1L1 är på valideringen bättre än A0 utan något sämre mått, vilket A1 inte är, men sämre än A1 över 400 m och i falska ekon per kvart på lovartsidan, och samma mönster syns nu på 15 träningsdagar.
+
+Försök 2 står i ett eget avsnitt nedan ("Försök 2: 15 träningsdagar och A1S"); avsnitten före det är försök 1 oförändrade.
 
 ## Före uppgiften
 
@@ -113,13 +115,47 @@ A2 (uppgift 3) och filtret F4 (uppgift 4) slutade båda som klara. A2 räknas p�
 - `experiments/analys/lovart.py` (ny): `diag`, `kor`, `jamfor` och `valj`.
 - Den här rapporten.
 
+## Försök 2: 15 träningsdagar och A1S
+
+Försök 1 slutade som delvis med träningen på 5 av 28 dagar och förslaget att pröva en snävare variant. Försök 2 gjorde båda, men inte alla 28 dagar.
+
+**A1S, ny variant.** `knep.analys.a1.still_fraction(f0, f1, motion, sigma=3)` ger andelen s = (e_L − e_E) / (e_L + e_E), klippt till 0..1, där e_E är det lokala kvadratfelet (Gauss 3 px) mellan f1 och f0 på plats och e_L mellan f1 och f0 flyttad ett helt intervall längs rörelsen. Den gemensamma delen står alltså still bara där bilden på plats stämmer bättre än den flyttade, mätt i varje intervall på samma sätt som diagnosen, i stället för ur lyftet eller överallt. Inga parametrar valdes på data (sigma 3 px bestämdes i förväg). Ett nytt test i `tests/test_a1.py` (stillastående topp ger s nära 1, en cell som flyttar sig med rörelsen nära 0, torrt ger 0). Varianten heter `A1S` i `lovart.py` och kostar cirka 2,5 min per dag med en process.
+
+**Träningsdagarna.** Bakgrundskörningar gick inte att starta i den här sessionen, så allt kördes i förgrunden en dag i taget med två processer parallellt (cirka 6 min per dag och process för A1 och A1S tillsammans, minnet låg på över 3 GB ledigt hela tiden). Tiden räckte till 10 nya dagar. Jag tog de 8 träningsdagar som redan hade A0 sparat (det sparar tid; valet gjordes före resultaten) och två till: 2020-05-01, 2020-08-29, 2020-10-07, 2021-05-11, 2023-01-04, 2023-11-22, 2024-07-28, 2024-09-26, 2025-06-23, 2025-10-24. Med försök 1:s fem blir det 15 dagar med alla årstider. A0, A1, A1S och A1L1 finns för alla 15; A1M bara för de första 5 (den var sämre än A1 i sex mått redan där och kördes inte vidare). 13 träningsdagar saknas fortfarande.
+
+**Valet** med samma regel som i försök 1 (`lovart.py valj A1L1 A1S`, tabellerna `/data/analys/domare/tabell_{A1,A1S,A1L1}_mot_{A0,A1}_traning.json`):
+
+| mått (skillnad i godhet, 95 %, 15 dagar) | A1 − A0 | A1S − A1 | A1L1 − A1 | A1L1 − A0 |
+|---|---|---|---|---|
+| timme lovart, kvot summa (A0 0,733, A1 0,731) | −0,004 (−0,015 till +0,007) | +0,001 (−0,000 till +0,002) | **+0,031 (+0,017 till +0,049)** | **+0,027 (+0,012 till +0,047)** |
+| kvart lovart, kvot summa | +0,005 (−0,004 till +0,016) | −0,000 | **+0,025 (+0,010 till +0,043)** | **+0,030 (+0,014 till +0,051)** |
+| timme över 400 m, kvot summa | −0,002 (−0,090 till +0,062) | +0,002 (−0,004 till +0,012) | **−0,034 (−0,058 till −0,012)** | −0,036 (−0,126 till +0,021) |
+| timme över 400 m, kvot över 1 mm | | **−0,003 (−0,008 till −0,000)** | **sämre** | |
+| timme över 400 m, FSS 0,5 | | **−0,0002 (−0,0005 till −0,0000)** | **sämre** | |
+| kvart alla, CSI 0,5 | **+0,012** | −0,000 | **−0,004** | **+0,007** |
+| timme alla, CSI 0,5 | **+0,008** | +0,000 | **−0,003** | +0,005 (−0,001 till +0,011) |
+| kartmåttet (A0 54,2, A1 57,0 rutor per dag) | −2,8 (−6,8 till +1,1) | **+2,3 (+0,7 till +4,2)** | **+2,5 (+0,4 till +5,1)** | −0,3 |
+
+Domen på träningen (15 dagar):
+
+- **A1 mot A0: bättre**, inget sämre (MAE, CSI 0,5 och 1, FSS 0,5 och 1, kvart och timme). Summakvoten på lovartsidan är densamma som A0:s (0,731 mot 0,733 per timme, per kvart till och med högre). **På träningen finns alltså inget underskott på lovartsidan.** Det som domaren fann på valideringen kommer från 2023-08-08 och 2021-10-20 och, enligt diagnosen, från några få stationer där A0 redan ligger över mätaren.
+- **A1S mot A1: inte bättre.** Den gör nästan ingenting: alla skillnader är under 0,003 utom kartmåttet, där A1S har 2,3 färre rutor med eko under torra timmar per dag (intervallet över 0, alltså mindre utsmetat klotter). Den är sämre med intervallet helt på fel sida i kvoten över 1 mm och FSS 0,5 över 400 m, men med mycket små tal (−0,003 och −0,0002). Andelen som står still slår alltså sällan till; där regnet på riktigt står still rör sig fältet långsamt och då är A1 redan lika med A0.
+- **A1L1 mot A1: inte bättre**, och nu tydligare än på 5 dagar. Den höjer summakvoten på lovartsidan med 0,03 med intervallet över 0, men är sämre i summakvoten över 400 m (kvart och timme), kvoten över 1 mm och FSS 0,5 över 400 m, MAE på lovartsidan (kvart och timme) och i falska ekon per kvart på lovartsidan (båda måtten). Det är samma mönster som på valideringen i försök 1. Mot A0 är A1L1 bättre utan sämre mått, också på träningen.
+- **Valet: ingen variant klarar regeln.** A1 står kvar som i drift, valet `stay` stannar av, och ingenting frystes. Därför kördes ingen variant på valideringen i försök 2 (valideringen är redan sedd för A1L1 i försök 1, och A1S skulle bara ha varit information om en variant som inte valdes).
+
+Tolkningen efter båda försöken: A1:s underskott på lovartsidan är inget systematiskt fel i A1. Det syns inte på 15 träningsdagar, det kommer från två valideringsdagar, och där kommer det från toppar i A0 som är för höga vid några mätare. Att hålla kvar regn vid sluttningen (A1L1) höjer kvoten på lovartsidan men flyttar regnet fel mot mätarna högre upp och ger fler falska ekon; att hålla kvar bara det som verkligen står still (A1S) är nästan samma sak som A1. Det försiktigaste är att inte ändra A1. Det som återstår är en fråga om domaren (punkt 1 nedan), inte om A1.
+
+**A2 och filtret** kördes inte om, eftersom ingen variant valdes: A2 räknas på A1:s fält, som är oförändrade, och filtret F4 verkar på A0.
+
+**Ny data i försök 2**: domarens summor per dag för A0, A1, A1S och A1L1 (några kB per dag och variant) under `/data/analys/domare/`. Inga fält sparades. `uv run pytest`: 167 godkända.
+
 ## Nästa steg
 
 1. **Domaren och summakvoten på lovartsidan.** Underskottet är ingen förlust av regn utan en utjämning av toppar, och vid de mätare som bidrar mest ligger A1 närmare mätaren. Summakvoten belönar för höga toppar så länge radarn i stort är för torr. Ett mått för mängden som inte belönar det (till exempel kvoten bara för perioder där mätaren har regn, eller kvoten efter A2:s rättning i stor skala) bör beslutas för sig, och baslinjerna köras om. Det föreslogs redan i uppgift 5.
-2. **Träningen på alla 28 dagar** med en process (cirka 3,5 min per dag och variant), så att valet inte vilar på 5 dagar. `lovart.py kor A1 A1M A1L1 --del traning` hoppar över de dagar som redan finns. Därefter avgör testdelen mellan A1 och A1L1, efter beslut av användaren.
-3. **Ett snävare val**: stå stilla bara där regnet faktiskt står stilla, mätt på samma sätt som diagnosen (korrelationen på plats mot längs rörelsen över senaste kvarten), i stället för ur lyftet eller överallt. Diagnosen visar att det bara gäller 21 till 29 % av fallen på lovartsidan, så både A1M och A1L1 håller sannolikt kvar för mycket.
-4. Om en variant väljs: koppla valet till `cli.py` (terrängen på radarns rutnät behövs för lyftet) och kör om A2 på dess fält.
+2. **De 13 träningsdagar som saknas** (gjort till 15 av 28 i försök 2): `lovart.py kor A0 A1 A1S A1L1 --del traning` hoppar över de dagar som redan finns, cirka 6 min per dag med en process. Det ändrar troligen inte domen, eftersom A1L1:s sämre mått mot A1 blev fler och inte färre från 5 till 15 dagar.
+3. ~~Ett snävare val~~: prövat i försök 2 som A1S. Det gör nästan ingenting och är inte bättre än A1.
+4. Om en variant ändå skulle väljas senare: koppla valet till `cli.py` (terrängen på radarns rutnät behövs för lyftet i A1L1) och kör om A2 på dess fält. I nuläget ska A1 inte ändras.
 
-Varför delvis: orsaken är funnen och rättningen finns som ett val med tester, men ingen variant blev godkänd mot A1, träningen hann bara 5 av 28 dagar, och A2 kördes inte om.
+Varför delvis: orsaken är funnen (utjämning av toppar i fort rörligt regn på två valideringsdagar, inget systematiskt underskott på träningen) och tre rättningar finns som val med tester, men ingen blev godkänd mot A1, träningen täcker 15 av 28 dagar, och A2 och filtret kördes därför inte om. Ändrade filer i försök 2: `src/knep/analys/a1.py` (`still_fraction`), `tests/test_a1.py` (ett test), `experiments/analys/lovart.py` (varianten A1S) och den här rapporten.
 
 Status: delvis
