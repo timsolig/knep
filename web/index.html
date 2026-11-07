@@ -383,6 +383,7 @@
       <div class="chips seg" id="verif-obs" role="group" aria-label="Facit">
         <button aria-pressed="true" data-obs="radar" title="Radarns timsumma i 4 km-rutor, bara uppmätta rutor">Mot radarn</button>
         <button aria-pressed="false" data-obs="gauges" title="SMHI:s regnmätare, timsumma">Mot regnmätarna</button>
+        <button aria-pressed="false" data-obs="a2t" title="Analysen rättad mot regnmätarna (A2T), bara uppmätta rutor" hidden>Mot A2T</button>
       </div>
       <label>Mått <select id="verif-metric" aria-label="Mått"></select></label>
       <div class="chips seg" id="verif-thr" role="group" aria-label="Tröskel"></div>
@@ -466,7 +467,8 @@
        Slå på <b>Mätare</b> för att jämföra stegen med vad som faktiskt kom ner.</p>
     <h4><span class="sw" style="background:var(--met)"></span>Verifiering</h4>
     <p>Fliken <b>Verifiering</b> visar hur modellerna har träffat de senaste 7 eller 30 dygnen, mot radarn och mot SMHI:s regnmätare:
-       ETS, FAR, MCC, FSS och fler mått per ledtid och dygn, med osäkerheten och skillnaden mot Tim-KNEP. Där står också vilka rutor och mätare som är facit.</p>
+       ETS, FAR, MCC, FSS och fler mått per ledtid och dygn, med osäkerheten och skillnaden mot Tim-KNEP. Där står också vilka rutor och mätare som är facit.<span class="intro-a2t-ja" hidden>
+       Analysen A2, rättad mot mätarna, finns också som facit vid sidan av radarn; den har sett mätarna och är därför inget oberoende bevis bredvid dem.</span></p>
     <h4><span class="sw" style="background:var(--snow)"></span>Att tänka på</h4>
     <p>MET Norge räknar två timmar framåt. SNOW finns per timme och är ensemblens median, så kraftiga skurar blir svagare där.
        Tim-KNEP bygger bara på radarn och flyttar regnet med dess rörelse hela vägen till fem timmar, utan någon vädermodell.
@@ -1898,8 +1900,10 @@ const VM = {  // grupp, riktning (1 högre är bättre, -1 lägre är bättre, 1
   r: ['cont', 1, 'Korrelation', 'Pearsons korrelation mellan modellens och facits timsummor.'],
   ratio: ['cont', 'one', 'Volymkvot', 'Modellens summa delat med facits. 1 är rätt mängd.'],
 };
-const VEXTRA = { persistens: { name: 'Persistens', color: 'var(--past)', dash: '5 4' }, radar: { name: 'Radarn', color: 'var(--gauge)', dash: '1.5 3' } };
-const VORDER = ['ours', 'met', 'snow', 'persistens', 'radar'];
+const VEXTRA = { persistens: { name: 'Persistens', color: 'var(--past)', dash: '5 4' }, radar: { name: 'Radarn', color: 'var(--gauge)', dash: '1.5 3' },
+                 a2t: { name: 'A2T', color: '#0a7d8c', dash: '6 3' } };
+const VORDER = ['ours', 'met', 'snow', 'persistens', 'radar', 'a2t'];
+const VFACIT = { radar: 'radarn', gauges: 'regnmätarna', a2t: 'A2T' };
 const vf = { doc: null, loaded: 0, win: store.get('vwin', '7'), obs: store.get('vobs', 'radar'), metric: store.get('vmetric', 'ets'),
              thr: store.get('vthr', 1), scale: 1, lead: 0, map: null, layers: [] };
 const vinfo = k => VEXTRA[k] || { ...modelInfo(k), dash: '' };
@@ -2030,6 +2034,7 @@ function verifDraw() {
     return;
   }
   $('verif-body').hidden = false; $('verif-empty').hidden = true;
+  $('verif-obs').querySelector('[data-obs="a2t"]').hidden = !W.a2t?.models?.ours;  // bara när A2T har räknats som facit
   if (!W[vf.obs]?.models?.ours) vf.obs = 'radar';
   if (vf.obs === 'gauges' && VM[vf.metric][0] === 'fss') vf.metric = 'ets';
   const O = W[vf.obs], R = O.models, keys = VORDER.filter(k => R[k]);
@@ -2037,7 +2042,7 @@ function verifDraw() {
   pressed($('verif-win'), 'win', vf.win);
   $('verif-win').querySelectorAll('button').forEach(b => { b.disabled = !D.windows[b.dataset.win]; });
   pressed($('verif-obs'), 'obs', vf.obs);
-  $('verif-metric').innerHTML = Object.entries(VM).filter(([k, m]) => vf.obs === 'radar' || m[0] !== 'fss')
+  $('verif-metric').innerHTML = Object.entries(VM).filter(([k, m]) => vf.obs !== 'gauges' || m[0] !== 'fss')
     .map(([k, m]) => `<option value="${k}"${k === vf.metric ? ' selected' : ''}>${m[2]}</option>`).join('');
   const [grp, dir, mname, mtext] = VM[vf.metric];
   const thrs = vthrs(), ti = vthrIndex();
@@ -2047,7 +2052,7 @@ function verifDraw() {
   vseg('verif-scale', D.fss_km.map((k, i) => [i, `${k} km`, i ? 'Fönstrets sida' : 'Ett block, alltså punktvis']), vf.scale, 'scale', v => { vf.scale = +v; verifDraw(); });
   vseg('verif-lead', D.leads.map((l, i) => [i, `+${l} h`, 'Ledtid för dygnen och tabellen']), vf.lead, 'lead', v => { vf.lead = +v; verifDraw(); });
   const what = grp === 'cont' ? '' : grp === 'fss' ? ` vid ${num(thrs[ti])} mm på ${D.fss_km[vf.scale]} km` : ` vid minst ${num(thrs[ti])} mm under timmen`;
-  const facit = vf.obs === 'radar' ? 'radarn' : 'regnmätarna';
+  const facit = VFACIT[vf.obs];
 
   // per ledtid
   const series = keys.map(k => ({ key: k, ...vinfo(k), vals: D.leads.map((_, l) => vget(R[k], vf.metric, l)) }));
@@ -2083,8 +2088,8 @@ function verifDraw() {
 
   // alla mått vid en ledtid
   $('verif-all-title').textContent = `Alla mått vid +${D.leads[vf.lead]} h`;
-  $('verif-all-meta').textContent = `Mot ${facit}. Tröskel ${num(thrs[ti])} mm för måtten på regn och torrt${vf.obs === 'radar' ? `, FSS på ${D.fss_km[vf.scale]} km` : ''}. Det bästa värdet bland prognoserna är fetstilt; persistens och radarn är referenser och tävlar inte.`;
-  const rows = Object.entries(VM).filter(([k, m]) => vf.obs === 'radar' || m[0] !== 'fss');
+  $('verif-all-meta').textContent = `Mot ${facit}. Tröskel ${num(thrs[ti])} mm för måtten på regn och torrt${vf.obs !== 'gauges' ? `, FSS på ${D.fss_km[vf.scale]} km` : ''}. Det bästa värdet bland prognoserna är fetstilt; persistens${R.a2t ? ', radarn och A2T' : ' och radarn'} är referenser och tävlar inte.${vf.obs === 'gauges' && R.a2t ? ' A2T har rättats mot samma mätare, så i mätarens ruta är A2T nästan mätaren.' : ''}`;
+  const rows = Object.entries(VM).filter(([k, m]) => vf.obs !== 'gauges' || m[0] !== 'fss');
   const best = (k, vals) => {
     const d = VM[k][1], cand = vals.map((v, i) => [v?.[0], i]).filter(([v, i]) => v != null && !VEXTRA[keys[i]]);
     if (cand.length < 2) return -1;
@@ -2102,7 +2107,7 @@ function verifDraw() {
   }
   const lead = vf.lead;
   t += `<tr><td class="obs">Timmar</td>${keys.map(k => `<td class="obs">${num(R[k].hours[lead])}</td>`).join('')}</tr>`;
-  t += `<tr><td class="obs">${vf.obs === 'radar' ? 'Rutor' : 'Mätarvärden'}</td>${keys.map(k => `<td class="obs">${num(R[k].n[lead])}</td>`).join('')}</tr>`;
+  t += `<tr><td class="obs">${vf.obs !== 'gauges' ? 'Rutor' : 'Mätarvärden'}</td>${keys.map(k => `<td class="obs">${num(R[k].n[lead])}</td>`).join('')}</tr>`;
   t += `<tr><td class="obs">Över tröskeln i facit</td>${keys.map(k => `<td class="obs">${num(R[k].events[lead][ti] ?? 0)}</td>`).join('')}</tr>`;
   $('verif-all').innerHTML = t + '</table>';
 
@@ -2115,6 +2120,7 @@ function verifBasis(D, W) {
     [num(W.issues), 'utgåvor, en per timme'],
     [num(W.obs_hours), 'timmar med radarn som facit'],
     [num(W.gauge_hours), 'timmar med mätarna som facit'],
+    ...(W.a2t ? [[num(W.a2t_hours), `timmar med A2T som facit, i medel ${num(W.a2t_gauges)} mätarvärden per timme`]] : []),
     [num(W.stations.length), 'regnmätare med minst ett värde'],
     [`${num(D.grid_km)} km`, 'rutornas storlek'],
   ].map(([b, s]) => `<div><b>${b}</b><span>${s}</span></div>`).join('')
@@ -2150,6 +2156,11 @@ function verifBasis(D, W) {
     <p><b>Facit, regnmätarna.</b> SMHI:s timsummor (parameter 7, kvalitet kontrollerad eller misstänkt) mot prognosens värde i rutan där mätaren står.
       Värden över ${num(D.gauge_max)} mm räknas inte, eftersom arkivet har felaktiga mätvärden. Radarn verifieras också mot mätarna, som en jämförelse:
       en prognos kan inte väntas träffa mätarna bättre än radarn gör. Mätarna är oberoende av radarn, så här gynnas ingen modell, men en mätare är en punkt och rutan ${num(D.grid_km)} km.</p>
+    ${W.a2t ? `<p><b>Facit, A2T.</b> Analysen rättad mot regnmätarna, samma som A2 i fliken Analys, vid sidan av radarn och inte i stället för den.
+      Den räknas på de rutor där radarn är facit och A2T finns, med den senaste versionen av timmen, eftersom A2T räknas om när fler mätare kommer in.
+      Tim-KNEP utgår från radaranalysen och inte från A2T, så den gynnas mindre här än mot radarn.
+      A2T har rättats mot samma mätare som facit ovan, så i mätarens ruta är A2T nästan mätaren: A2T och mätarna är inte två oberoende facit,
+      och A2T:s rad mot mätarna visar bara hur nära rättningen kommer.</p>` : ''}
     <p><b>Urvalet.</b> Varje modell räknas på de rutor och timmar där både facit och modellen finns. Skillnaden mot Tim-KNEP räknas på exakt samma rutor och timmar
       som den andra modellen, så att en modell som saknas en timme inte jämförs mot ett annat urval.</p>
     <p><b>Osäkerheten.</b> Intervallen är 90 % ur ${num(D.boot)} dragningar av dygnen med återläggning. Rutor och timmar samma dygn hänger ihop, så det är dygnen som räknas som oberoende.
@@ -2231,22 +2242,25 @@ function located(e) {
 }
 
 // förklaringen: visas första gången, och med ? uppe till höger
-// INTRO är förklaringen med A2 (manifestet har bilder i levels.a2); utan A2 är den som förut, INTRO - 1
-const INTRO = 5;  // höj när förklaringen ändras, så att den visas igen
-const introVer = () => hasA2(live.manifest) ? INTRO : INTRO - 1;
+// INTRO är förklaringen med A2T som facit i verifieringen (manifestet har verification.a2t);
+// med A2 men utan det INTRO - 1, och utan A2 som förut, INTRO - 2
+const INTRO = 6;  // höj när förklaringen ändras, så att den visas igen
+const hasA2T = m => !!m?.verification?.a2t;
+const introVer = () => hasA2T(live.manifest) ? INTRO : hasA2(live.manifest) ? INTRO - 1 : INTRO - 2;
 const introHere = () => !location.hash.startsWith('#handelser') && !location.hash.startsWith('#verifiering');
 function introOpen() { try { $('intro').showModal(); } catch (e) { $('intro').setAttribute('open', ''); } }
-function introA2() {  // texten om A2 när manifestet har kommit, och förklaringen igen första gången A2 finns
-  const ja = hasA2(live.manifest);
+function introA2() {  // texterna om A2 och A2T när manifestet har kommit, och förklaringen igen första gången de finns
+  const ja = hasA2(live.manifest), facit = hasA2T(live.manifest);
   document.querySelectorAll('.intro-a2-ja').forEach(e => { e.hidden = !ja; });
   document.querySelectorAll('.intro-a2-nej').forEach(e => { e.hidden = ja; });
-  if (ja && !$('intro').open && store.get('intro', 0) < INTRO && introHere()) introOpen();
+  document.querySelectorAll('.intro-a2t-ja').forEach(e => { e.hidden = !facit; });
+  if (introVer() > INTRO - 2 && !$('intro').open && store.get('intro', 0) < introVer() && introHere()) introOpen();
 }
 const introSeen = () => store.set('intro', Math.max(store.get('intro', 0), introVer()));
 $('help').addEventListener('click', introOpen);
 $('intro-close').addEventListener('click', () => { $('intro').close(); introSeen(); });
 $('intro').addEventListener('close', introSeen);
-if (store.get('intro', 0) < INTRO - 1 && introHere()) introOpen();
+if (store.get('intro', 0) < INTRO - 2 && introHere()) introOpen();
 
 // kartorna finns från början, så att sidan inte hoppar när manifestet kommer
 for (const k of ['ours', 'met', 'snow']) makePane(k);
