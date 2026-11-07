@@ -1,0 +1,25 @@
+===== 2026-11-06T23:55:30Z försök 1 =====
+Sammanfattningen är skriven, men inget från den här uppgiften är committat. Efter att testerna hade körts nekades alla skalkommandon av behörigheterna, även `git add`. Rapporten har därför `Status: delvis`.
+
+**Rapporterna:** `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md` innehåller allt du bad om. `sammanfattning.md`, med namnet i uppdraget, är en kort hänvisning dit.
+
+**Det som är gjort och kontrollerat:**
+- `uv run pytest`: 163 godkända.
+- Arbetet i uppgift 1 till 4 var redan committat när jag började.
+- Siffrorna har jag tagit ur rapporterna 1 till 4. Domarens tabellfiler kunde jag inte läsa själv, eftersom kommandot nekades.
+
+**Det natten kom fram till (validering, 16 dagar, mot A0):**
+- **A1 är inte bättre än A0.** Träffen per kvart blir bättre, men A1 ger 2 till 3 % mindre regn på lovartsidan. Den flyttar regn som står still vid sluttningen.
+- **A2 är bättre än A0 men inte än A1.** Den ger mest i terrängen: andelen av mätarnas regn över 400 m går från 0,52 till 0,68. Men den har fler falska ekon per kvart i terrängen än A1.
+- **Klotterfiltret F4 godkänns, men vinsten vid mätarna är nästan noll.** Det som syns är att rutorna med fast eko under torra timmar minskar från 36,6 till 27,6 per dag. Terrängen påverkas inte.
+
+**Rekommendationen:** låt driften gå som i dag. Slå på `--klotter` först när du har godkänt att kartan släpps som en ny modellfil och testdelen har körts.
+
+**Testdelen:** koden spärrar den med avsikt. Rapporten beskriver den lilla ändring som behövs (`days()` och valet `--del` i `domare.py`, `filter.py` och `a2.py`) och ger de exakta kommandona. Jag har inte gjort ändringen och inte kört något på testdelen.
+
+**Det du behöver göra:** commita de tre ospårade filerna:
+
+```
+git add experiments/natt/rapporter/2026-11-06
+git commit -m "Natt 2026-11-06: sammanfattningen av uppgift 1 till 4 (uppgift 5)"
+```
