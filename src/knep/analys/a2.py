@@ -1,6 +1,6 @@
 """A2T: analysen A1 rättad mot SMHI:s regnmätare, för en timme och dess fyra kvartar.
 
-Avstängd: körs inte i cli.py. Metoden och parametrarna är A2T ur experiments/analys/a2.py
+Körs i cykeln bara med valet --a2 (analys/a2_cykel.py), som är av som standard. Metoden och parametrarna är A2T ur experiments/analys/a2.py
 (system_params("A2T")), som slår A0 och A1 enligt analysens domare på valideringen; se
 experiments/bakgrund/rapporter/2026-11-07/0001-a2-falska-ekon.md. Likheten med experimentet prövas i
 tests/test_a2_src.py och experiments/analys/a2_src_likhet.py.
