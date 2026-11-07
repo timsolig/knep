@@ -114,6 +114,21 @@ def test_no_upscaling_of_weak_echo():
     assert q1[t, 75, 75] > 0.5 and np.isclose(q1[t, 75, 75], q0[t, 75, 75])  # starkt eko skalas som förut
 
 
+def test_cap_over_weak_echo_stops_oi_lift():
+    dag = _wet_dag(2.0)  # våta mätare: OI lyfter omgivningen
+    kv = np.full((96, H, W), 0.08, np.float32)
+    kv[:, 100:110, 100:110] = 0.0  # radarn torr här: OI får fortfarande lägga till regn
+    tm = kv.reshape(24, 4, H, W).sum(axis=1)
+    rng = np.full((H, W), 60.0, np.float32)
+    base = {r: dict(a2.PARAMS[r], ALFA=1e9) for r in a2.PARAMS}  # utan kvoten, bara OI
+    var = {"timme": base["timme"], "kvart": dict(base["kvart"], K_SVAG=0.125, SVAG_TAK=True)}
+    q0, _ = a2.A2(kv, tm, rng, params=base).falt(dag, (dag.kvart, dag.timme), hours=[5])
+    q1, _ = a2.A2(kv, tm, rng, params=var).falt(dag, (dag.kvart, dag.timme), hours=[5])
+    t = 20
+    assert q0[t, 90, 90] > 0.125 and q1[t, 90, 90] <= 0.08 + 1e-6  # svagt eko lyfts inte
+    assert np.isclose(q1[t, 104, 104], q0[t, 104, 104]) and q1[t, 104, 104] > 0  # där A1 = 0 som förut
+
+
 def test_dry_mask_over_weak_echo():
     for mm, removed in ((0.0, True), (1.0, False)):
         dag = _wet_dag(mm)

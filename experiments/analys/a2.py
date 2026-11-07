@@ -145,6 +145,15 @@ def svag_kvot(ratio, bg, p):
     return np.where(bg < ks, np.minimum(ratio, 1.0), ratio)
 
 
+def svag_tak(out, bg, p):
+    """Varianten med tak över svagt eko (SVAG_TAK): där 0 < A1 < K_SVAG blir A2 högst A1, så att varken
+    kvoten eller OI lyfter ett svagt eko. Där A1 är 0 får OI fortfarande lägga till regn."""
+    ks = p.get("K_SVAG", 0.0)
+    if ks <= 0 or not p.get("SVAG_TAK", False):
+        return out
+    return np.where((bg > 0) & (bg < ks), np.minimum(out, bg), out)
+
+
 def analys_punkter(t_bg, t_xy, t_rng, ratio_t, g_xy, g_mm, g_bg, g_rng, ratio_g, g_wet_tree, p,
                    torrmask=True):
     """A2 i målpunkterna för en period.
@@ -161,6 +170,7 @@ def analys_punkter(t_bg, t_xy, t_rng, ratio_t, g_xy, g_mm, g_bg, g_rng, ratio_g,
         v = oi_vikter(g_xy[ok_g], sbg, d, p)
         inc = oi_tillskott(t_xy, sigma_b(t_rng, p), g_xy[ok_g], sbg, v, p)
         out = np.maximum(np.sqrt(np.maximum(out, 0)) + inc, 0) ** 2
+    out = svag_tak(out, t_bg, p)
     if torrmask and len(g_mm):
         tree = cKDTree(g_xy)
         nb = tree.query_ball_point(t_xy, p["R_TORR"])
@@ -425,10 +435,11 @@ def cmd_diagnos(a):
 # varianterna som prövas för kvarten på träningen: (namn, ändringar i PARAMS["kvart"])
 VARIANTER = (
     [("standard", {})]
-    + [(f"K_SVAG={v:g}", {"K_SVAG": v}) for v in (0.05, 0.1, 0.2, 0.3)]
+    + [(f"K_SVAG={v:g}", {"K_SVAG": v}) for v in (0.1, 0.125, 0.2, 0.3)]
+    + [(f"K_SVAG={v:g} tak", {"K_SVAG": v, "SVAG_TAK": True}) for v in (0.1, 0.125, 0.2, 0.3)]
     + [(f"TORR2={v:g} R={r:g}", {"TORR2": v, "R_TORR2": r}) for v in (0.1, 0.2, 0.3) for r in (30.0, 40.0, 80.0)]
-    + [(f"K_SVAG={k:g} TORR2={v:g} R={r:g}", {"K_SVAG": k, "TORR2": v, "R_TORR2": r})
-       for k in (0.1, 0.2) for v in (0.1, 0.2) for r in (40.0, 80.0)]
+    + [(f"K_SVAG={k:g} tak TORR2={v:g} R={r:g}", {"K_SVAG": k, "SVAG_TAK": True, "TORR2": v, "R_TORR2": r})
+       for k in (0.125, 0.2) for v in (0.1, 0.2) for r in (40.0, 80.0)]
 )
 
 
@@ -447,11 +458,12 @@ def _train_pdays(a):
 def cmd_varianter(a):
     """Varianterna mot de falska ekona, på träningspunkterna (samma korsvalidering som trana)."""
     pdays = _train_pdays(a)
-    path = OUT / "varianter.json"
+    i, n = (int(x) for x in a.bit.split("/"))
+    path = OUT / ("varianter.json" if n == 1 else f"varianter_{i}.json")
     result = json.loads(path.read_text()) if path.exists() else {}
     for res in a.res:
         rows = result.get(res, {})
-        for namn, ch in VARIANTER:
+        for namn, ch in VARIANTER[i::n]:
             if namn in rows:
                 continue
             t = time.time()
@@ -576,6 +588,7 @@ class A2:
             v = oi_vikter(xy[ok], sbg, d, p)
             inc = oi_tillskott(self.cxy, sigma_b(self.crng, p), xy[ok], sbg, v, p).reshape(self.cshape)
             out = np.maximum(np.sqrt(out) + _up(inc, self.shape), 0.0) ** 2
+        out = svag_tak(out, F0, p)
         if len(g):
             # torrmasken på det glesa rutnätet (närmaste mätare och närmaste våta mätare), upp med närmaste
             d_any = cKDTree(xy).query(self.cxy, distance_upper_bound=p["R_TORR"] + 1)[0]
