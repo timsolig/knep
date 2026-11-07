@@ -92,6 +92,12 @@ FRYSTA: dict[str, dict] = {
     # samma värden som utan; vid lika valdes skyddet.
     "A2TK": {"K_SVAG": 0.125, "SVAG_TAK": True, "QC_T": 3.0, "QC_R": 50.0, "QC_SKYDD400": True,
              "timme": {"QC_T": 2.5, "QC_R": 50.0, "QC_SKYDD400": True}},
+    # A2T med kontrollen per station och dygn (uppgiften a2-texter-och-stationskontroll, 0007), vald på
+    # träningen med urvalsregeln i rapporten 0007 (VARIANTER_QCS "N=8/3 R=100 skydd400 noll-los") och
+    # fryst innan valideringen kördes
+    "A2TS": {"K_SVAG": 0.125, "SVAG_TAK": True,
+             "QCS": {"N": {"kvart": 8, "timme": 3}, "R": 100.0, "SKYDD400": True,
+                     "A_VAT": {"kvart": 0.25, "timme": 1.0}, "N_VAT": {"kvart": 0.2, "timme": 0.5}}},
 }
 
 # kontrollen av mätarna (uppgiften a2t-kontroll-matare): av som standard (QC_T saknas eller 0). Se kontroll().
