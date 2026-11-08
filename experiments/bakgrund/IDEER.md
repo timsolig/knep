@@ -6,7 +6,6 @@ Kandidaterna som planeraren väljer från, ungefär i den ordning de ger mest nu
 
 Användarens beslut 2026-11-07 (`MAL.md`) går först, i den här ordningen:
 
-- **Beslut d: F4 på alla 28 träningsdagar och kartan som modellfil** (nästa, planeraren 2026-11-08 04:18). Kartan (`filter.build_map`) bygger redan på alla 28 träningsdagar; det som gjordes på bara 13 var bedömningen på träningen (rapport `natt/2026-11-06/4-filter.md`). Uppgiften: dagfiler med `kvot våt` för A0 och F4 på alla 28 träningsdagar (cirka 4 min per dag, en process), F4 mot A0 på träningen, kontroll att `klotter_f4.npz` byggs om bit för bit ur nuvarande kod, och modellfilen med sha256 utanför repot. Inget släpp; det kommer efter testdelen. Kostnad 3 till 3,5 h, risk liten (F4 är redan godkänd på valideringen).
 - **Beslut e: testdelen en gång** (efter d och helst efter att kedjans ändringar nedan är bedömda på valideringen). A0, A1, kedjan, F4 och A2T, kommandona i `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md`, egen rapport. A0 körs utan `--opera-fjarr` (fälld i uppgift 0010).
 
 Övriga, ungefär i den ordning de ger mest:
@@ -31,6 +30,8 @@ Användarens beslut 2026-11-07 (`MAL.md`) går först, i den här ordningen:
 - **max_age vid bortfall** (mål 6). Kandidaterna bedöms på prognosen.
 
 ## Avgjort
+
+- **Beslut d: F4 på alla 28 träningsdagar och kartan som modellfil** (uppgift 0011, 2026-11-08): kartan byggs om bit för bit lika (sha256 `535dd606…`, 621 rutor, alla 28 träningsdagar), modellfilen ligger i `/data/analys/filter/klotter-v1/` och släppet `klotter-v1` är beskrivet. Dagfiler med kvot våt för A0 och F4 på alla 28 träningsdagar (gamla summor oförändrade). Domaren fäller F4 på träningen av kvot våt per timme över 400 m (−0,000112, −0,000261 till −0,000012; 0,1 mm vid våta fjällmätare på fyra dagar), med kartmåttet +9,8 rutor per dag och FSS bättre; valet ändras inte, men det är en varning inför testdelen. [Rapporten](rapporter/2026-11-08/0011-f4-alla-traningsdagar.md)
 
 - **Beslut 6: glappet nordväst om Riksgränsen** (uppgift 0010, 2026-11-08): glappet är verkligt (SMHI 0 där OPERA har regn i 59 % av OPERA:s våta rutbilder där svensk stråle är över 2 km och 84 % över 4 km på 9 träningsdagar, mot cirka 25 % närmare radarerna). `composite.layer_far` och valet `--opera-fjarr` (av) finns med tester. A0O med H = 2, vald på träningen, fyller bågen i fallet och höjer kvot våt per timme vid zonens 36 mätare (0,802 mot 0,729), men fälls mot A0 på 6 valideringsdagar av falska ekon (per timme 0,015 mot 0,011, −0,005 till −0,003) och kartmåttet. Ingen av fem varianter (H 2, 3, 4, tröskel 0,3) godkänns ens på träningen. Røst och Andøyas kärna ligger utanför SMHI:s täckning och påverkas inte. OPERA finns bara var 15:e minut i arkivet före 2024. [Rapporten](rapporter/2026-11-08/0010-glappet-riksgransen.md)
 

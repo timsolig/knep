@@ -181,4 +181,60 @@ Inget är släppt, och `models/` och `deploy/` är inte ändrade. Efter testdele
 3. Checka in `models/models.json` och release-texten (inte `.npz`-filen). `drift.sh` kör `knep-models fetch` i varje ny utcheckning innan den byts in, så filen hämtas och kontrolleras mot sha256 av sig själv. Kontrollera med `uv run knep-models status`.
 4. Att slå på filtret i drift är ett eget steg: `--klotter models/klotter_f4.npz` i anropet i `deploy/cycle.sh` (som står i repots rot efter `cd`). Saknas filen loggar `analys.bygg` en varning och filtrerar inget, så cykeln går ändå. Det steget beslutar användaren om efter testdelen (beslut 4 nämner släppet och låsningen; påslagningen är en ändring i `deploy/`).
 
-UTKAST
+UTKAST_A1
+
+## Tider, minne och disk
+
+- Provkörningen 2020-05-01 (A0 och F4 i en process): A0 65 s, F4 105 s (räknat från dagens start), cirka 1,08 GB minne (RSS) för processen. Med driften var 1,9 GB kvar tillgängligt.
+- De 27 andra dagarna i en process: 48 min (03:24 till 04:12 UTC), 92 till 172 s per dag för båda tillsammans, medan `pytest` gick samtidigt en stund. Ingen process dödades.
+- Tabellerna: under 1 min var (`f4_traning.py` 18 s för 6 dagar, ett par minuter för 28 och 13 dagar).
+- `/data/analys/domare_v2/` växte från 632 kB till cirka 1 MB; `/data/analys/filter/v2/` och `klotter-v1/` cirka 120 kB. Ledigt på `/data` 3,8 GB före och efter.
+
+## Kommandona för testdelen (beslut e), uppdaterade
+
+Kommandona i `natt/rapporter/2026-11-06/5-sammanfattning.md` och `2026-11-07/sammanfattning.md` gäller med de här ändringarna sedan dess: domarens filer ligger nu i `/data/analys/domare_v2/` (uppgift 0009), A2 är nu A2T (`--namn A2T`), A0 körs utan `--opera-fjarr` (uppgift 0010; domarens A0 har ingen OPERA alls), och körningar som läser en hel dags radarbilder går **en i taget** (uppgift 0009: två fick inte plats bredvid driften). Ingenting är kört eller upplåst här.
+
+Upplåsningen (bara när beslutet gäller, och ingenting annat ändras):
+
+1. `experiments/analys/domare.py`, `days()`: lägg till `elif part == "test": out = sorted(test)` före `else`, och flytta `assert not test & set(out)` in i grenarna `validering` och `traning`. Lägg till `"test"` i `choices` för `--del` i `domare.py` och `filter.py`.
+2. `experiments/analys/a2.py`: lägg till `--del` (standard `validering`) och använd det i stället för `"validering"` i `cmd_a1falt` och `cmd_kor`, också i assertionen i `cmd_kor`.
+3. `experiments/projektion/domare.py`: läget `"test": dict(days=lambda: [d["day"] for d in load_days("test")], res=2, hours=lambda d: [h for h in _chain_hours(d) if h % 3 == 0], ref="kedja")` i `LÄGEN`, och kontrollen i `mode_days` villkorlig (`if mode != "test": assert ...`).
+
+Sedan, en körning i taget i bakgrunden med logg och `timeout`:
+
+    # analysen: A0, A1 och F4 i en process (F4 och A1 återanvänder A0:s bilder), cirka 6,5 min per dag
+    timeout 2h uv run python experiments/analys/filter.py kor A0 A1 F4 --del test --dagar <testdagarna, första halvan> > logg_test_0.txt 2>&1
+    timeout 2h uv run python experiments/analys/filter.py kor A0 A1 F4 --del test --dagar <andra halvan> > logg_test_1.txt 2>&1
+    # A2T på A1:s fält (A1:s fält sparas först; cirka 5 min per dag)
+    timeout 2h uv run python experiments/analys/a2.py a1falt --del test > logg_test_a1falt.txt 2>&1
+    timeout 2h uv run python experiments/analys/a2.py kor --namn A2T --del test > logg_test_a2t.txt 2>&1
+    # tabellerna (/data/analys/domare_v2/tabell_<system>_mot_<bas>_test.json, ny och gammal regel)
+    uv run python experiments/analys/domare.py tabell A1 --mot A0 --del test
+    uv run python experiments/analys/domare.py tabell F4 --mot A0 --del test
+    uv run python experiments/analys/domare.py tabell A2T --mot A0 --del test
+    uv run python experiments/analys/domare.py tabell A2T --mot A1 --del test
+    # prognosen: driftens kedja för testdagarna, om den inte redan finns i /data/sverige/kedja/, sedan domaren
+    uv run python experiments/sverige/kedja.py --part test --shard 0/2
+    uv run python experiments/sverige/kedja.py --part test --shard 1/2
+    uv run python experiments/projektion/domare.py kör --läge test --system kedja persistens --procs 2
+    uv run python experiments/projektion/domare.py tabell --läge test --system kedja persistens
+
+F4 körs med kartan i `/data/analys/filter/karta.npz` (samma som `klotter-v1`, sha256 ovan) och räknas inte om. `a2.py a1falt` läser en hel dags bilder och får inte gå samtidigt som `filter.py kor`. Testdelens rapport bör ta med varningen ovan om kvot våt över 400 m. Ingen parameter, tröskel eller karta får ändras efter att testdelen är sedd.
+
+## Filerna som ändrades
+
+- `experiments/analys/filter.py`: valet `--karta-ut` och `set_fout`, så att kartan kan byggas om till en annan katalog (standard som förut).
+- `experiments/analys/karta_lika.py` (nytt): jämförelsen av kartorna bit för bit.
+- `experiments/analys/f4_traning.py` (nytt): F4 mot A0 på 28 och 13 träningsdagar, och huvudraderna ur valideringens sparade tabell.
+- `experiments/analys/f4_dagar.py` (nytt): vad F4 tar bort vid mätarna per dag.
+- `experiments/analys/klotter_modell.py` (nytt): modellfilen med metadata.
+- `tests/test_analys_filter.py`: test för `set_fout`.
+- Den här rapporten, `MAL.md` (en fråga) och `IDEER.md` (beslut d till Avgjort).
+
+`src/`, `deploy/`, `models/`, `.github/`, `dagar.json` och `experiments/natt/` är inte ändrade. `uv run pytest`: 213 godkända (7 min 20 s, med körningen igång).
+
+## Nästa steg
+
+1. **Beslut e, testdelen**, med kommandona ovan. Kartan och dagfilerna på träningen är klara. Varningen: F4 fälls på 28 träningsdagar av kvot våt per timme över 400 m (−0,000112, −0,000261 till −0,000012), en mycket liten verklig förlust vid våta fjällmätare på fyra dagar.
+2. Efter testdelen, om F4 godkänns och användaren vill: släppet `klotter-v1` (avsnittet ovan) i en PR mot `main`, och påslagningen i `deploy/cycle.sh` som eget beslut.
+3. Om F4 fälls på testdelen av samma mått: ta fram vilka mätare och timmar det är (`f4_dagar.py` visar dagarna; det behövs utdata per mätare), och pröva en variant som inte rör kartrutor inom en ruta från en mätare över 400 m, vald på träningen och bedömd på valideringen en gång. Inte före testdelen.
