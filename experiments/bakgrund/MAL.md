@@ -44,6 +44,8 @@ Svaren på frågorna nedan. De går före prioriteringarna; planeraren tar dem s
 
 ## Frågor till användaren
 
+- **Bash nekas i bakgrundens sessioner (2026-11-08 23:37, viktigast):** uppgift 0015 kunde inte köra något eftersom Bash nekades (läget "don't ask"), troligen samma sak som fick 0014 att sluta efter 0 min, och planeraren nekas Bash nu också. Utan skal går inga körningar, inga tester, ingen `df /data` och ingen commit; allt som kräver beräkning står still. Kan du ge loopens sessioner rätt att köra Bash igen (inställningarna för Claude Code i `~/.bakgrund/` eller loopens anrop)? Så länge gör bakgrunden bara det som går med att läsa och skriva filer.
+
 - **Kedjan utan matchning i testdelen? (uppgift 0013, 2026-11-08):** `kedja_utan_matchning` var redan dömd på valideringen i natt 1 (`validering_gles`, 16 dygn) och är **inte bättre** än kedjan: CSI och FSS något bättre, men blockmaxets 90-percentil säkert sämre vid alla ledtider (+0,058 till +0,065 i |log kvot|). Inflödet vid randen (`Inflode25`) är också redan fällt där. Rekommendationen är att testdelen (beslut e) körs för `kedja` som beslutat och att utan matchning inte tas med. Vill du ändå ha den med som jämförelse? (`rapporter/2026-11-08/0013-kedja-utan-matchning-validering.md`)
 - **Fliken Verifiering i en webbläsare (uppgift 0012, 2026-11-08):** den nya fliken (alla mått på en gång, grupperna, ledtiden som axel, egen period, `INTRO` 7) är skriven men aldrig ritad, eftersom Pi:n saknar webbläsare, Playwright och JS-tolk, och Chromium (cirka 300 MB) inte ryms så länge disken är under 3 GB. Beslut 8 kräver att den provas i Playwright, också i 390 × 844, innan den slås ihop. Vill du (a) prova grenen på en dator med webbläsare (instruktionen står i `rapporter/2026-11-08/0012-verifiering-flik-del1.md` under Prövningen), eller (b) låta bakgrunden installera Playwright med Chromium på Pi:n när disken har plats? Ändringen i `verify.py` påverkar inte sidan i dag och kan slås ihop för sig. Bakgrunden gör inget mer på sidan innan den är ritad.
 
@@ -60,6 +62,8 @@ Svaren på frågorna nedan. De går före prioriteringarna; planeraren tar dem s
 - F4:s klotterkarta som modellfil (`--klotter`): godkänd av domaren mot A0 men med liten vinst vid mätarna. Rekommendationen är att träna om den på alla 28 träningsdagar och köra testdelen före ett släpp. (2026-11-07)
 
 ## Ändringar
+
+- 2026-11-08 23:37: planeraren efter uppgift 0015: den misslyckades för att Bash nekades, inte för något i uppgiften, och planeraren nekas Bash nu också. Att lägga ut taket igen skulle misslyckas på samma sätt. Därför blir uppgift 0016 en skrivbordsdel av taket som bara kräver att läsa och skriva filer: läsa domaren och kedjan, skriva `experiments/projektion/tak.py` med fuskvarianterna (inte körd, märkt så) och en körplan med kommandon, så att nästa session med skal bara behöver provköra och köra. Frågan om Bash står först under Frågor. Ordningen är oförändrad. Planeraren kunde inte kontrollera `df /data` eller committa.
 
 - 2026-11-08 22:40: planeraren efter uppgift 0014: uppgiften avbröts efter 0 min utan rapport och utan commit, så inget är prövat och skälet för den står kvar. Den läggs ut igen som uppgift 0015, med rapportens skelett och en commit först, fuskvarianterna i en egen modul (`experiments/projektion/tak.py`, domaren orörd) och en provkörning på en dag innan de sex dagarna. Ordningen är oförändrad. `df /data` visar 3 230 MB ledigt, så testdelen väntar fortfarande.
 
