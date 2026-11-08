@@ -1,5 +1,5 @@
 [Unit]
-Description=knep: bakgrunden (Claude Code arbetar dygnet runt, se experiments/bakgrund/README.md)
+Description=knep: bakgrunden (Claude Code arbetar på natten, se experiments/bakgrund/README.md)
 After=network-online.target
 
 [Service]
@@ -10,6 +10,11 @@ Restart=always
 RestartSec=120
 KillSignal=SIGINT
 TimeoutStopSec=120
+# Driften ska alltid hinna med sin cykel (under 4 min): bakgrunden får högst två av fyra kärnor
+# och viker undan när driften behöver processorn. Minnet går inte att begränsa här, eftersom
+# kärnan på Pi:n saknar minnesstyrningen i cgroup (kräver cgroup_enable=memory i cmdline.txt).
+CPUQuota=200%
+CPUWeight=20
 
 [Install]
 WantedBy=default.target
