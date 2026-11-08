@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0013 · 2026-11-08 10:10 · kedja-utan-matchning-validering · klar
+- Varför: Kedjan utan fördelningsmatchning var något bättre än kedjan på träningen och måste bedömas på valideringen före testdelen, medan fliken Verifiering väntar på en webbläsare och testdelen på disken.
+- Resultat: kedjan utan matchning är redan dömd på valideringen (`validering_gles`, 16 dygn, 125 utgåvor, körd 2026-11-04 i natt 1) och domen är **inte bättre**: CSI och FSS blir 0,001 till 0,006 bättre, men blockmaxets 90-percentil är säkert sämre vid alla ledtider (+0,058 till +0,065 i |log kvot|, intervallen +0,033 till +0,094), formen 4 till 8 km säkert sämre (+0,042 till +0,053) och SEDI 10 mm/h säkert sämre vid 15 till 60 min; jag körde inte valideringen en gång till, utan räknade om tabellen ur de sparade summorna och ett dygn bit för bit lika med dagens kod. Inflödet vid randen var också redan valt och fällt i natt 1 (`Inflode25`); på träningen tar det tillbaka hälften av förlusten nära randen (kvoten mot radarn vid +60 min 0,897 mot kedjans 0,778).
+- Rapport: [rapporter/2026-11-08/0013-kedja-utan-matchning-validering.md](rapporter/2026-11-08/0013-kedja-utan-matchning-validering.md), 73 min
+
 ### 0012 · 2026-11-08 08:54 · verifiering-flik-del1 · delvis
 - Varför: Användarens beslut 8 är beställt och behöver ingen ny data, medan testdelen (beslut e) väntar eftersom /data har under 3 GB ledigt.
 - Resultat: fliken Verifiering är omskriven med alla mått på en gång (ett litet diagram per mått, ledtiden +1 till +5 h som axel, en linje per modell, intervallet som band) i fyra grupper, med egen period från och till som räknas i sidan ur dygnens summor; `verify.py` skriver nu det som saknades för det (Tim-KNEP på de andras urval, timmarna och underlaget per dygn) utan att något befintligt tal ändras, och måtten ur dygnens summor stämmer med `verify.py` inom 0,00011 på provdatan; sidan är **inte** ritad eller körd, eftersom varken Playwright, en webbläsare eller node finns på Pi:n.
