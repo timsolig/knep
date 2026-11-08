@@ -2409,6 +2409,7 @@ for (const id of ['verif-from', 'verif-to']) $(id).addEventListener('change', ()
   verifDraw();
 });
 $('verif-obs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { vf.obs = b.dataset.obs; store.set('vobs', vf.obs); verifDraw(); }));
+document.querySelector('#verifview .vmore').addEventListener('toggle', () => { if (vf.doc) verifDraw(); });  // dolda diagram har ingen bredd
 
 /* ---------- flikar ---------- */
 // Prognos och Analys är samma vy med olika kartor (live.analys); bytet görs i liveTab
