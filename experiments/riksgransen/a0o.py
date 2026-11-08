@@ -121,11 +121,57 @@ def kor(a):
         gc.collect()
 
 
+VARIANTER = {"H2": (2.0, 0.1), "H3": (3.0, 0.1), "H4": (4.0, 0.1), "H2t03": (2.0, 0.3), "H3t03": (3.0, 0.3)}
+TR_OUT = zon.OUT / "domare_tr"
+
+
+def trana(a):
+    """Varianterna (H, minsta OPERA i mm/h) på träningsdagarna, ur samma A0-bilder. Skriver
+    domarens dagfiler för A0 och varje variant under TR_OUT/alla/ och för zonens mätare (zonen
+    för variantens H) under TR_OUT/zon_H<H>/. Valideringen rörs inte."""
+    for d in a.dagar:
+        assert d in domare.days("traning")
+        if (TR_OUT / "alla" / list(VARIANTER)[-1] / f"{d}.json").exists():
+            continue
+        t = time.time()
+        rd = domare.Radardag(d)
+        dag = domare.build_dag(d, rd)
+        g = zon.grid_of(rd.grid)
+        fr = domare.A0(rd).frames()
+        k0 = domare.Radardag.PRE + 1
+        _, v = zon.load_opera_day(d)
+        zones = {h: composite.far_zone(g, h) for h in {h for h, _ in VARIANTER.values()}}
+        dz = {h: zone_dag(dag, z) for h, z in zones.items()}
+        res = {}
+        q, h_ = domare.sums(fr[k0:])
+        res["A0"] = (q, h_)
+
+        def write(name, q, hh):
+            for sub, dd in [("alla", dag)] + [(f"zon_H{h:g}", dz[h]) for h in zones]:
+                p = TR_OUT / sub / name / f"{d}.json"
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(json.dumps(domare.evaluate_fields(dd, q, hh)))
+        write("A0", q, h_)
+        del q, h_, res
+        src = np.zeros(g.shape, np.uint8)
+        for name, (H, thr) in VARIANTER.items():
+            def interval(i, H=H, thr=thr):
+                k = k0 + i
+                o = zon.decode(v[opera_index(k)])
+                return composite.layer_far(fr[k], src, o, composite.SOURCE_OPERA, zones[H], min_extra=thr)[0]
+            q, hh = domare.sums_hourly(interval)
+            write(name, q, hh)
+            del q, hh
+        print(d, f"{time.time() - t:.0f} s", flush=True)
+        del rd, dag, fr, v
+        gc.collect()
+
+
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("cmd", choices=["kor"])
+    p.add_argument("cmd", choices=["kor", "trana"])
     p.add_argument("dagar", nargs="+")
-    p.add_argument("--H", type=float, required=True)
+    p.add_argument("--H", type=float, default=2.0)
     p.add_argument("--regel", default="torr", choices=["torr", "max"])
     p.add_argument("--om", action="store_true", help="räkna om dagar som redan finns")
     p.add_argument("--ut", help="domarens katalog för dagfilerna (standard domare.OUT); zonens filer under <ut>/zon")
@@ -134,7 +180,7 @@ def main():
         global ZON_OUT
         domare.set_out(a.ut)
         ZON_OUT = Path(a.ut) / "zon"
-    kor(a)
+    trana(a) if a.cmd == "trana" else kor(a)
 
 
 if __name__ == "__main__":
