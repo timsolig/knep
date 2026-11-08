@@ -1,15 +1,20 @@
 """Tabellerna i markdown ur results/facit_a2t_varianter.json (uppgift 0006).
 
     uv run python experiments/projektion/facit_a2t_varianter_tabell.py
+    uv run python experiments/projektion/facit_a2t_varianter_tabell.py inflode25 konservering:Inflode25
+
+Utan argument som i uppgift 0006; annars namnet (results/facit_a2t_<namn>.json) och varianterna (uppgift 0013).
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
-R = json.loads((Path(__file__).resolve().parent / "results" / "facit_a2t_varianter.json").read_text())
-VAR = ["kedja_utan_platskarta", "kedja_utan_matchning"]
+_NAMN = sys.argv[1] if len(sys.argv) > 1 else "varianter"
+R = json.loads((Path(__file__).resolve().parent / "results" / f"facit_a2t_{_NAMN}.json").read_text())
+VAR = sys.argv[2:] or ["kedja_utan_platskarta", "kedja_utan_matchning"]
 FACIT = {"radar": "radarn (A0)", "a2t": "A2T", "matare": "mätarna (p7)"}
 
 
