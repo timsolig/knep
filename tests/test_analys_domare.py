@@ -61,6 +61,7 @@ def test_perfect_analysis_scores_perfectly():
     for key in ("kvart/alla", "timme/alla"):
         m = domare.metrics(res[key], key.split("/")[0])
         assert m["kvot summa"][0] == pytest.approx(1.0)
+        assert m["kvot våt"][0] == pytest.approx(1.0)
         assert m["MAE"][0] == pytest.approx(0.0, abs=1e-6)  # fälten är float32
         assert m["CSI 0.5"][0] == pytest.approx(1.0)
         assert m["falskt vid torr mätare"][0] == 0.0
@@ -77,6 +78,33 @@ def test_scaled_analysis_ratio_and_false_echo():
     m = domare.metrics(res["timme/alla"], "timme")
     assert m["falskt vid torr mätare"][0] == pytest.approx(1.0)
     assert res["rutor"]["eko_torr"] == res["rutor"]["rutor_torr"] > 0
+
+
+def test_wet_ratio_ignores_echo_at_dry_gauges():
+    """Eko vid torra mätare höjer summakvoten men inte kvoten för våta perioder."""
+    dag = make_dag(seed=6)
+    q, h = perfect_fields(dag)
+    a_q, a_h = 0.5 * q, 0.5 * h
+    m = dag.timme
+    dry = m.mm == 0
+    a_h[m.t[dry], m.r[dry], m.c[dry]] = 3.0
+    res = domare.evaluate_fields(dag, a_q, a_h)
+    mt = domare.metrics(res["timme/alla"], "timme")
+    assert mt["kvot våt"][0] == pytest.approx(0.5)
+    assert mt["kvot summa"][0] > 0.5
+    acc = res["timme/alla"]
+    assert acc["sgw"] == pytest.approx(acc["sg"])
+    assert acc["saw"] == pytest.approx(0.5 * acc["sg"])
+
+
+def test_new_sums_leave_old_ones_unchanged():
+    """compare_old: en ny dagfil med saw och sgw utöver de gamla summorna godkänns, en ändrad inte."""
+    dag = make_dag(seed=7)
+    new = domare.evaluate_fields(dag, *perfect_fields(dag))
+    old = {k: {c: v for c, v in acc.items() if c not in ("saw", "sgw")} for k, acc in new.items()}
+    assert domare.compare_old(new, old) == []
+    old["timme/alla"]["sa"] += 1e-9
+    assert domare.compare_old(new, old)
 
 
 def test_nan_is_skipped():
@@ -164,6 +192,19 @@ def test_sums_from_intervals():
     assert h[0, 1, 1] == pytest.approx(1.0) and h[0, 0, 0] == pytest.approx(1.0)
 
 
+@pytest.mark.parametrize("dtype", [np.float32, np.float16])
+def test_sums_hourly_equals_sums(dtype):
+    rng = np.random.default_rng(3)
+    iv = rng.gamma(0.5, 2.0, (288, 4, 5))
+    iv[rng.random(iv.shape) < 0.2] = np.nan
+    q0, h0 = domare.sums(iv.astype(dtype))
+    calls = []
+    q1, h1 = domare.sums_hourly(lambda i: calls.append(i) or iv[i], dtype)
+    assert calls == list(range(288))
+    np.testing.assert_array_equal(q0, q1)
+    np.testing.assert_array_equal(h0, h1)
+
+
 def test_lovart_mask_follows_slope():
     elev = np.tile(np.linspace(0, 2000, W, dtype=np.float32), (H, 1))  # stiger österut
     lat = np.full((H, W), 65.0)
@@ -176,9 +217,9 @@ def test_lovart_mask_follows_slope():
     assert lov[:12][mid].all() and not lov[12:][mid].any()
 
 
-def _fake_day(rng, mae, false=0):
+def _fake_day(rng, mae, false=0, wet=100.0):
     acc = domare._empty()
-    acc.update(n=100, sa=100.0, sg=100.0, ae=mae * 100, ndry=100, fdry=false, ndryo=100, fdryo=false,
+    acc.update(n=100, sa=100.0, sg=100.0, saw=wet, sgw=100.0, ae=mae * 100, ndry=100, fdry=false, ndryo=100, fdryo=false,
                **{f"hit{t:g}": 50.0 for t in domare.CSI_THR}, **{f"mis{t:g}": 10.0 for t in domare.CSI_THR},
                **{f"fal{t:g}": 10.0 for t in domare.CSI_THR}, **{f"fpo{t:g}": 10.0 for t in domare.CSI_THR},
                **{f"fp2{t:g}": 50.0 for t in domare.CSI_THR}, **{f"fo2{t:g}": 50.0 for t in domare.CSI_THR},
@@ -204,6 +245,24 @@ def test_table_and_verdict():
     assert not v["battre"] and any("falskt" in s for s in v["samre_i"])
     # likadan som baslinjen: inte bättre
     assert not domare.verdict(domare.table(base, base, B=300))["battre"]
+
+
+def test_verdict_old_and_new_rule():
+    """Samma summakvot men kvoten för våta perioder närmare 1: bättre bara med den nya regeln."""
+    rng = np.random.default_rng(2)
+    base = {f"d{i}": _fake_day(rng, 0.6, wet=70.0 + rng.random()) for i in range(10)}
+    sysd = {d: _fake_day(rng, 0.6, wet=90.0 + rng.random()) for d in base}
+    tab = domare.table(sysd, base, B=300)
+    assert tab["timme/alla"]["kvot våt"]["lo"] > 0
+    v, vg = domare.verdict(tab), domare.verdict(tab, regel="gammal")
+    assert v["battre"] and "timme kvot våt" in v["battre_i"]
+    assert not vg["battre"] and not any("kvot våt" in s for s in vg["battre_i"])
+    # gamla dagfiler utan saw och sgw: kvot våt saknas och bedöms inte
+    old = {d: {k: {c: x for c, x in acc.items() if c not in ("saw", "sgw")} for k, acc in r.items()}
+           for d, r in base.items()}
+    t_old = domare.table(old, old, B=50)
+    assert np.isnan(t_old["timme/alla"]["kvot våt"]["varde"]) and t_old["timme/alla"]["kvot våt"]["dagar"] == 0
+    assert not domare.verdict(t_old)["battre"]
 
 
 def test_metric_with_one_day_of_support_is_not_judged():

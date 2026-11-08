@@ -208,13 +208,10 @@ def make_system(name: str, kw: dict):
             rd = self.rd
             flt = Filter(rd.grid, **kw)
             k0 = domare.Radardag.PRE + 1
-            iv = np.empty((288, *fr.shape[1:]), np.float32)
-            for i in range(288):
-                k = k0 + i
-                # bilden gäller de fem minuterna före rd.times[k]
-                iv[i] = flt.apply(fr[k], rd.times[k])
+            # bilden gäller de fem minuterna före rd.times[k]; en timme i taget för minnets skull
+            out = domare.sums_hourly(lambda i: flt.apply(fr[k0 + i], rd.times[k0 + i]), np.float32)
             self.removed = flt.removed
-            return domare.sums(iv)
+            return out
     AF.__name__ = name
     return AF
 
@@ -268,7 +265,9 @@ def main() -> None:
     p.add_argument("--mot")
     p.add_argument("--dagar", nargs="*", help="flera dagar i följd (i stället för --dag)")
     p.add_argument("--bit", default="0/1")
+    p.add_argument("--ut", help=f"domarens katalog för dagfiler och tabeller (standard {domare.OUT})")
     a = p.parse_args()
+    domare.set_out(a.ut)
     if a.cmd == "karta":
         build_map()
     elif a.cmd == "karta_drift":

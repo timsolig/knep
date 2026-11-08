@@ -13,6 +13,8 @@
    webbläsarens cache när timmen räknas om.
 4. Kartorna ritas med render.Renderer.periods till a2/ och listas som history, under levels.a2 i
    manifestet. En timme utan mätare ritas inte.
+5. Timsumman sparas också som tal för verifieringen (verify.store_a2t, cache/verif/a2t/), där A2T
+   är ett andra facit vid sidan av radarn. En omräkning skriver över, så verifieringen tar den senaste.
 
 Mätarna kontrolleras grovt som i analysens domare: värden under 0 eller över MAX_MM tas bort.
 """
@@ -236,14 +238,20 @@ def rakna(state_dir: Path, out: Path, grid, now: datetime, doc: dict | None,
 
 
 def kor(state_dir: Path, out: Path, rend, a1_frames: list[tuple[datetime, np.ndarray]], now: datetime,
-        hours: float, doc: dict | None, modell: a2.A2T | None = None) -> dict:
+        hours: float, doc: dict | None, modell: a2.A2T | None = None, verif_dir: Path | None = None) -> dict:
     """En cykel: spara A1:s timmar, räkna A2T för de timmar som behöver det och rita dem till a2/.
 
-    Returnerar listan för levels.a2 (samma form som Renderer.history)."""
+    Med verif_dir sparas varje räknad timsumma också som tal för verifieringen (verify.store_a2t,
+    senaste versionen skriver över den förra). Returnerar listan för levels.a2 (samma form som
+    Renderer.history)."""
+    from .. import verify  # verifieringen ligger ovanför analysen
+
     start = time.monotonic()
     spara_a1(state_dir, a1_frames, now)
     items = []
     for end, tm, kv, tag in rakna(state_dir, out, rend.grid, now, doc, modell):
+        if verif_dir is not None:
+            verify.store_a2t(verif_dir, end, tm, int(tag[1:]), now)
         items.append((end, 60, tm, tag))  # mm per timme är mm/h
         items += [(end - TIMME + (i + 1) * KVART, 15, kv[i] * 4.0, tag) for i in range(4)]
     res = rend.periods(out, items, now, hours, directory=DIR)

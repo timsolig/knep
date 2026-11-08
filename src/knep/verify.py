@@ -21,6 +21,15 @@ värde i blocket där mätaren står. Värden över GAUGE_MAX mm räknas inte (f
 arkivet). Radarn verifieras också mot mätarna, som jämförelse. Mätarna kommer ungefär en timme
 efter radarn, så en utgåva räknas först GAUGE_DELAY efter sin sista timme.
 
+Facit, A2T. Analysen rättad mot mätarna (analys/a2.py, i cykeln med --a2), vid sidan av radarn och
+inte i stället för den. a2_cykel.kor sparar A2T:s timsumma på verifieringens rutnät i
+cache/verif/a2t/ (store_a2t) varje gång timmen räknas (om); en senare omräkning skriver över den
+förra, så att räkningen tar den senaste versionen. A2T kommer 1 till 2,5 h efter timmen, inom
+GAUGE_DELAY, så väntetiden ändras inte. Gruppen a2t räknas som radar på blocken där A2T, radarns
+mask och prognosen finns; saknas A2T för en ledtid räknas bara radarn. I mätargruppen är A2T en
+kandidat som radarn, men A2T har sett mätarna, så A2T i mätarens ruta är nästan mätaren och A2T-facit
+och mätarfacit är inte två oberoende bevis.
+
 Urvalet. Varje modell räknas på de block och timmar där facit, modellen och Tim-KNEP finns.
 Skillnaden mot Tim-KNEP räknas parvis: Tim-KNEP på exakt samma block och timmar som den andra
 modellen (nyckeln ours@met), så att en modell som bara räknar två timmar inte jämförs mot ett
@@ -63,6 +72,7 @@ MIN_CELLS = 50
 GAUGE_DELAY = timedelta(hours=2, minutes=30)
 GAUGE_MAX = 60.0
 KEEP_DAYS = 35
+A2T_KEEP = timedelta(hours=12)  # utgåvan räknas 7,5 h efter sin heltimme
 WINDOWS = (7, 30)
 BOOT = 1000
 MEASURED = (composite.SOURCE_SMHI, composite.SOURCE_OPERA, composite.SOURCE_VOLUME)
@@ -168,6 +178,34 @@ def _prune(d: Path, pattern: str, oldest: datetime, fmt: str) -> None:
 def obs_hour(vdir: Path, end: datetime) -> np.ndarray | None:
     p = vdir / "obs60" / f"{end:%Y%m%dT%H}.npy"
     return np.load(p).astype(np.float32) if p.exists() else None
+
+
+# ---------- facit: A2T:s timsummor ----------
+
+def a2t_dir(vdir: Path) -> Path:
+    return vdir / "a2t"
+
+
+def store_a2t(vdir: Path, end: datetime, field: np.ndarray, n: int, now: datetime) -> None:
+    """Spara A2T:s timsumma (mm, radarns rutnät) för timmen som slutar end, i block. Anropas av a2_cykel.kor.
+
+    En senare omräkning av samma timme skriver över den förra. n: antalet mätarvärden (märket)."""
+    d = a2t_dir(vdir)
+    d.mkdir(parents=True, exist_ok=True)
+    tmp = d / f".{end:%Y%m%dT%H}.tmp.npz"
+    np.savez_compressed(tmp, hour=block(field).astype(np.float16), n=np.array(int(n), np.int64),
+                        computed=np.array(_iso(now)))
+    tmp.replace(d / f"{end:%Y%m%dT%H}.npz")
+    _prune(d, "*.npz", now - A2T_KEEP, "%Y%m%dT%H")
+
+
+def a2t_hour(vdir: Path, end: datetime) -> tuple[np.ndarray, int] | None:
+    """A2T:s timsumma i block och antalet mätarvärden, eller None."""
+    try:
+        with np.load(a2t_dir(vdir) / f"{end:%Y%m%dT%H}.npz") as z:
+            return z["hour"].astype(np.float32), int(z["n"])
+    except (OSError, KeyError, ValueError):
+        return None
 
 
 # ---------- utgåvan ----------
@@ -314,11 +352,14 @@ class Day:
     def __init__(self, path: Path, shape: tuple[int, int]):
         self.path = path
         self.arrays: dict[str, np.ndarray] = {}
-        self.meta = {"issues": 0, "issued": [], "stations": {}, "lags": {}, "obs_hours": 0, "gauge_hours": 0}
+        self.meta = {"issues": 0, "issued": [], "stations": {}, "lags": {}, "obs_hours": 0, "gauge_hours": 0,
+                     "a2t_hours": 0, "a2t_n": 0}
         self.area = np.zeros(shape, np.uint16)
         if path.exists():
             with np.load(path) as d:
                 self.meta = json.loads(str(d["meta"]))
+                self.meta.setdefault("a2t_hours", 0)  # dygn från före A2T
+                self.meta.setdefault("a2t_n", 0)
                 self.arrays = {k: d[k] for k in d.files if k not in ("meta", "area")}
                 if d["area"].shape == tuple(shape):
                     self.area = d["area"]
@@ -361,6 +402,25 @@ def _gauge_points(gauges: dict | None, end: datetime, grid: Grid):
     return ids, row[ok], col[ok], np.array([vals[s] for s in ids], np.float64), stations
 
 
+def _add_fields(day: Day, obs: str, k: int, fc: dict, O: np.ndarray, base: np.ndarray, km: float) -> None:
+    """Alla modeller mot facit O på blocken base (där facit och Tim-KNEP finns), med paren mot Tim-KNEP."""
+    F0 = fc["ours"]
+    # modellerna med samma block som Tim-KNEP räknas tillsammans; de andra var för sig
+    groups: dict[str, tuple[np.ndarray, dict]] = {}
+    for m, F in fc.items():
+        mask = base & np.isfinite(F)
+        if mask.sum() < MIN_CELLS:
+            continue
+        g = "base" if np.array_equal(mask, base) else m
+        groups.setdefault(g, (mask, {}))[1][m] = F
+    for mask, Fs in groups.values():
+        parts = fss_many(Fs | {"ours": F0}, O, mask, km)
+        for m, F in Fs.items():
+            day.add(obs, m, k, F[mask], O[mask], parts[m])
+            if m != "ours":
+                day.add(obs, f"ours@{m}", k, F0[mask], O[mask], parts["ours"])
+
+
 def score(vdir: Path, grid: Grid, now: datetime, gauges: dict | None) -> int:
     """Räkna utgåvorna vars sista timme är äldre än GAUGE_DELAY; returnerar hur många."""
     vg = vgrid(grid)
@@ -393,30 +453,27 @@ def score(vdir: Path, grid: Grid, now: datetime, gauges: dict | None) -> int:
                 continue
             F0 = fc["ours"]
             O = obs_hour(vdir, end)
+            a2t = a2t_hour(vdir, end)
+            A = a2t[0] if a2t is not None and a2t[0].shape == vg.shape else None
             if O is not None:
                 base = np.isfinite(O) & np.isfinite(F0)
                 if base.sum() >= MIN_CELLS:
                     day.meta["obs_hours"] += 1
                     day.area += base.astype(np.uint16)
-                    # modellerna med samma block som Tim-KNEP räknas tillsammans; de andra var för sig
-                    groups: dict[str, tuple[np.ndarray, dict]] = {}
-                    for m, F in fc.items():
-                        mask = base & np.isfinite(F)
-                        if mask.sum() < MIN_CELLS:
-                            continue
-                        g = "base" if np.array_equal(mask, base) else m
-                        groups.setdefault(g, (mask, {}))[1][m] = F
-                    for mask, Fs in groups.values():
-                        parts = fss_many(Fs | {"ours": F0}, O, mask, km)
-                        for m, F in Fs.items():
-                            day.add("radar", m, k, F[mask], O[mask], parts[m])
-                            if m != "ours":
-                                day.add("radar", f"ours@{m}", k, F0[mask], O[mask], parts["ours"])
+                    _add_fields(day, "radar", k, fc, O, base, km)
+                if A is not None:  # A2T bara där radarn också är facit
+                    base_a = base & np.isfinite(A)
+                    if base_a.sum() >= MIN_CELLS:
+                        day.meta["a2t_hours"] += 1
+                        day.meta["a2t_n"] += a2t[1]
+                        _add_fields(day, "a2t", k, fc, A, base_a, km)
             ids, row, col, g, stations = _gauge_points(gauges, end, vg)
             if len(ids):
                 cand = dict(fc)
                 if O is not None:
                     cand["radar"] = O
+                if A is not None:  # A2T har sett mätarna, så det här är ingen oberoende jämförelse
+                    cand["a2t"] = A
                 f0 = F0[row, col]
                 used = np.zeros(len(ids), bool)
                 for m, F in cand.items():
@@ -493,6 +550,7 @@ def fss_scores(x: np.ndarray) -> np.ndarray:
     return 1 - _div(x[..., 0], x[..., 1])
 
 
+OBS = ("radar", "gauges", "a2t")  # facit: radarn, mätarna och A2T
 DICHOTOMOUS = ("ets", "csi", "pod", "far", "fbi", "hss", "pss", "mcc", "sedi", "pofd")
 CONTINUOUS = ("mae", "rmse", "me", "r", "ratio")
 
@@ -566,8 +624,10 @@ def _window(days: list[Day], seed: int = 0) -> dict:
     fss = lambda x: {"fss": fss_scores(x)}  # noqa: E731
     ct_shape, c_shape, f_shape = (LEADS, len(THRESHOLDS), 4), (LEADS, len(CONT)), (LEADS, len(FSS_THRESHOLDS), len(FSS_KM), 2)
     res = {}
-    for obs in ("radar", "gauges"):
+    for obs in OBS:
         keys = sorted({k.split("/")[1] for d in days for k in d.arrays if k.startswith(obs + "/")})
+        if obs == "a2t" and not keys:
+            continue  # utan A2T ser verif.json ut som förut
         res[obs] = {"models": {}, "diff": {}}
         for key in keys:
             if "@" in key:
@@ -577,7 +637,7 @@ def _window(days: list[Day], seed: int = 0) -> dict:
             hours = _stack(days, f"{obs}/{key}/hours", (LEADS,), np.int64).sum(0)
             e = {"hours": hours.tolist(), "n": c[..., 0].sum(0).astype(int).tolist(),
                  "events": (ct[..., 0] + ct[..., 2]).sum(0).tolist(), "scores": scores(ct, dich), "cont": scores(c, cont)}
-            if obs == "radar":
+            if obs != "gauges":
                 fs = _stack(days, f"{obs}/{key}/fss", f_shape, np.float64)
                 e["fss"] = scores(fs, fss)["fss"]
             res[obs]["models"][key] = e
@@ -587,7 +647,7 @@ def _window(days: list[Day], seed: int = 0) -> dict:
             ct0 = _stack(days, f"{obs}/{pair}/ct", ct_shape, np.int64)
             c0 = _stack(days, f"{obs}/{pair}/c", c_shape, np.float64)
             dd = {"scores": scores(np.stack([ct, ct0], 1), diff(dich, 2)), "cont": scores(np.stack([c, c0], 1), diff(cont, 1))}
-            if obs == "radar":
+            if obs != "gauges":
                 fs0 = _stack(days, f"{obs}/{pair}/fss", f_shape, np.float64)
                 dd["fss"] = scores(np.stack([fs, fs0], 1), diff(fss, 3))["fss"]
             res[obs]["diff"][key] = dd
@@ -597,12 +657,14 @@ def _window(days: list[Day], seed: int = 0) -> dict:
 def _daily(days: list[Day]) -> dict:
     """Råa summor per dygn för diagrammet över tiden (sidan räknar måtten med samma formler)."""
     out = {"days": [d.path.stem for d in days], "radar": {}, "gauges": {}}
-    for obs in ("radar", "gauges"):
+    for obs in OBS:
         keys = sorted({k.split("/")[1] for d in days for k in d.arrays if k.startswith(obs + "/") and "@" not in k})
+        if keys:
+            out.setdefault(obs, {})  # a2t bara när den finns
         for key in keys:
             e = {"ct": _stack(days, f"{obs}/{key}/ct", (LEADS, len(THRESHOLDS), 4), np.int64).tolist(),
                  "c": _round(_stack(days, f"{obs}/{key}/c", (LEADS, len(CONT)), np.float64), 3)}
-            if obs == "radar":
+            if obs != "gauges":
                 e["fss"] = _round(_stack(days, f"{obs}/{key}/fss", (LEADS, len(FSS_THRESHOLDS), len(FSS_KM), 2), np.float64), 2)
             out[obs][key] = e
     return out
@@ -645,6 +707,10 @@ def summary(vdir: Path, out: Path, grid: Grid, now: datetime) -> dict:
             "stations": [[sid, *v[1:], v[0]] for sid, v in sorted(stations.items())],
             "lags": {k: {"median": float(np.median(v)), "max": float(np.max(v)), "n": len(v)} for k, v in lags.items() if v},
         })
+        if "a2t" in e:
+            n = sum(d.meta.get("a2t_hours", 0) for d in sel)
+            e["a2t_hours"] = n
+            e["a2t_gauges"] = round(sum(d.meta.get("a2t_n", 0) for d in sel) / max(n, 1), 1)  # mätarvärden per timme
         doc["windows"][str(w)] = e
     if days:
         doc["daily"] = _daily([d for d in days if date.fromisoformat(d.path.stem) > today - timedelta(days=max(WINDOWS))])
@@ -659,7 +725,15 @@ def summary(vdir: Path, out: Path, grid: Grid, now: datetime) -> dict:
     tmp = out / (FILE + ".tmp")
     tmp.write_text(json.dumps(doc, separators=(",", ":"), ensure_ascii=False, allow_nan=False))
     tmp.replace(out / FILE)
-    return {"file": FILE, "updated": doc["updated"], "windows": sorted(int(k) for k in doc["windows"])}
+    return _entry(doc)
+
+
+def _entry(doc: dict) -> dict:
+    """Posten till manifestet; a2t bara när någon period har A2T som facit."""
+    e = {"file": FILE, "updated": doc["updated"], "windows": sorted(int(k) for k in doc["windows"])}
+    if any("a2t" in w for w in doc["windows"].values()):
+        e["a2t"] = True
+    return e
 
 
 def cycle(vdir: Path, out: Path, grid: Grid, t0: datetime, frames: list[tuple], source_of) -> dict | None:
@@ -677,8 +751,7 @@ def cycle(vdir: Path, out: Path, grid: Grid, t0: datetime, frames: list[tuple], 
             return None
         return summary(vdir, out, grid, t0)
     try:
-        doc = json.loads((out / FILE).read_text())
-        return {"file": FILE, "updated": doc["updated"], "windows": sorted(int(k) for k in doc["windows"])}
+        return _entry(json.loads((out / FILE).read_text()))
     except (FileNotFoundError, ValueError, KeyError):
         return None
 
