@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0014 · 2026-11-08 22:05 · tak-kedjans-delar · misslyckad
+- Varför: Användarens beslut 9 vill veta var de stora vinsterna finns innan fler finjusteringar, och mål 2 har inget kvar som är redo att bedömas efter uppgift 0013.
+- Resultat: ingen rapport skrevs (loggen på Pi:n: ~/.bakgrund/logg/0014-tak-kedjans-delar.txt)
+- Rapport: ingen, 0 min
+
 ### 0013 · 2026-11-08 10:10 · kedja-utan-matchning-validering · klar
 - Varför: Kedjan utan fördelningsmatchning var något bättre än kedjan på träningen och måste bedömas på valideringen före testdelen, medan fliken Verifiering väntar på en webbläsare och testdelen på disken.
 - Resultat: kedjan utan matchning är redan dömd på valideringen (`validering_gles`, 16 dygn, 125 utgåvor, körd 2026-11-04 i natt 1) och domen är **inte bättre**: CSI och FSS blir 0,001 till 0,006 bättre, men blockmaxets 90-percentil är säkert sämre vid alla ledtider (+0,058 till +0,065 i |log kvot|, intervallen +0,033 till +0,094), formen 4 till 8 km säkert sämre (+0,042 till +0,053) och SEDI 10 mm/h säkert sämre vid 15 till 60 min; jag körde inte valideringen en gång till, utan räknade om tabellen ur de sparade summorna och ett dygn bit för bit lika med dagens kod. Inflödet vid randen var också redan valt och fällt i natt 1 (`Inflode25`); på träningen tar det tillbaka hälften av förlusten nära randen (kvoten mot radarn vid +60 min 0,897 mot kedjans 0,778).
