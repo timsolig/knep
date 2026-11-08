@@ -1,6 +1,6 @@
 # Bakgrunden
 
-Claude Code arbetar i knep dygnet runt, utan att någon svarar på frågor. Den väljer själv vad som ska göras härnäst utifrån målen och det som redan är gjort, och lämnar resultatet som en PR. Den ersätter den fasta kön i `experiments/natt/`.
+Claude Code arbetar i knep på natten, utan att någon svarar på frågor. Nya varv startar bara 22 till 07 svensk tid (inte under sista timmen), högst tre uppgifter per natt, högst 150 min per uppgift, och uppgifterna körs med Sonnet medan planeraren kör standardmodellen, så att användningen dagtid räcker till användaren (`FONSTER_START`, `FONSTER_SLUT`, `MAX_PER_NATT`, `UPPGIFT_MAX_MIN`, `UPPGIFT_MODELL` i `loop.sh`). Natten räknas i `~/.bakgrund/varv.txt`. Den väljer själv vad som ska göras härnäst utifrån målen och det som redan är gjort, och lämnar resultatet som en PR. Den ersätter den fasta kön i `experiments/natt/`.
 
 ## Ett varv
 

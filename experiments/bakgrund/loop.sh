@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bakgrunden: Claude Code arbetar i knep dygnet runt, ett varv i taget.
+# Bakgrunden: Claude Code arbetar i knep på natten (FONSTER_START till FONSTER_SLUT), ett varv i taget.
 #   1. Planeraren läser MAL.md, JOURNAL.md, IDEER.md och de senaste rapporterna, prioriterar om och skriver nasta.md.
 #   2. Uppgiften körs i en egen session och skriver en rapport.
 #   3. Loopen skriver posten i JOURNAL.md, pushar grenen bakgrund/<start> och håller en PR mot main öppen.
@@ -14,7 +14,12 @@ TRAD=${BAKGRUND_DIR:-$HOME/bakgrund}       # arbetsträdet där sessionerna arbe
 STATE=${BAKGRUND_STATE:-$HOME/.bakgrund}   # läget: logg, STOPP, SPARR, grenen, sessionernas loggar
 INST=$(cd "$(dirname "$0")" && pwd)        # installerade kopior av loop.sh, settings.json och uppdrag.md
 PLAN_MIN=${PLAN_MIN:-20}                   # minuter för planeringen
-MAX_MIN=${UPPGIFT_MAX_MIN:-240}            # högsta tid för en uppgift
+MAX_MIN=${UPPGIFT_MAX_MIN:-150}            # högsta tid för en uppgift
+FONSTER_START=${FONSTER_START:-22}         # nya varv startar bara från den här timmen (svensk tid) ...
+FONSTER_SLUT=${FONSTER_SLUT:-7}            # ... till den här, så att användningen dagtid räcker till användaren
+FONSTER_MARGINAL=${FONSTER_MARGINAL:-60}   # minuter före fönstrets slut då inget nytt varv startar
+MAX_PER_NATT=${MAX_PER_NATT:-3}            # högst så många uppgifter per natt
+UPPGIFT_MODELL=${UPPGIFT_MODELL:-sonnet}   # modellen för uppgifterna; planeraren kör standardmodellen
 VANTA_GRANS=${VANTA_GRANS:-1200}           # sekunder att vänta när användningsgränsen är nådd
 B=experiments/bakgrund
 TRAILER="Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -43,7 +48,7 @@ done
 # inte finns. Det är bara loopen själv som pushar, efter spärrarna i sparr().
 TOM_GH=$(mktemp -d)
 trap 'rm -rf "$TOM_GH"' EXIT
-claude_kor() {  # $1 prompt, $2 loggfil, $3 sekunder
+claude_kor() {  # $1 prompt, $2 loggfil, $3 sekunder, $4 modell (tomt: standard)
   ( cd "$TRAD" && env -u GH_TOKEN -u GITHUB_TOKEN -u SSH_AUTH_SOCK \
       GH_CONFIG_DIR="$TOM_GH" GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false GIT_SSH_COMMAND=/bin/false \
       GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=remote.origin.pushurl GIT_CONFIG_VALUE_0=ingen-push://avstangt-i-bakgrunden \
@@ -51,7 +56,7 @@ claude_kor() {  # $1 prompt, $2 loggfil, $3 sekunder
       GIT_AUTHOR_NAME="Claude (bakgrund)" GIT_AUTHOR_EMAIL=noreply@anthropic.com \
       GIT_COMMITTER_NAME="Claude (bakgrund)" GIT_COMMITTER_EMAIL=noreply@anthropic.com \
       timeout --signal=INT --kill-after=60 "$3" nice -n 15 ionice -c3 \
-      claude -p "$1" -n "bakgrund $(nu)" \
+      claude -p "$1" -n "bakgrund $(nu)" ${4:+--model "$4"} \
         --permission-mode dontAsk --permission-prompts none \
         --settings "$STATE/settings.json" --add-dir /data \
         --output-format text </dev/null >>"$2" 2>&1 )
@@ -275,7 +280,7 @@ kor_uppgift() {
     [ "$KVAR_MIN" -lt 10 ] && break
     echo "===== $(date -u +%FT%TZ) försök $forsok =====" >>"$f"
     logg "uppgift $NR ($NAMN), försök $forsok, högst $KVAR_MIN min"
-    claude_kor "$(uppgiftsprompt $forsok)" "$f" $((KVAR_MIN * 60))
+    claude_kor "$(uppgiftsprompt $forsok)" "$f" $((KVAR_MIN * 60)) "$UPPGIFT_MODELL"
     commit_rester "uppgift $NR ($NAMN)"
     grep -qiE '^Status:' "$TRAD/$RAPPORT" 2>/dev/null && break
     if gransen "$f"; then
@@ -313,6 +318,31 @@ journal() {
   logg "uppgift $NR ($NAMN): $STATUS, $min min"
 }
 
+# Fönstret: nya varv bara på natten och högst MAX_PER_NATT per natt. En natt räknas från FONSTER_START;
+# timmarna efter midnatt hör till natten som började dagen innan.
+natt_nyckel() {
+  local h; h=$((10#$(TZ=Europe/Stockholm date +%H)))
+  if [ "$h" -lt "$FONSTER_SLUT" ]; then TZ=Europe/Stockholm date -d yesterday +%F; else TZ=Europe/Stockholm date +%F; fi
+}
+i_fonstret() {  # sant om ett nytt varv får starta nu
+  local h m kvar
+  h=$((10#$(TZ=Europe/Stockholm date +%H))); m=$((10#$(TZ=Europe/Stockholm date +%M)))
+  if [ "$FONSTER_START" -gt "$FONSTER_SLUT" ]; then
+    { [ "$h" -ge "$FONSTER_START" ] || [ "$h" -lt "$FONSTER_SLUT" ]; } || return 1
+  else
+    { [ "$h" -ge "$FONSTER_START" ] && [ "$h" -lt "$FONSTER_SLUT" ]; } || return 1
+  fi
+  kvar=$(( ((FONSTER_SLUT * 60 - (h * 60 + m)) % 1440 + 1440) % 1440 ))
+  [ "$kvar" -ge "$FONSTER_MARGINAL" ]
+}
+varv_i_natt() { touch "$STATE/varv.txt"; awk -v k="$(natt_nyckel)" '$0 == k { n++ } END { print n + 0 }' "$STATE/varv.txt"; }
+vanta_pa_fonstret() {
+  local orsak=$1
+  [ "${VANTAR:-}" = "$orsak" ] || logg "väntar: $orsak"
+  VANTAR=$orsak
+  sleep 300
+}
+
 pausa() {
   local orsak=STOPP
   [ -f "$STATE/SPARR" ] && orsak=SPARR
@@ -327,6 +357,9 @@ snabba_fel=0
 while :; do
   if [ -f "$STATE/STOPP" ] || [ -f "$STATE/SPARR" ]; then pausa; continue; fi
   [ -n "${PAUSAD:-}" ] && { logg "fortsätter"; PAUSAD=; }
+  if ! i_fonstret; then vanta_pa_fonstret "utanför fönstret ${FONSTER_START}-${FONSTER_SLUT}"; continue; fi
+  if [ "$(varv_i_natt)" -ge "$MAX_PER_NATT" ]; then vanta_pa_fonstret "$MAX_PER_NATT uppgifter klara i natt"; continue; fi
+  [ -n "${VANTAR:-}" ] && { logg "fönstret öppet, fortsätter"; VANTAR=; }
   uppdatera
   sakra_gren || { logg "grenen gick inte att ordna, försöker igen om 30 min"; sleep 1800; continue; }
   [ "${BAKGRUND_UV_SYNC:-1}" = 1 ] && { (cd "$TRAD" && uv sync -q) || logg "uv sync misslyckades"; }
@@ -342,6 +375,7 @@ while :; do
   fi
   plan_fel=0
 
+  natt_nyckel >> "$STATE/varv.txt"
   kor_uppgift
   journal
   pusha || logg "grenen pushades inte"
