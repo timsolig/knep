@@ -1,6 +1,6 @@
 # 0011 F4 på alla 28 träningsdagar och klotterkartan som modellfil
 
-Kort: UTKAST
+Kort: Klotterkartan byggs om bit för bit lika (sha256 535dd606…, 621 rutor, alla 28 träningsdagar) och ligger som modellfil i `/data/analys/filter/klotter-v1/` med släppet `klotter-v1` beskrivet, A0 och F4 har dagfiler med kvot våt på alla 28 träningsdagar, och där minskar F4 kartmåttet från 51,8 till 42,0 rutor per dag (+9,79, +7,82 till +11,93) och höjer FSS, men domaren fäller F4 mot A0 på träningen av kvot våt per timme över 400 m (0,48880 mot 0,48886, −0,000112, −0,000261 till −0,000012; 0,1 mm bort vid våta fjällmätare på fyra dagar), vilket är en varning inför testdelen.
 
 Säkerställd förbättring: nej. Inget nytt är visat på valideringen; F4 var redan godkänd där, och bedömningen på träningen avgör inget. F4 i drift kräver släppet efter testdelen (beslut e).
 
@@ -13,7 +13,7 @@ Användarens beslut 4 (`MAL.md`, 2026-11-07): klotterkartan för F4 som modellfi
 3. A0 och F4 genom domaren på alla 28 träningsdagar i en process (`filter.py kor A0 F4 --del traning --dagar ...`, där F4 återanvänder A0:s bilder), med kontrollen mot de gamla dagfilerna.
 4. F4 mot A0 på träningen med den nya och den gamla regeln, på alla 28 och på de 13 dagarna från 2026-11-06 (`f4_traning.py`, `domare.py tabell`, `filter.py urval`).
 5. Modellfilen under `/data/analys/filter/klotter-v1/` med sha256 och metadata (`klotter_modell.py`), och släppet beskrivet.
-6. A1 på träningsdagarna som saknar den: se nedan.
+6. A1 genom domaren på de 13 träningsdagar som saknade den (tiden räckte).
 
 Testdelen lästes inte och kördes inte. Valideringen kördes inte igen; dess tabell lästes ur den sparade filen (`f4_traning.py --validering` räknar inget). Domaren är inte ändrad. `deploy/`, `models/`, `.github/`, `dagar.json` och `experiments/natt/` är inte ändrade.
 
@@ -181,7 +181,28 @@ Inget är släppt, och `models/` och `deploy/` är inte ändrade. Efter testdele
 3. Checka in `models/models.json` och release-texten (inte `.npz`-filen). `drift.sh` kör `knep-models fetch` i varje ny utcheckning innan den byts in, så filen hämtas och kontrolleras mot sha256 av sig själv. Kontrollera med `uv run knep-models status`.
 4. Att slå på filtret i drift är ett eget steg: `--klotter models/klotter_f4.npz` i anropet i `deploy/cycle.sh` (som står i repots rot efter `cd`). Saknas filen loggar `analys.bygg` en varning och filtrerar inget, så cykeln går ändå. Det steget beslutar användaren om efter testdelen (beslut 4 nämner släppet och låsningen; påslagningen är en ändring i `deploy/`).
 
-UTKAST_A1
+## A1 på de 13 träningsdagar som saknade den (punkt 6)
+
+Tiden räckte, så A1 kördes genom domaren på de 13 träningsdagar som saknade dagfiler för A1 i `/data/analys/domare/A1/` (idén "Fler kalla träningsdagar med A1"), de kalla först, i en process efter A0 och F4:
+
+    uv run python experiments/analys/filter.py kor A1 --del traning --dagar 2020-12-27 2024-01-24 2024-12-19 2024-11-25 2023-03-17 2021-04-05 2020-10-22 2023-04-25 2024-04-14 2022-05-21 2023-08-02 2024-08-09 2025-09-15
+    uv run python experiments/analys/f4_traning.py --sys A1 --mot A0     # /data/analys/domare_v2/a1_traning_jamforelse.json
+
+273 till 374 s per dag (A0:s bilder läses och utfylls, sedan A1), cirka 1,09 GB minne, 64 min för de 13. Dagfilerna ligger i `/data/analys/domare_v2/A1/` (med `kvot våt`). Nu finns A1 för alla 28 träningsdagar, men i två kataloger: de 15 gamla i `/data/analys/domare/A1/` (utan `saw`, `sgw`) och de 13 nya i `domare_v2`. `experiments/projektion/facit_a2t.py` väljer sina dagar ur den gamla katalogen (`A1_DOMARE`) och ser därför inte de nya; för idén om kalla dagar ska den också läsa `domare_v2/A1/` (en rad), och A2T och kedjan räknas sedan på de nya dagarna. Det gjordes inte här.
+
+A1 mot A0 på de 13 nya dagarna (ny domare, utdrag):
+
+| delmängd | mått | A1 | A0 | skillnad i godhet (95 %) |
+|---|---|---|---|---|
+| kvart, alla | kvot våt | 0,643 | 0,636 | +0,011 (+0,006 till +0,017) |
+| timme, alla | CSI 0,5 | 0,488 | 0,481 | +0,007 (+0,004 till +0,010) |
+| timme, alla | MAE | 0,190 | 0,194 | +0,004 (+0,002 till +0,005) |
+| kvart, alla | falskt vid torr mätare | 0,0245 | 0,0257 | +0,0012 (+0,0009 till +0,0016) |
+| timme, över 400 m | kvot våt | 0,485 | 0,472 | +0,026 (−0,004 till +0,077) |
+| **timme, lovart** | **kvot våt** | **0,659** | **0,675** | **−0,023 (−0,042 till −0,004)** |
+| kartan | rutor med eko i torra timmar, per dag | 50,5 | 49,1 | −1,5 (−7,2 till +4,6) |
+
+Domen: inte bättre, sämre i kvot våt per timme på lovartsidan (med den gamla regeln i summakvoten där), bättre i tio mått för mängd och träff. Det är samma utfall som på valideringen (uppgift 0009: −0,020, −0,038 till −0,002), nu på dagar som inte var med 2026-11-07 (där A1 på 15 träningsdagar var bättre än A0 utan sämre mått, med den gamla domaren). Underskottet på lovartsidan per timme vid våta mätare är alltså inte bara två valideringsdagars toppar. Det ändrar inget som är valt; A1 är redan en baslinje och ingen kandidat.
 
 ## Tider, minne och disk
 
@@ -225,16 +246,19 @@ F4 körs med kartan i `/data/analys/filter/karta.npz` (samma som `klotter-v1`, s
 
 - `experiments/analys/filter.py`: valet `--karta-ut` och `set_fout`, så att kartan kan byggas om till en annan katalog (standard som förut).
 - `experiments/analys/karta_lika.py` (nytt): jämförelsen av kartorna bit för bit.
-- `experiments/analys/f4_traning.py` (nytt): F4 mot A0 på 28 och 13 träningsdagar, och huvudraderna ur valideringens sparade tabell.
+- `experiments/analys/f4_traning.py` (nytt): F4 (eller `--sys A1`) mot A0 på alla träningsdagar och på de 13, och huvudraderna ur valideringens sparade tabell.
 - `experiments/analys/f4_dagar.py` (nytt): vad F4 tar bort vid mätarna per dag.
 - `experiments/analys/klotter_modell.py` (nytt): modellfilen med metadata.
 - `tests/test_analys_filter.py`: test för `set_fout`.
 - Den här rapporten, `MAL.md` (en fråga) och `IDEER.md` (beslut d till Avgjort).
 
-`src/`, `deploy/`, `models/`, `.github/`, `dagar.json` och `experiments/natt/` är inte ändrade. `uv run pytest`: 213 godkända (7 min 20 s, med körningen igång).
+`src/`, `deploy/`, `models/`, `.github/`, `dagar.json` och `experiments/natt/` är inte ändrade. `uv run pytest`: 213 godkända (4 min 14 s till slut; 7 min 20 s med körningen igång).
 
 ## Nästa steg
 
 1. **Beslut e, testdelen**, med kommandona ovan. Kartan och dagfilerna på träningen är klara. Varningen: F4 fälls på 28 träningsdagar av kvot våt per timme över 400 m (−0,000112, −0,000261 till −0,000012), en mycket liten verklig förlust vid våta fjällmätare på fyra dagar.
 2. Efter testdelen, om F4 godkänns och användaren vill: släppet `klotter-v1` (avsnittet ovan) i en PR mot `main`, och påslagningen i `deploy/cycle.sh` som eget beslut.
 3. Om F4 fälls på testdelen av samma mått: ta fram vilka mätare och timmar det är (`f4_dagar.py` visar dagarna; det behövs utdata per mätare), och pröva en variant som inte rör kartrutor inom en ruta från en mätare över 400 m, vald på träningen och bedömd på valideringen en gång. Inte före testdelen.
+4. `facit_a2t.py` på de 13 nya A1-dagarna (låt `A1_DOMARE` också läsa `/data/analys/domare_v2/A1/`), för idén om kalla träningsdagar i mål 2.
+
+Status: klar

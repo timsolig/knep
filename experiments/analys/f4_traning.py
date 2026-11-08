@@ -64,8 +64,10 @@ def main() -> None:
         visa("validering (sparad tabell)", r)
         return
     s, b = domare.load_results(a.sys, "traning"), domare.load_results(a.mot, "traning")
-    ut = {"alla": bedom(s, b),
-          "dagar13": bedom({d: s[d] for d in DAGAR13 if d in s}, {d: b[d] for d in DAGAR13 if d in b})}
+    ut = {"alla": bedom(s, b)}
+    s13 = {d: s[d] for d in DAGAR13 if d in s}
+    if s13:
+        ut["dagar13"] = bedom(s13, {d: b[d] for d in DAGAR13 if d in b})
     for namn, r in ut.items():
         visa(namn, r)
     (domare.OUT / f"{a.sys.lower()}_traning_jamforelse.json").write_text(
