@@ -37,26 +37,37 @@ def bedom(s: dict, b: dict) -> dict:
             "dom_utan_underlagskrav": domare.verdict(tab, min_days=0)}
 
 
+def visa(namn: str, r: dict) -> None:
+    print(f"\n== {namn}: {len(r['dagar'])} dagar")
+    for k, m in RADER:
+        x = r["tabell"][k].get(m)
+        if x is None:
+            continue
+        print(f"  {k:14s} {m:36s} {x['varde']:.5f} mot {x['bas']:.5f}  {x['diff']:+.6f} "
+              f"({x['lo']:+.6f} till {x['hi']:+.6f})  dagar {x['dagar']}")
+    x = r["tabell"]["rutor"]["rutor med eko i över hälften av de torra timmarna, per dag"]
+    print(f"  kartmåttet {x['varde']:.2f} mot {x['bas']:.2f}  {x['diff']:+.2f} ({x['lo']:+.2f} till {x['hi']:+.2f})")
+    for d in ("dom", "dom_gammal_regel", "dom_utan_underlagskrav"):
+        if d in r:
+            print(f"  {d}: {json.dumps(r[d], ensure_ascii=False)}")
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--sys", default="F4")
     p.add_argument("--mot", default="A0")
+    p.add_argument("--validering", action="store_true",
+                   help="skriv bara huvudraderna ur den sparade tabellen för valideringen (räknar inget om)")
     a = p.parse_args()
+    if a.validering:
+        r = json.loads((domare.OUT / f"tabell_{a.sys}_mot_{a.mot}_validering.json").read_text())
+        visa("validering (sparad tabell)", r)
+        return
     s, b = domare.load_results(a.sys, "traning"), domare.load_results(a.mot, "traning")
     ut = {"alla": bedom(s, b),
           "dagar13": bedom({d: s[d] for d in DAGAR13 if d in s}, {d: b[d] for d in DAGAR13 if d in b})}
     for namn, r in ut.items():
-        print(f"\n== {namn}: {len(r['dagar'])} dagar")
-        for k, m in RADER:
-            x = r["tabell"][k].get(m)
-            if x is None:
-                continue
-            print(f"  {k:14s} {m:36s} {x['varde']:.5f} mot {x['bas']:.5f}  {x['diff']:+.5f} "
-                  f"({x['lo']:+.5f} till {x['hi']:+.5f})  dagar {x['dagar']}")
-        x = r["tabell"]["rutor"]["rutor med eko i över hälften av de torra timmarna, per dag"]
-        print(f"  kartmåttet {x['varde']:.2f} mot {x['bas']:.2f}  {x['diff']:+.2f} ({x['lo']:+.2f} till {x['hi']:+.2f})")
-        for d in ("dom", "dom_gammal_regel", "dom_utan_underlagskrav"):
-            print(f"  {d}: {json.dumps(r[d], ensure_ascii=False)}")
+        visa(namn, r)
     (domare.OUT / f"{a.sys.lower()}_traning_jamforelse.json").write_text(
         json.dumps(ut, ensure_ascii=False, indent=1, default=float))
 
