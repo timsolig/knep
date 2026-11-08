@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0012 · 2026-11-08 08:54 · verifiering-flik-del1 · delvis
+- Varför: Användarens beslut 8 är beställt och behöver ingen ny data, medan testdelen (beslut e) väntar eftersom /data har under 3 GB ledigt.
+- Resultat: fliken Verifiering är omskriven med alla mått på en gång (ett litet diagram per mått, ledtiden +1 till +5 h som axel, en linje per modell, intervallet som band) i fyra grupper, med egen period från och till som räknas i sidan ur dygnens summor; `verify.py` skriver nu det som saknades för det (Tim-KNEP på de andras urval, timmarna och underlaget per dygn) utan att något befintligt tal ändras, och måtten ur dygnens summor stämmer med `verify.py` inom 0,00011 på provdatan; sidan är **inte** ritad eller körd, eftersom varken Playwright, en webbläsare eller node finns på Pi:n.
+- Rapport: [rapporter/2026-11-08/0012-verifiering-flik-del1.md](rapporter/2026-11-08/0012-verifiering-flik-del1.md), 17 min
+
 ### 0011 · 2026-11-08 06:34 · f4-alla-traningsdagar · klar
 - Varför: Användarens beslut d (F4 på alla 28 träningsdagar och klotterkartan som modellfil) är nästa beslut i ordningen nu när glappet vid Riksgränsen är avgjort, och det måste vara klart innan testdelen (beslut e) körs.
 - Resultat: Klotterkartan byggs om bit för bit lika (sha256 535dd606…, 621 rutor, alla 28 träningsdagar) och ligger som modellfil i `/data/analys/filter/klotter-v1/` med släppet `klotter-v1` beskrivet, A0 och F4 har dagfiler med kvot våt på alla 28 träningsdagar, och där minskar F4 kartmåttet från 51,8 till 42,0 rutor per dag (+9,79, +7,82 till +11,93) och höjer FSS, men domaren fäller F4 mot A0 på träningen av kvot våt per timme över 400 m (0,48880 mot 0,48886, −0,000112, −0,000261 till −0,000012; 0,1 mm bort vid våta fjällmätare på fyra dagar), vilket är en varning inför testdelen.
