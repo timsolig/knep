@@ -69,6 +69,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--fallback", action="store_true", help="fyll radarbortfall med OPERA-kompositen")
     p.add_argument("--klotter", type=Path, default=None,
                    help="karta över fast klotter (analys/klotter.py); filtret är av utan den")
+    p.add_argument("--opera-fjarr", type=float, default=None, metavar="KM",
+                   help="med --fallback: OPERA där SMHI är torr inom zonen där de svenska radarernas lägsta "
+                        "stråle ligger över KM km (glappet nordväst om Kiruna); av utan värde")
     p.add_argument("--reference", action="store_true", help="kör referensmodellen i stället för kedjan")
     p.add_argument("--keep-cache", action="store_true", help="rensa inte gamla radarbilder")
     p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")
@@ -100,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
 
     a = analys.bygg(t0, args.history, args.cache, state_dir, session, fallback=args.fallback,
                     bias_path=None if args.no_bias else args.bias, collect=not args.time,
-                    klotter_path=args.klotter)
+                    klotter_path=args.klotter, opera_fjarr=args.opera_fjarr)
     if a is None:
         return 1
     steps = round(args.hours * 60 / 5)

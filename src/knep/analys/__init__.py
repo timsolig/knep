@@ -53,11 +53,25 @@ def target(grid: radar.Grid) -> composite.TargetGrid:
     return composite.TargetGrid(grid.transform.c, grid.transform.f, grid.transform.a, grid.shape)
 
 
-def _analyses(times, cache, state_dir, session, fallback):
+_FAR: dict = {}
+
+
+def far_zone(tgt: composite.TargetGrid, h_km: float) -> np.ndarray:
+    """composite.far_zone, räknad en gång per rutnät och höjd."""
+    key = (tgt.west, tgt.north, tgt.res, tgt.shape, h_km)
+    if key not in _FAR:
+        _FAR[key] = composite.far_zone(tgt, h_km)
+    return _FAR[key]
+
+
+def _analyses(times, cache, state_dir, session, fallback, opera_fjarr=None):
     """Analyser för times (äldst först): sparade om de redan byggts, annars SMHI plus reserv och utfyllnad.
 
     Returnerar också tiderna för de analyser som finns, eftersom en tid hoppas över när SMHI-bilden
     saknas och det inte finns något utfyllnadstillstånd.
+
+    opera_fjarr (km, None av): med reserven på tas OPERA också där SMHI är torr och OPERA har regn,
+    inom zonen där de svenska radarernas lägsta stråle ligger över så många km (composite.layer_far).
     """
     out, kept, grid, sources, missing = [], [], None, None, []
     gap = composite.GapState.load(state_dir / "gaps.npz")
@@ -83,15 +97,22 @@ def _analyses(times, cache, state_dir, session, fallback):
             rain = np.full(gap.analysis.shape, np.nan, np.float32)
         src = np.where(np.isfinite(rain), composite.SOURCE_SMHI, composite.SOURCE_NONE).astype(np.uint8)
         hole = ~np.isfinite(rain) & (gap.expected >= 0.5) if gap is not None else None
-        if fallback and hole is not None and hole.any() and grid is not None:
+        far = fallback and opera_fjarr is not None and grid is not None
+        if fallback and grid is not None and ((hole is not None and hole.any()) or far):
             from . import sources as srcs
             tgt = target(grid)
             path = srcs.fetch_opera(session, t, cache)
             if path is not None:
                 try:
-                    rain, src = composite.layer(rain, src, srcs.read_opera(path, tgt), composite.SOURCE_OPERA)
+                    op = srcs.read_opera(path, tgt)
+                    rain, src = composite.layer(rain, src, op, composite.SOURCE_OPERA)
+                    if far:
+                        rain, src = composite.layer_far(rain, src, op, composite.SOURCE_OPERA, far_zone(tgt, opera_fjarr))
                 except (OSError, KeyError, ValueError) as e:
                     log.warning("kunde inte läsa OPERA %s: %s", t, e)
+        if fallback and hole is not None and hole.any() and grid is not None:
+            from . import sources as srcs
+            tgt = target(grid)
             hole = ~np.isfinite(rain) & (gap.expected >= 0.5)
             if hole.any():
                 # egen komposit av de närmaste radarerna som når hålet, med förlängd räckvidd
@@ -115,16 +136,18 @@ def _analyses(times, cache, state_dir, session, fallback):
 
 def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requests.Session, *,
          fallback: bool = False, bias_path: Path | None = None, collect: bool = False,
-         klotter_path: Path | None = None) -> Analys | None:
+         klotter_path: Path | None = None, opera_fjarr: float | None = None) -> Analys | None:
     """Analyserna för de `history` senaste bilderna fram till t0, eller None om för få finns.
 
     bias_path: låst karta för volymkorrektionen (None stänger av). collect: samla radarns värden
     vid mätarna och räkna veckofaktorn (bara i realtid, eftersom den hämtar senaste timmens mätare).
     klotter_path: karta över misstänkt fast klotter (klotter.py); None, standard, stänger av filtret.
     Filtret verkar före volymkorrektionen och ändrar inte de sparade analyserna i state_dir.
+    opera_fjarr: OPERA där SMHI är torr inom zonen med svensk stråle över så många km (kräver
+    fallback); None, standard, stänger av (se _analyses).
     """
     times = [t0 - k * radar.STEP for k in range(history)][::-1]
-    fields, kept, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback)
+    fields, kept, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback, opera_fjarr)
     if len(fields) < 2 or grid is None:
         log.error("för få radarbilder bakåt från %s", t0)
         return None

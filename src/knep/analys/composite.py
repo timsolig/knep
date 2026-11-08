@@ -253,6 +253,30 @@ def layer(rain, source, extra, code):
     return rain, source
 
 
+def far_zone(grid: TargetGrid, h_km: float, radars=None) -> np.ndarray:
+    """Zonen där de svenska radarernas lägsta stråle (0,5°) ligger över h_km km över havet.
+
+    Där går SMHI:s stråle över grund nederbörd (till exempel bakom fjällen nordväst om Kiruna),
+    så att SMHI:s komposit säger torrt där andra radarer ser regn. Utanför räckvidden (240 km) är
+    zonen falsk; där är SMHI:s komposit ändå NaN och `layer` tar reserven. Räknas en gång per rutnät.
+    """
+    from .bias import beam_height
+
+    radars = radars or {k: v for k, v in RADARS.items() if k.startswith("se")}
+    beam = beam_height(grid, radars)
+    return np.isfinite(beam) & (beam > h_km)
+
+
+def layer_far(rain, source, extra, code, far, min_extra=0.1, mode="torr"):
+    """Inom zonen `far` (bool): ta reservkällan där den har minst min_extra mm/h och analysen är
+    torr (0, mode="torr") eller lägre (mode="max"). Utanför zonen ändras inget; NaN tas av `layer`."""
+    take = far & np.isfinite(rain) & np.isfinite(extra) & (extra >= min_extra)
+    take &= (rain <= 0) if mode == "torr" else (extra > rain)
+    rain = np.where(take, extra, rain)
+    source = np.where(take, code, source).astype(np.uint8)
+    return rain, source
+
+
 def missing_radars(rain, grid: TargetGrid, expected, radius_km=100.0, frac=0.5):
     """Svenska radarer vars närområde till stor del saknar data trots att det brukar finnas."""
     X, Y = grid.centres()
