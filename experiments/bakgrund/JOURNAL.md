@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0015 · 2026-11-08 22:37 · tak-kedjans-delar · misslyckad
+- Varför: Användarens beslut 9 vill veta var de stora vinsterna i kedjan finns innan fler finjusteringar, och förra försöket (0014) avbröts efter 0 min utan att något prövades.
+- Resultat: uppgiften kunde inte köras eftersom Bash nekades; ingen fuskvariant är byggd eller körd.
+- Rapport: [rapporter/2026-11-08/0015-tak-kedjans-delar.md](rapporter/2026-11-08/0015-tak-kedjans-delar.md), 0 min
+
 ### 0014 · 2026-11-08 22:05 · tak-kedjans-delar · misslyckad
 - Varför: Användarens beslut 9 vill veta var de stora vinsterna finns innan fler finjusteringar, och mål 2 har inget kvar som är redo att bedömas efter uppgift 0013.
 - Resultat: ingen rapport skrevs (loggen på Pi:n: ~/.bakgrund/logg/0014-tak-kedjans-delar.txt)
