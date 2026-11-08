@@ -256,6 +256,14 @@ def cmd_urval(a) -> None:
     (FOUT / f"{namn}.json").write_text(json.dumps({"valt": val, "varianter": res}, ensure_ascii=False, indent=1, default=float))
 
 
+def set_fout(path: str | Path) -> None:
+    """Byter katalogen för kartan, ekrarna och driftkartan (valet --karta-ut), så att en ombyggd
+    karta kan jämföras med den gamla utan att skriva över den."""
+    global FOUT, KARTA, EKRAR, KARTA_DRIFT
+    FOUT = Path(path)
+    KARTA, EKRAR, KARTA_DRIFT = FOUT / "karta.npz", FOUT / "ekrar.json", FOUT / "klotter_f4.npz"
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("cmd", choices=["karta", "karta_drift", "kor", "tabell", "urval"])
@@ -266,8 +274,12 @@ def main() -> None:
     p.add_argument("--dagar", nargs="*", help="flera dagar i följd (i stället för --dag)")
     p.add_argument("--bit", default="0/1")
     p.add_argument("--ut", help=f"domarens katalog för dagfiler och tabeller (standard {domare.OUT})")
+    p.add_argument("--karta-ut", help=f"katalog för kartan, ekrarna och driftkartan (standard {FOUT}); "
+                   "filtret läser också kartan därifrån")
     a = p.parse_args()
     domare.set_out(a.ut)
+    if a.karta_ut:
+        set_fout(a.karta_ut)
     if a.cmd == "karta":
         build_map()
     elif a.cmd == "karta_drift":

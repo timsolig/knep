@@ -6,6 +6,16 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0011 · 2026-11-08 06:34 · f4-alla-traningsdagar · klar
+- Varför: Användarens beslut d (F4 på alla 28 träningsdagar och klotterkartan som modellfil) är nästa beslut i ordningen nu när glappet vid Riksgränsen är avgjort, och det måste vara klart innan testdelen (beslut e) körs.
+- Resultat: Klotterkartan byggs om bit för bit lika (sha256 535dd606…, 621 rutor, alla 28 träningsdagar) och ligger som modellfil i `/data/analys/filter/klotter-v1/` med släppet `klotter-v1` beskrivet, A0 och F4 har dagfiler med kvot våt på alla 28 träningsdagar, och där minskar F4 kartmåttet från 51,8 till 42,0 rutor per dag (+9,79, +7,82 till +11,93) och höjer FSS, men domaren fäller F4 mot A0 på träningen av kvot våt per timme över 400 m (0,48880 mot 0,48886, −0,000112, −0,000261 till −0,000012; 0,1 mm bort vid våta fjällmätare på fyra dagar), vilket är en varning inför testdelen.
+- Rapport: [rapporter/2026-11-08/0011-f4-alla-traningsdagar.md](rapporter/2026-11-08/0011-f4-alla-traningsdagar.md), 133 min
+
+### 0010 · 2026-11-08 04:18 · glappet-riksgransen · klar
+- Varför: Användarens beslut 6 säger att glappet nordväst om Riksgränsen ska rättas direkt efter domarens kvot våt (klar i uppgift 0009) och före F4:s omträning och testdelen, så att testdelen körs på den rättade A0.
+- Resultat: Glappet är verkligt och systematiskt (SMHI 0 där OPERA har minst 0,1 mm/h i 59 % av rutbilderna där svensk stråle är över 2 km och 84 % över 4 km på 9 träningsdagar, mot cirka 25 % närmare radarerna), och regeln `composite.layer_far` med H = 2 km, vald på träningen, fyller bågen i fallet (rutan vid Narvik 0,000 till 0,39 till 0,65 mm/h) och höjer kvot våt per timme vid zonens mätare på valideringen från 0,729 till 0,802 (+0,095, +0,055 till +0,111), men domaren godkänner den inte mot A0 eftersom falska ekon blir fler (falskt vid torr mätare per timme 0,015 mot 0,011, −0,004, −0,005 till −0,003; rutor med eko i torra timmar 66,3 mot 60,8 per dag), och ingen av fem varianter (H 2, 3, 4 och tröskel 0,3 mm/h) godkänns ens på träningen; valet `--opera-fjarr` finns avstängt.
+- Rapport: [rapporter/2026-11-08/0010-glappet-riksgransen.md](rapporter/2026-11-08/0010-glappet-riksgransen.md), 123 min
+
 ### 0009 · 2026-11-08 00:02 · domare-vat-kvot · klar
 - Varför: Användarens beslut c (analysens domare med kvoten för perioder då mätaren har regn, och baslinjerna omkörda) är nästa beslut i ordningen nu när a och b är klara, och den behövs innan F4 tränas om och testdelen körs.
 - Resultat: Domaren har nu `kvot våt` (Σanalys/Σmätare där mätaren har regn) i stället för summakvoten i domens mängdgrupp, med den gamla regeln kvar bredvid. På hela valideringen (16 dagar) ändras ingen av de fyra domarna: A2T slår fortfarande A0 och A1 utan sämre mått (kvot våt per timme över 400 m 0,614 mot A0 0,467 och A1 0,455), F4 godkänns fortfarande mot A0 (bara FSS bättre, kvoterna exakt som A0), och A1 fälls fortfarande mot A0, nu av `kvot våt` per timme på lovartsidan (0,598 mot 0,609, −0,020, −0,038 till −0,002) i stället för av summakvoten per kvart och timme där.

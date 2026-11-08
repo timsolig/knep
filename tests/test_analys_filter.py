@@ -80,3 +80,16 @@ def test_fixed_spoke_is_removed_only_where_the_narrow_test_fires():
     wide = np.where((d >= 20) & (d < 100), 1.0, 0.0).astype(np.float32)
     f = F.Filter(Grid(), karta=False, ekrar=True, klotter=np.zeros((H, W), bool), fasta={"xx": [60]}, geo=geo)
     np.testing.assert_array_equal(f.apply(wide, T), wide)
+
+
+def test_set_fout_byter_alla_kartfiler(tmp_path):
+    gamla = (F.FOUT, F.KARTA, F.EKRAR, F.KARTA_DRIFT)
+    try:
+        F.set_fout(tmp_path)
+        assert (F.FOUT, F.KARTA, F.EKRAR, F.KARTA_DRIFT) == (
+            tmp_path, tmp_path / "karta.npz", tmp_path / "ekrar.json", tmp_path / "klotter_f4.npz")
+        np.savez_compressed(tmp_path / "karta.npz", klotter=_map(), torr=_map(), eko=np.zeros((H, W), bool))
+        flt = F.Filter(Grid(), ekrar=False, utvidgad=False)  # läser kartan ur den nya katalogen
+        assert flt.M.sum() == 9
+    finally:
+        F.FOUT, F.KARTA, F.EKRAR, F.KARTA_DRIFT = gamla
