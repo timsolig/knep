@@ -8,7 +8,7 @@ set -uo pipefail
 root=$1
 cd "$(dirname "$0")/.."
 
-timeout 4m knep --out "$root/out/data" --cache "$root/cache" --fallback --a2
+timeout 4m knep --out "$root/out/data" --cache "$root/cache" --fallback --a2 --opera-fjarr 3
 rc=$?
 case $rc in
   0)  timeout 2m deploy/publish.sh "$root/out/data" || echo "publiceringen misslyckades (kod $?)" >&2 ;;
