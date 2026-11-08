@@ -28,14 +28,16 @@ def main() -> None:
     s, b = domare.load_results("F4", a.del_), domare.load_results("A0", a.del_)
     for k in a.nyckel:
         print(f"\n{k}: dag, sgw (mätare våt), saw A0, saw F4 − A0, sa F4 − A0 (mm)")
-        tot = 0.0
+        tot, sgw, saw = 0.0, 0.0, 0.0
         for d in sorted(set(s) & set(b)):
             x, y = s[d][k], b[d][k]
             dw, ds = x["saw"] - y["saw"], x["sa"] - y["sa"]
             tot += dw
+            sgw += y["sgw"]
+            saw += y["saw"]
             if dw or ds:
                 print(f"  {d}  {y['sgw']:8.1f}  {y['saw']:8.1f}  {dw:+8.3f}  {ds:+8.3f}")
-        print(f"  summa saw F4 − A0 {tot:+.3f} mm")
+        print(f"  summa saw F4 − A0 {tot:+.3f} mm; alla dagar: sgw {sgw:.1f} mm, saw A0 {saw:.1f} mm")
 
 
 if __name__ == "__main__":
