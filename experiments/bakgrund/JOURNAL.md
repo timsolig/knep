@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0016 · 2026-11-08 23:42 · tak-skrivbord · klar
+- Varför: Taket för kedjans delar (användarens beslut 9) har misslyckats två gånger för att Bash nekades, så den här delen görs med bara läsning och skrivning av filer och lämnar en färdig modul och körplan till nästa session som har skal.
+- Resultat: `tak.py` med fem fuskvarianter (rörelse, mängd, tillväxt, fast och bästa utjämning) och en körplan är skrivna och genomlästa mot domaren men inte körda; inga siffror finns, och FSS 1 mm vid 10 och 40 km finns inte i domaren (närmaste är `fss1_30`, `fss5_10`).
+- Rapport: [rapporter/2026-11-08/0016-tak-skrivbord.md](rapporter/2026-11-08/0016-tak-skrivbord.md), 3 min
+
 ### 0015 · 2026-11-08 22:37 · tak-kedjans-delar · misslyckad
 - Varför: Användarens beslut 9 vill veta var de stora vinsterna i kedjan finns innan fler finjusteringar, och förra försöket (0014) avbröts efter 0 min utan att något prövades.
 - Resultat: uppgiften kunde inte köras eftersom Bash nekades; ingen fuskvariant är byggd eller körd.
