@@ -225,7 +225,7 @@
   .vtable td.verdict { font-size: 11.5px; }
   .vtable .better { color: var(--good); font-weight: 600; }
   .vtable .worse { color: var(--warn); font-weight: 600; }
-  .vtable th .sw { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 4px; vertical-align: 3px; }
+  .vtable th .sw, .vtable td .sw { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 4px; vertical-align: 3px; }
   #verif-map { height: 380px; border-radius: 8px; margin-top: 6px; background: #e8ebee; }
   .vfacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0; }
   .vfacts div { background: var(--chip); border-radius: 8px; padding: 6px 9px; }
@@ -236,8 +236,27 @@
   .vtext dt { font-weight: 600; margin-top: 6px; }
   .vtext dd { margin: 0 0 2px; color: var(--fg); }
   #verif-empty { margin-top: 20px; }
+  .vfilters { flex-direction: column; align-items: stretch; gap: 6px; }
+  .vfrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .vflabel { font-size: 12px; color: var(--muted); min-width: 42px; }
+  .vdates { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .vdates input { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--bg); border-radius: 7px; padding: 2px 5px; }
+  .vhow { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; }
+  .vgroup { background: var(--bg); border-radius: 12px; box-shadow: 0 1px 4px rgba(16,24,40,.08); padding: 12px 14px; margin-top: 12px; }
+  .vghead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+  .vghead .chips { margin: 0; }
+  .vgroup h2 { font-size: 16px; margin: 0; }
+  .vgroup > .meta { margin: 3px 0 6px; font-size: 12.5px; line-height: 1.4; }
+  .vcharts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 10px 14px; margin-top: 6px; }
+  .vmini { position: relative; min-width: 0; border-radius: 8px; padding: 4px 4px 0; }
+  .vmini.picked { box-shadow: inset 0 0 0 2px var(--accent); }
+  .vmini h3 { font-size: 13px; margin: 0; }
+  .vmini p { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.3; }
+  .vchart.small { height: 150px; cursor: pointer; touch-action: pan-y; }
+  .vmore summary { cursor: pointer; font-size: 12.5px; color: var(--accent); margin-top: 8px; }
+  #verif-body > .vgrid { margin-top: 12px; }
   @media (max-width: 480px) { #tabs button { padding: 6px 9px; } }
-  @media (max-width: 699px) { #verifview .vwrap { padding-top: calc(60px + env(safe-area-inset-top)); } .vchart { height: 200px; } }
+  @media (max-width: 699px) { #verifview .vwrap { padding-top: calc(60px + env(safe-area-inset-top)); } .vchart { height: 200px; } .vchart.small { height: 160px; } }
 </style>
 </head>
 <body>
@@ -376,45 +395,65 @@
     <h1>Verifiering</h1>
     <div class="meta" id="verif-meta">Laddar</div>
     <div class="vfilters" role="group" aria-label="Urval">
-      <div class="chips seg" id="verif-win" role="group" aria-label="Period">
-        <button aria-pressed="true" data-win="7">7 dygn</button>
-        <button aria-pressed="false" data-win="30">30 dygn</button>
+      <div class="vfrow">
+        <span class="vflabel">Period</span>
+        <div class="chips seg" id="verif-win" role="group" aria-label="Period">
+          <button aria-pressed="true" data-win="7" title="De senaste 7 dygnen">7 dygn</button>
+          <button aria-pressed="false" data-win="30" title="De senaste 30 dygnen">30 dygn</button>
+          <button aria-pressed="false" data-win="egen" title="Välj själv från och till">Egen</button>
+        </div>
+        <span class="vdates">
+          <label>från <input type="date" id="verif-from" aria-label="Periodens första dygn"></label>
+          <label>till <input type="date" id="verif-to" aria-label="Periodens sista dygn"></label>
+        </span>
       </div>
-      <div class="chips seg" id="verif-obs" role="group" aria-label="Facit">
-        <button aria-pressed="true" data-obs="radar" title="Radarns timsumma i 4 km-rutor, bara uppmätta rutor">Mot radarn</button>
-        <button aria-pressed="false" data-obs="gauges" title="SMHI:s regnmätare, timsumma">Mot regnmätarna</button>
-        <button aria-pressed="false" data-obs="a2t" title="Analysen rättad mot regnmätarna (A2T), bara uppmätta rutor" hidden>Mot A2T</button>
+      <div class="vfrow">
+        <span class="vflabel">Facit</span>
+        <div class="chips seg" id="verif-obs" role="group" aria-label="Facit">
+          <button aria-pressed="true" data-obs="radar" title="Radarns timsumma i 4 km-rutor, bara uppmätta rutor">Mot radarn</button>
+          <button aria-pressed="false" data-obs="gauges" title="SMHI:s regnmätare, timsumma">Mot regnmätarna</button>
+          <button aria-pressed="false" data-obs="a2t" title="Analysen rättad mot regnmätarna (A2T), bara uppmätta rutor" hidden>Mot A2T</button>
+        </div>
       </div>
-      <label>Mått <select id="verif-metric" aria-label="Mått"></select></label>
-      <div class="chips seg" id="verif-thr" role="group" aria-label="Tröskel"></div>
-      <div class="chips seg" id="verif-scale" role="group" aria-label="Skala för FSS" hidden></div>
-      <div class="chips seg" id="verif-lead" role="group" aria-label="Ledtid för dygnen och tabellen"></div>
     </div>
     <div class="status" id="verif-empty" hidden></div>
-    <div class="vgrid" id="verif-body" hidden>
-      <section class="vcard">
-        <h2 id="verif-lead-title">Per ledtid</h2>
-        <div class="meta" id="verif-lead-meta"></div>
-        <div class="vkeys" id="verif-lead-keys"></div>
-        <svg id="verif-lead-chart" class="vchart" role="img" aria-label="Måttet per ledtid och modell"></svg>
-        <div class="vtip" id="verif-lead-tip" hidden></div>
+    <div id="verif-body" hidden>
+      <p class="meta vhow">Varje litet diagram är ett mått med ledtiden +1 till +5 h längs axeln: timmen som slutar så många timmar efter utgåvan.
+        En linje per modell, och bandet är 90 %-intervallet över dygnen. Peka i ett diagram för värdena, och tryck för att se måttet dygn för dygn längst ned.</p>
+      <section class="vgroup" aria-labelledby="vg-hit-h">
+        <div class="vghead"><h2 id="vg-hit-h">Träff och falsklarm</h2><div class="chips seg" id="verif-thr" role="group" aria-label="Tröskel för träff och falsklarm"></div></div>
+        <p class="meta">Kom regnet där modellen sa att det skulle komma, och hur ofta larmade den i onödan? Varje ruta och timme är regn eller torrt efter om timsumman når tröskeln.</p>
+        <div class="vkeys" id="verif-hit-keys"></div>
+        <div class="vcharts" id="verif-hit"></div>
+        <details class="vmore"><summary>Fler mått för regn och torrt</summary><div class="vcharts" id="verif-hit-more"></div></details>
       </section>
-      <section class="vcard">
+      <section class="vgroup" aria-labelledby="vg-amount-h">
+        <div class="vghead"><h2 id="vg-amount-h">Mängd och fel</h2></div>
+        <p class="meta">Gav modellen rätt mängd regn, och hur stora är felen i millimeter? Räknat på timsummorna i varje ruta eller mätare, också de torra.</p>
+        <div class="vkeys" id="verif-amount-keys"></div>
+        <div class="vcharts" id="verif-amount"></div>
+      </section>
+      <section class="vgroup" id="vg-shape" aria-labelledby="vg-shape-h">
+        <div class="vghead"><h2 id="vg-shape-h">Form och läge</h2><div class="chips seg" id="verif-fthr" role="group" aria-label="Tröskel för FSS"></div></div>
+        <p class="meta">Har regnområdena rätt form och ungefär rätt plats? FSS jämför andelen regn i fönster av tre storlekar; ett fält som ligger lite fel får högre FSS i ett större fönster. 1 är perfekt.</p>
+        <div class="vkeys" id="verif-shape-keys"></div>
+        <div class="vcharts" id="verif-shape"></div>
+      </section>
+      <section class="vgroup" aria-labelledby="vg-diff-h">
+        <div class="vghead"><h2 id="vg-diff-h">Skillnaden mot Tim-KNEP</h2></div>
+        <p class="meta" id="verif-diff-meta"></p>
+        <div class="vkeys" id="verif-diff-keys"></div>
+        <div class="vcharts" id="verif-diff"></div>
+        <div class="vtable" id="verif-verdict"></div>
+      </section>
+      <div class="vgrid">
+      <section class="vcard wide" id="verif-daycard">
         <h2 id="verif-day-title">Dygn för dygn</h2>
         <div class="meta" id="verif-day-meta"></div>
         <div class="vkeys" id="verif-day-keys"></div>
         <svg id="verif-day-chart" class="vchart" role="img" aria-label="Måttet per dygn och modell"></svg>
         <div class="vtip" id="verif-day-tip" hidden></div>
-      </section>
-      <section class="vcard wide">
-        <h2>Mot Tim-KNEP</h2>
-        <div class="meta" id="verif-diff-meta"></div>
-        <div class="vtable" id="verif-diff"></div>
-      </section>
-      <section class="vcard wide">
-        <h2 id="verif-all-title">Alla mått</h2>
-        <div class="meta" id="verif-all-meta"></div>
-        <div class="vtable" id="verif-all"></div>
+        <div class="vtable" id="verif-day-table"></div>
       </section>
       <section class="vcard wide">
         <h2>Underlaget</h2>
@@ -431,6 +470,7 @@
         <h2>Så räknas det</h2>
         <div id="verif-method"></div>
       </section>
+      </div>
     </div>
   </div>
 </main>
@@ -466,8 +506,10 @@
        och finns bara som summa per kvart och timme, inte var femte minut.</span>
        Slå på <b>Mätare</b> för att jämföra stegen med vad som faktiskt kom ner.</p>
     <h4><span class="sw" style="background:var(--met)"></span>Verifiering</h4>
-    <p>Fliken <b>Verifiering</b> visar hur modellerna har träffat de senaste 7 eller 30 dygnen, mot radarn och mot SMHI:s regnmätare:
-       ETS, FAR, MCC, FSS och fler mått per ledtid och dygn, med osäkerheten och skillnaden mot Tim-KNEP. Där står också vilka rutor och mätare som är facit.<span class="intro-a2t-ja" hidden>
+    <p>Fliken <b>Verifiering</b> visar hur modellerna har träffat, mot radarn eller mot SMHI:s regnmätare, med alla måtten på en gång i grupper efter vad de säger:
+       träff och falsklarm, mängd och fel, form och läge, och skillnaden mot Tim-KNEP. Varje litet diagram har ledtiden +1 till +5 h längs axeln och en linje per modell,
+       med osäkerheten som band; tryck i ett diagram för att se måttet dygn för dygn. Välj de senaste 7 eller 30 dygnen eller en egen period från och till.
+       Där står också vilka rutor och mätare som är facit.<span class="intro-a2t-ja" hidden>
        Analysen A2, rättad mot mätarna, finns också som facit vid sidan av radarn; den har sett mätarna och är därför inget oberoende bevis bredvid dem.</span></p>
     <h4><span class="sw" style="background:var(--snow)"></span>Att tänka på</h4>
     <p>MET Norge räknar två timmar framåt. SNOW finns per timme och är ensemblens median, så kraftiga skurar blir svagare där.
@@ -1880,9 +1922,14 @@ $('share').addEventListener('click', async () => {
 
 /* ---------- verifieringen ----------
    verify.py räknar allt på Pi:n en gång i timmen och skriver data/verif.json: per period (7 och 30 dygn),
-   facit (radarn eller mätarna), modell, ledtid och tröskel, med 90 %-intervall från bootstrap över dygnen,
-   och skillnaden mot Tim-KNEP på samma rutor och timmar. Per dygn finns de råa summorna, och måtten
-   räknas här med samma formler som verify.dichotomous och verify.continuous_scores. */
+   facit (radarn, mätarna och A2T), modell, ledtid och tröskel, med 90 %-intervall från bootstrap över dygnen,
+   och skillnaden mot Tim-KNEP på samma rutor och timmar. De perioderna visas som de står där.
+   Per dygn finns de råa summorna (daily): kontingenstabellerna, de kontinuerliga summorna, FSS-summorna och
+   timmarna per modell, Tim-KNEP:s summor på de andras urval (daily.pairs) och underlaget (daily.meta).
+   För en egen period räknas måtten här ur dem, med samma formler som verify.dichotomous,
+   verify.continuous_scores och verify.fss_scores, och intervallet med samma bootstrap över dygnen
+   (verify._window och verify._interval) men med ett eget fast frö, så att intervallen kan skilja
+   i sista decimalen från Pi:ns för samma dygn. Skattningarna är desamma. */
 const VM = {  // grupp, riktning (1 högre är bättre, -1 lägre är bättre, 1 eller 0 är målet), kort namn, förklaring
   ets: ['scores', 1, 'ETS', 'Equitable threat score: träffkvoten rensad från de träffar som slumpen ger. 1 är perfekt, 0 är som slumpen.'],
   csi: ['scores', 1, 'CSI', 'Träffkvot: träffar delat med träffar, falsklarm och missar. Torra rutor räknas inte.'],
@@ -1900,44 +1947,162 @@ const VM = {  // grupp, riktning (1 högre är bättre, -1 lägre är bättre, 1
   r: ['cont', 1, 'Korrelation', 'Pearsons korrelation mellan modellens och facits timsummor.'],
   ratio: ['cont', 'one', 'Volymkvot', 'Modellens summa delat med facits. 1 är rätt mängd.'],
 };
+const VDICH = ['ets', 'csi', 'pod', 'far', 'fbi', 'hss', 'pss', 'mcc', 'sedi', 'pofd'];  // som verify.DICHOTOMOUS
+const VCONT = ['mae', 'rmse', 'me', 'r', 'ratio'];  // som verify.CONTINUOUS
+const VHINT = { 1: 'högre är bättre', '-1': 'lägre är bättre', one: '1 är rätt', zero: '0 är rätt' };
+const VGROUP = { hit: ['pod', 'far', 'csi', 'ets', 'fbi'], more: ['hss', 'pss', 'mcc', 'sedi'], amount: ['ratio', 'me', 'mae', 'rmse', 'r'] };
 const VEXTRA = { persistens: { name: 'Persistens', color: 'var(--past)', dash: '5 4' }, radar: { name: 'Radarn', color: 'var(--gauge)', dash: '1.5 3' },
                  a2t: { name: 'A2T', color: '#0a7d8c', dash: '6 3' } };
 const VORDER = ['ours', 'met', 'snow', 'persistens', 'radar', 'a2t'];
 const VFACIT = { radar: 'radarn', gauges: 'regnmätarna', a2t: 'A2T' };
-const vf = { doc: null, loaded: 0, win: store.get('vwin', '7'), obs: store.get('vobs', 'radar'), metric: store.get('vmetric', 'ets'),
-             thr: store.get('vthr', 1), scale: 1, lead: 0, map: null, layers: [] };
+const vf = { doc: null, loaded: 0, win: store.get('vwin', '7'), from: null, to: null, obs: store.get('vobs', 'radar'),
+             thr: store.get('vthr', 1), fthr: store.get('vfthr', 1), pick: null, own: { key: null }, map: null, layers: [] };
+if (!['7', '30'].includes(vf.win)) vf.win = '7';  // en egen period sparas inte, dygnen byts ut
 const vinfo = k => VEXTRA[k] || { ...modelInfo(k), dash: '' };
 const vcss = c => c.startsWith('var(') ? getComputedStyle(document.documentElement).getPropertyValue(c.slice(4, -1)).trim() : c;
 const vnum = (v, d = 2) => v == null || !isFinite(v) ? '' : (Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toLocaleString('sv-SE', { minimumFractionDigits: d, maximumFractionDigits: d }).replace('-', '−');
 const vdig = m => ['mae', 'rmse', 'me'].includes(m) ? 2 : m === 'ratio' || m === 'fbi' ? 2 : 3;
-const vthrs = () => VM[vf.metric][0] === 'fss' ? vf.doc.fss_thresholds : vf.doc.thresholds;
-const vthrIndex = () => { const l = vthrs(); let i = l.indexOf(vf.thr); if (i < 0) i = l.reduce((b, v, j) => Math.abs(v - vf.thr) < Math.abs(l[b] - vf.thr) ? j : b, 0); return i; };
+const vnear = (list, v) => { const i = list.indexOf(v); return i >= 0 ? i : list.reduce((b, x, j) => Math.abs(x - v) < Math.abs(list[b] - v) ? j : b, 0); };
+const vfin = v => Number.isFinite(v) ? v : null;
+const vday = d => new Date(d + 'T12:00:00Z').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
-function vget(e, metric, lead) {  // [skattning, nedre, övre] eller null
-  if (!e) return null;
-  const [g] = VM[metric];
-  if (g === 'scores') return e.scores?.[metric]?.[lead]?.[vthrIndex()] || null;
-  if (g === 'cont') return e.cont?.[metric]?.[lead] || null;
-  return e.fss?.[lead]?.[vthrIndex()]?.[vf.scale] || null;
-}
-function vdaily(e, metric, day, lead) {  // samma formler som verify.py, ur dygnets summor
-  const [g] = VM[metric];
-  if (g === 'fss') { const x = e.fss?.[day]?.[lead]?.[vthrIndex()]?.[vf.scale]; return x && x[1] > 0 ? 1 - x[0] / x[1] : null; }
-  if (g === 'cont') {
-    const [n, sf, so, sff, soo, sfo, sabs] = e.c?.[day]?.[lead] || [];
-    if (!n) return null;
-    return { me: (sf - so) / n, mae: sabs / n, rmse: Math.sqrt(Math.max(0, (sff - 2 * sfo + soo) / n)), ratio: so ? sf / so : null,
-             r: (() => { const v = Math.sqrt(Math.max(0, n * sff - sf * sf) * Math.max(0, n * soo - so * so)); return v ? (n * sfo - sf * so) / v : null; })() }[metric];
+/* Måtten ur summorna, platta listor. Samma formler som verify.py; odefinierat blir NaN. */
+const vq = (u, v) => v !== 0 ? u / v : NaN;  // som verify._div
+function vmDich(x, n) {  // x: n kontingenstabeller [träff, falsklarm, miss, rätt torrt] efter varandra
+  const o = {};
+  for (const k of VDICH) o[k] = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = x[4 * i], b = x[4 * i + 1], c = x[4 * i + 2], d = x[4 * i + 3], N = a + b + c + d;
+    const ar = vq((a + b) * (a + c), N), H = vq(a, a + c), F = vq(b, b + d);
+    const lf = Math.log(F), lh = Math.log(H), l1f = Math.log(1 - F), l1h = Math.log(1 - H);
+    const sedi = vq(lf - lh - l1f + l1h, lf + lh + l1f + l1h);
+    o.pod[i] = H; o.far[i] = vq(b, a + b); o.pofd[i] = F; o.csi[i] = vq(a, a + b + c);
+    o.ets[i] = vq(a - ar, a + b + c - ar);
+    o.hss[i] = vq(2 * (a * d - b * c), (a + c) * (c + d) + (a + b) * (b + d));
+    o.pss[i] = H - F;
+    o.mcc[i] = vq(a * d - b * c, Math.sqrt((a + b) * (a + c) * (b + d) * (c + d)));
+    o.fbi[i] = vq(a + b, a + c);
+    o.sedi[i] = Number.isFinite(sedi) ? sedi : NaN;
   }
-  const ct = e.ct?.[day]?.[lead]?.[vthrIndex()];
-  if (!ct) return null;
-  const [a, b, c, d] = ct, n = a + b + c + d, q = (x, y) => y ? x / y : null;
-  const ar = n ? (a + b) * (a + c) / n : 0, H = q(a, a + c), F = q(b, b + d);
-  const sedi = H > 0 && H < 1 && F > 0 && F < 1
-    ? (Math.log(F) - Math.log(H) - Math.log(1 - F) + Math.log(1 - H)) / (Math.log(F) + Math.log(H) + Math.log(1 - F) + Math.log(1 - H)) : null;
-  return { pod: H, far: q(b, a + b), csi: q(a, a + b + c), ets: q(a - ar, a + b + c - ar), fbi: q(a + b, a + c),
-           hss: q(2 * (a * d - b * c), (a + c) * (c + d) + (a + b) * (b + d)), pss: H == null || F == null ? null : H - F,
-           mcc: q(a * d - b * c, Math.sqrt((a + b) * (a + c) * (b + d) * (c + d))), sedi }[metric];
+  return o;
+}
+function vmCont(x, n) {  // x: n gånger [antal, Σf, Σo, Σf², Σo², Σfo, Σ|f − o|]
+  const o = {};
+  for (const k of VCONT) o[k] = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const [N, sf, so, sff, soo, sfo, sabs] = x.slice(7 * i, 7 * i + 7);
+    o.me[i] = vq(sf - so, N); o.mae[i] = vq(sabs, N);
+    o.rmse[i] = Math.sqrt(Math.max(vq(sff - 2 * sfo + soo, N), 0));
+    o.r[i] = vq(N * sfo - sf * so, Math.sqrt(Math.max(N * sff - sf * sf, 0) * Math.max(N * soo - so * so, 0)));
+    o.ratio[i] = vq(sf, so);
+  }
+  return o;
+}
+function vmFss(x, n) {  // x: n gånger [Σ(Pf − Po)², Σ(Pf² + Po²)]
+  const f = new Float64Array(n);
+  for (let i = 0; i < n; i++) f[i] = 1 - vq(x[2 * i], x[2 * i + 1]);
+  return { fss: f };
+}
+const vflat = a => Float64Array.from(a.flat(Infinity), v => v == null ? 0 : v);
+function vsum(arrs, w) {  // summan över dygnen, med vikterna w (antalet gånger dygnet drogs) eller ett var
+  const out = new Float64Array(arrs[0].length);
+  arrs.forEach((a, j) => { const k = w ? w[j] : 1; if (k) for (let i = 0; i < out.length; i++) out[i] += k * a[i]; });
+  return out;
+}
+function vrng(seed) {  // mulberry32: ett fast frö, så att samma period ger samma intervall
+  let s = seed >>> 0;
+  return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function vquant(samples, size, p) {  // som verify._interval: närmaste rang, inget intervall om måttet saknas i hälften av dragningarna
+  const out = new Float64Array(size).fill(NaN), B = samples.length;
+  for (let i = 0; i < size; i++) {
+    const v = [];
+    for (const s of samples) if (Number.isFinite(s[i])) v.push(s[i]);
+    if (v.length < 0.5 * B || !v.length) continue;
+    v.sort((a, b) => a - b);
+    out[i] = v[Math.max(0, Math.round(p * (v.length - 1)))];
+  }
+  return out;
+}
+function vnest(est, lo, hi, dims) {  // platt till [skattning, nedre, övre] längst in, som i verif.json
+  const rec = (off, di) => di === dims.length ? [vfin(est[off]), lo ? vfin(lo[off]) : null, hi ? vfin(hi[off]) : null]
+    : Array.from({ length: dims[di] }, (_, j) => rec(off * dims[di] + j, di + 1));
+  return rec(0, 0);
+}
+
+// Den egna periodens tal för ett facit, i samma form som en period i verif.json.
+function vcompute(obs, idx) {
+  const D = vf.doc, dl = D.daily, src = dl[obs] || {}, pairs = dl.pairs?.[obs] || {};
+  const L = D.leads.length, T = D.thresholds.length, FT = D.fss_thresholds.length, FS = D.fss_km.length, N = idx.length;
+  let weights = null;
+  if (N >= 3) {
+    const rnd = vrng(1);
+    weights = Array.from({ length: D.boot || 1000 }, () => { const w = new Float64Array(N); for (let j = 0; j < N; j++) w[Math.floor(rnd() * N)]++; return w; });
+  }
+  const days = (e, k) => idx.map(i => vflat(e[k][i]));
+  function stat(arrs, arrs0, fn, n, dims) {  // {mått: nästlade tripplar}; med arrs0 skillnaden modell minus Tim-KNEP
+    const f = w => {
+      const m = fn(vsum(arrs, w), n);
+      if (!arrs0) return m;
+      const m0 = fn(vsum(arrs0, w), n);
+      for (const k in m) for (let i = 0; i < n; i++) m[k][i] -= m0[k][i];
+      return m;
+    };
+    const est = f(null), smp = weights ? weights.map(f) : null, out = {};
+    for (const k in est) {
+      out[k] = smp ? vnest(est[k], vquant(smp.map(s => s[k]), n, 0.05), vquant(smp.map(s => s[k]), n, 0.95), dims) : vnest(est[k], null, null, dims);
+    }
+    return out;
+  }
+  const pick = (m, keys) => { const o = {}; for (const k of keys) o[k] = m[k]; return o; };
+  const dich = (x, n) => pick(vmDich(x, n), VDICH), cont = (x, n) => pick(vmCont(x, n), VCONT);
+  const res = { models: {}, diff: {} };
+  for (const key of Object.keys(src)) {
+    const e = src[key];
+    const hours = D.leads.map((_, l) => idx.reduce((t, i) => t + (e.hours?.[i]?.[l] || 0), 0));
+    if (!hours.some(h => h > 0)) continue;  // modellen fanns inte under perioden
+    const ct = days(e, 'ct'), c = days(e, 'c'), fs = e.fss ? days(e, 'fss') : null;
+    const sct = vsum(ct), sc = vsum(c);
+    res.models[key] = {
+      hours, n: D.leads.map((_, l) => Math.round(sc[7 * l])),
+      events: D.leads.map((_, l) => D.thresholds.map((_, t) => sct[4 * (l * T + t)] + sct[4 * (l * T + t) + 2])),
+      scores: stat(ct, null, dich, L * T, [L, T]), cont: stat(c, null, cont, L, [L]),
+    };
+    if (fs) res.models[key].fss = stat(fs, null, vmFss, L * FT * FS, [L, FT, FS]).fss;
+    const p = pairs[key];
+    if (key === 'ours' || !p || !D.leads.some((_, l) => idx.some(i => p.hours?.[i]?.[l]))) continue;
+    res.diff[key] = { scores: stat(ct, days(p, 'ct'), dich, L * T, [L, T]), cont: stat(c, days(p, 'c'), cont, L, [L]) };
+    if (fs && p.fss) res.diff[key].fss = stat(fs, days(p, 'fss'), vmFss, L * FT * FS, [L, FT, FS]).fss;
+  }
+  return res;
+}
+function vbase(idx) {  // underlaget för en egen period; mätarna och loppens ålder finns bara för de förberäknade perioderna
+  const D = vf.doc, dl = D.daily, m = dl.meta || {};
+  const s = k => idx.reduce((t, i) => t + (m[k]?.[i] || 0), 0);
+  const refKey = D.windows['30'] ? '30' : Object.keys(D.windows)[0], ref = D.windows[refKey] || {};
+  const firsts = idx.map(i => m.first?.[i]).filter(Boolean).sort(), lasts = idx.map(i => m.last?.[i]).filter(Boolean).sort();
+  return { custom: true, refDays: +refKey, days: idx.length, from: dl.days[idx[0]], to: dl.days[idx[idx.length - 1]],
+           issues: s('issues'), obs_hours: s('obs_hours'), gauge_hours: s('gauge_hours'), first: firsts[0] || null, last: lasts[lasts.length - 1] || null,
+           a2t_hours: s('a2t_hours'), a2t_gauges: Math.round(s('a2t_n') / Math.max(s('a2t_hours'), 1) * 10) / 10,
+           stations: ref.stations || [], lags: ref.lags || {} };
+}
+const vidx = () => (vf.doc.daily?.days || []).map((d, i) => [d, i]).filter(([d]) => d >= vf.from && d <= vf.to).map(([, i]) => i);
+
+// värdet för en modell eller en skillnad: spec = { metric, ti (tröskel), si (skala) }
+function vval(e, s, l) {
+  if (!e) return null;
+  const g = VM[s.metric][0];
+  if (g === 'scores') return e.scores?.[s.metric]?.[l]?.[s.ti] || null;
+  if (g === 'cont') return e.cont?.[s.metric]?.[l] || null;
+  return e.fss?.[l]?.[s.ti]?.[s.si] || null;
+}
+function vone(e, d, s, l) {  // ett dygns värde ur dygnets summor
+  if (!e) return null;
+  const g = VM[s.metric][0];
+  if (g === 'scores') { const x = e.ct?.[d]?.[l]?.[s.ti]; return x ? vfin(vmDich(x, 1)[s.metric][0]) : null; }
+  if (g === 'cont') { const x = e.c?.[d]?.[l]; return x ? vfin(vmCont(x, 1)[s.metric][0]) : null; }
+  const x = e.fss?.[d]?.[l]?.[s.ti]?.[s.si];
+  return x ? vfin(vmFss(x, 1).fss[0]) : null;
 }
 
 async function verifLoad() {
@@ -1947,171 +2112,227 @@ async function verifLoad() {
     if (!r.ok) throw new Error(r.status);
     vf.doc = await r.json();
     vf.loaded = Date.now();
+    vf.own = { key: null };
   } catch (e) {
     vf.doc = null;
   }
   verifDraw();
 }
 
-function vticks(lo, hi) {
-  const span = hi - lo || 1, raw = span / 4, mag = 10 ** Math.floor(Math.log10(raw));
+function vticks(lo, hi, k = 4) {
+  const span = hi - lo || 1, raw = span / k, mag = 10 ** Math.floor(Math.log10(raw));
   const step = [1, 2, 2.5, 5, 10].map(k => k * mag).find(s => s >= raw);
   const out = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
   return out;
 }
-// Ett linjediagram med en linje per modell, band för intervallet, hårkors och ruta vid pekaren.
-function vchart(svg, tip, cats, series, metric) {
-  const Wd = svg.clientWidth || 460, Hd = svg.clientHeight || 230, narrow = Wd < 420;
-  const L0 = 44, R0 = narrow ? 10 : 86, T0 = 10, B0 = 22;
-  const dir = VM[metric][1];
-  const all = series.flatMap(s => s.vals.flatMap(v => v ? [v[0], v[1], v[2]] : [])).filter(v => v != null && isFinite(v));
-  if (dir === 'one') all.push(1);
-  if (dir === 'zero' || VM[metric][0] !== 'cont') all.push(0);
+// Ett litet linjediagram: en linje per modell, band för intervallet, hårkors och ruta vid pekaren.
+// o: { dir, bounded (måttet ligger mellan −1 och 1), ref (linjen vid 0 eller 1), digits, onpick(i), sel (vald punkt) }
+function vchart(svg, tip, cats, series, o) {
+  const Wd = svg.clientWidth || 300, Hd = svg.clientHeight || 150;
+  const L0 = 38, R0 = 10, T0 = 8, B0 = 20;
+  const all = series.flatMap(s => s.vals.flatMap(v => v ? (s.band ? [v[0], v[1], v[2]] : [v[0]]) : [])).filter(v => v != null && isFinite(v));
+  svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
+  if (!all.length) {
+    svg.innerHTML = `<text x="${Wd / 2}" y="${Hd / 2}" text-anchor="middle">inget värde för perioden</text>`;
+    svg.onpointermove = svg.onpointerdown = svg.onclick = null;
+    return;
+  }
+  if (o.ref != null) all.push(o.ref);
   let lo = Math.min(...all), hi = Math.max(...all);
-  if (!all.length || !isFinite(lo)) { svg.innerHTML = ''; return; }
-  const pad = (hi - lo) * 0.06 || 0.1; lo -= pad; hi += pad;
-  if (VM[metric][0] !== 'cont') { hi = Math.min(hi, 1.02); lo = Math.max(lo, -1.02); }
+  const pad = (hi - lo) * 0.08 || 0.1; lo -= pad; hi += pad;
+  if (o.bounded) { hi = Math.min(hi, 1.02); lo = Math.max(lo, -1.02); }
   const n = cats.length, X = i => L0 + (n > 1 ? i / (n - 1) : 0.5) * (Wd - L0 - R0), Y = v => T0 + (hi - v) / (hi - lo) * (Hd - T0 - B0);
   let g = '';
-  for (const v of vticks(lo, hi)) g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 5}" y="${Y(v) + 3.5}" text-anchor="end">${vnum(v, Math.abs(v) < 10 && v % 1 ? 2 : 0)}</text>`;
-  const ref = dir === 'one' ? 1 : 0;
-  if (ref >= lo && ref <= hi) g += `<line class="zero" x1="${L0}" x2="${Wd - R0}" y1="${Y(ref)}" y2="${Y(ref)}"/>`;
-  const every = Math.ceil(n / Math.max(2, Math.floor((Wd - L0 - R0) / 46)));
-  cats.forEach((c, i) => { if (i % every === 0 || i === n - 1) g += `<text x="${X(i)}" y="${Hd - 6}" text-anchor="${i === n - 1 && narrow ? 'end' : 'middle'}">${c}</text>`; });
-  const ends = [];
+  for (const v of vticks(lo, hi, Hd < 180 ? 3 : 4)) g += `<line class="grid" x1="${L0}" x2="${Wd - R0}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L0 - 5}" y="${Y(v) + 3.5}" text-anchor="end">${vnum(v, Math.abs(v) < 10 && v % 1 ? (Math.abs(v * 10 % 1) > 1e-6 ? 2 : 1) : 0)}</text>`;
+  if (o.ref != null && o.ref >= lo && o.ref <= hi) g += `<line class="zero" x1="${L0}" x2="${Wd - R0}" y1="${Y(o.ref)}" y2="${Y(o.ref)}"/>`;
+  if (o.sel != null && o.sel < n) g += `<rect x="${X(o.sel) - 9}" y="${T0}" width="18" height="${Hd - T0 - B0}" rx="4" style="fill:var(--accent);opacity:.09"/>`;
+  const every = Math.ceil(n / Math.max(2, Math.floor((Wd - L0 - R0) / 44)));
+  cats.forEach((c, i) => { if (i % every === 0 || i === n - 1) g += `<text x="${X(i)}" y="${Hd - 6}" text-anchor="${n > 1 && i === n - 1 ? 'end' : n > 1 && i === 0 ? 'start' : 'middle'}">${c}</text>`; });
   for (const s of series) {
     const col = vcss(s.color);
-    const band = s.vals.map((v, i) => !VEXTRA[s.key] && v && v[1] != null && v[2] != null ? [X(i), Y(v[1]), Y(v[2])] : null);  // referenserna utan band
-    let run = [];
-    const flush = () => { if (run.length > 1) g += `<path d="M${run.map(q => `${q[0].toFixed(1)},${q[2].toFixed(1)}`).join('L')}L${run.slice().reverse().map(q => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join('L')}Z" style="fill:${col};opacity:.13"/>`; run = []; };
-    band.forEach(q => { if (q) run.push(q); else flush(); }); flush();
+    if (s.band) {
+      const band = s.vals.map((v, i) => v && v[1] != null && v[2] != null ? [X(i), Y(v[1]), Y(v[2])] : null);
+      let run = [];
+      const flush = () => { if (run.length > 1) g += `<path d="M${run.map(q => `${q[0].toFixed(1)},${q[2].toFixed(1)}`).join('L')}L${run.slice().reverse().map(q => `${q[0].toFixed(1)},${q[1].toFixed(1)}`).join('L')}Z" style="fill:${col};opacity:.13"/>`;
+        else if (run.length === 1) g += `<line x1="${run[0][0]}" x2="${run[0][0]}" y1="${run[0][1]}" y2="${run[0][2]}" style="stroke:${col};stroke-width:6;opacity:.18"/>`; run = []; };
+      band.forEach(q => { if (q) run.push(q); else flush(); }); flush();
+    }
     const pts = s.vals.map((v, i) => v && v[0] != null ? [X(i), Y(v[0])] : null);
     let d = '', pen = false;
     for (const q of pts) { if (!q) { pen = false; continue; } d += `${pen ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}`; pen = true; }
     g += `<path d="${d}" style="fill:none;stroke:${col};stroke-width:2${s.dash ? `;stroke-dasharray:${s.dash}` : ''}"/>`;
-    if (n <= 12) for (const q of pts) if (q) g += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="4" style="fill:${col};stroke:var(--bg);stroke-width:2"/>`;
-    const last = pts.map((q, i) => q ? i : -1).filter(i => i >= 0).pop();
-    if (last === n - 1) ends.push({ y: pts[last][1], x: pts[last][0], name: s.name });  // namnet bara där linjen når slutet; annars i nyckeln ovanför
+    if (n <= 12) for (const q of pts) if (q) g += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="3" style="fill:${col};stroke:var(--bg);stroke-width:1.5"/>`;
   }
-  if (!narrow) {  // namnen vid linjernas slut, isärflyttade så att de inte krockar
-    ends.sort((a, b) => a.y - b.y);
-    for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 13);
-    for (const e of ends) g += `<text class="lbl" x="${Wd - R0 + 8}" y="${(e.y + 4).toFixed(1)}">${e.name}</text>`;
-  }
-  g += `<line class="cross" id="${svg.id}-x" x1="0" x2="0" y1="${T0}" y2="${Hd - B0}" visibility="hidden"/>`;
-  svg.setAttribute('viewBox', `0 0 ${Wd} ${Hd}`);
+  g += `<line class="cross" x1="0" x2="0" y1="${T0}" y2="${Hd - B0}" visibility="hidden"/>`;
   svg.innerHTML = g;
-  const dg = vdig(metric);
+  const cross = svg.querySelector('.cross'), dg = o.digits ?? 3;
+  const at = ev => { const box = svg.getBoundingClientRect(), x = (ev.clientX - box.left) * Wd / box.width; return Math.max(0, Math.min(n - 1, Math.round((x - L0) / Math.max(1, Wd - L0 - R0) * (n - 1)))); };
   const move = ev => {
-    const box = svg.getBoundingClientRect(), x = (ev.clientX - box.left) * Wd / box.width;
-    const i = Math.max(0, Math.min(n - 1, Math.round((x - L0) / Math.max(1, Wd - L0 - R0) * (n - 1))));
-    const cross = $(`${svg.id}-x`);
+    const i = at(ev);
     cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('visibility', 'visible');
     const rows = series.filter(s => s.vals[i]?.[0] != null).sort((a, b) => b.vals[i][0] - a.vals[i][0]);
-    tip.innerHTML = `<b>${cats[i]}</b><br>` + (rows.length ? rows.map(s => `<i style="background:${s.color}"></i>${s.name} <b>${vnum(s.vals[i][0], dg)}</b>`
+    tip.innerHTML = `<b>${cats[i]}</b><br>` + (rows.length ? rows.map(s => `<i style="background:${s.color}"></i>${s.name} <b>${s.vals[i][0] > 0 && o.signed ? '+' : ''}${vnum(s.vals[i][0], dg)}</b>`
       + (s.vals[i][1] != null ? ` <span style="color:var(--muted)">${vnum(s.vals[i][1], dg)} till ${vnum(s.vals[i][2], dg)}</span>` : '')).join('<br>') : 'inget värde');
     tip.hidden = false;
     const card = svg.parentElement.getBoundingClientRect(), px = ev.clientX - card.left, tw = tip.offsetWidth;
-    tip.style.left = `${Math.max(4, Math.min(card.width - tw - 4, px + (px > card.width / 2 ? -tw - 14 : 14)))}px`;
-    tip.style.top = `${ev.clientY - card.top + 12}px`;
+    tip.style.left = `${Math.max(0, Math.min(card.width - tw, px + (px > card.width / 2 ? -tw - 12 : 12)))}px`;
+    tip.style.top = `${Math.max(0, ev.clientY - card.top + 14)}px`;
   };
   svg.onpointermove = move;
   svg.onpointerdown = move;
-  svg.onpointerleave = () => { tip.hidden = true; $(`${svg.id}-x`)?.setAttribute('visibility', 'hidden'); };
+  svg.onpointerleave = () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); };
+  svg.onclick = o.onpick ? ev => o.onpick(at(ev)) : null;
 }
 
 function vseg(id, items, cur, attr, onpick) {
   $(id).innerHTML = items.map(([v, label, title]) => `<button aria-pressed="${String(v) === String(cur)}" data-${attr}="${v}"${title ? ` title="${title}"` : ''}>${label}</button>`).join('');
   $(id).querySelectorAll('button').forEach(b => b.addEventListener('click', () => onpick(b.dataset[attr])));
 }
+const vkeys = list => list.map(s => `<span><i style="background:${s.color}${s.dash ? ';opacity:.6' : ''}"></i>${s.name}</span>`).join('');
+
+// Perioden som visas: en av verif.json:s, eller den egna, räknad här (null medan den räknas)
+function vperiod() {
+  const D = vf.doc;
+  if (vf.win !== 'egen') return D.windows[vf.win];
+  const idx = vidx();
+  if (!idx.length) return { empty: true };
+  const key = `${vf.from}|${vf.to}`;
+  if (vf.own.key !== key) vf.own = { key, base: vbase(idx), obs: {} };
+  if (!vf.own.obs[vf.obs]) {
+    $('verif-meta').textContent = `Räknar ${idx.length} dygn`;
+    setTimeout(() => { if (vf.own.key === key && !vf.own.obs[vf.obs]) { vf.own.obs[vf.obs] = vcompute(vf.obs, idx); verifDraw(); } }, 30);
+    return null;
+  }
+  return { ...vf.own.base, [vf.obs]: vf.own.obs[vf.obs] };
+}
+const vhasA2T = () => vf.win === 'egen' ? !!vf.doc.daily?.a2t?.ours && vidx().some(i => vf.doc.daily.a2t.ours.hours?.[i]?.some(h => h > 0))
+  : !!vf.doc.windows[vf.win]?.a2t?.models?.ours;
 
 function verifDraw() {
-  const D = vf.doc, W = D?.windows?.[vf.win] || D?.windows?.[Object.keys(D?.windows || {})[0]];
-  if (!D || !W) {
+  const D = vf.doc;
+  if (!D || !Object.keys(D.windows || {}).length) {
     $('verif-body').hidden = true; $('verif-empty').hidden = false; $('verif-meta').textContent = '';
     $('verif-empty').textContent = 'Verifieringen har inte kommit igång än. En utgåva räknas när mätarna för dess sista timme har kommit, ungefär sju och en halv timme efter att den gjordes. Sedan fylls perioderna på timme för timme.';
     return;
   }
-  $('verif-body').hidden = false; $('verif-empty').hidden = true;
-  $('verif-obs').querySelector('[data-obs="a2t"]').hidden = !W.a2t?.models?.ours;  // bara när A2T har räknats som facit
-  if (!W[vf.obs]?.models?.ours) vf.obs = 'radar';
-  if (vf.obs === 'gauges' && VM[vf.metric][0] === 'fss') vf.metric = 'ets';
-  const O = W[vf.obs], R = O.models, keys = VORDER.filter(k => R[k]);
-  $('verif-meta').textContent = `${W.days} dygn, ${day.format(new Date(W.from))} till ${day.format(new Date(W.to))} (UTC), ${num(W.issues)} utgåvor. Uppdaterad ${dayTime.format(new Date(D.updated))}.`;
+  const days = D.daily?.days || [], ownOk = !!(days.length && D.daily.pairs);
+  if (vf.win === 'egen' && !ownOk) vf.win = '7';
+  if (vf.win !== 'egen' && !D.windows[vf.win]) vf.win = Object.keys(D.windows)[0];
+  if (vf.win !== 'egen') { vf.from = D.windows[vf.win].from; vf.to = D.windows[vf.win].to; }
   pressed($('verif-win'), 'win', vf.win);
-  $('verif-win').querySelectorAll('button').forEach(b => { b.disabled = !D.windows[b.dataset.win]; });
-  pressed($('verif-obs'), 'obs', vf.obs);
-  $('verif-metric').innerHTML = Object.entries(VM).filter(([k, m]) => vf.obs !== 'gauges' || m[0] !== 'fss')
-    .map(([k, m]) => `<option value="${k}"${k === vf.metric ? ' selected' : ''}>${m[2]}</option>`).join('');
-  const [grp, dir, mname, mtext] = VM[vf.metric];
-  const thrs = vthrs(), ti = vthrIndex();
-  $('verif-thr').hidden = grp === 'cont';
-  vseg('verif-thr', thrs.map(t => [t, `≥ ${num(t)} mm`, 'Tröskel för timsumman']), thrs[ti], 'thr', v => { vf.thr = +v; store.set('vthr', vf.thr); verifDraw(); });
-  $('verif-scale').hidden = grp !== 'fss';
-  vseg('verif-scale', D.fss_km.map((k, i) => [i, `${k} km`, i ? 'Fönstrets sida' : 'Ett block, alltså punktvis']), vf.scale, 'scale', v => { vf.scale = +v; verifDraw(); });
-  vseg('verif-lead', D.leads.map((l, i) => [i, `+${l} h`, 'Ledtid för dygnen och tabellen']), vf.lead, 'lead', v => { vf.lead = +v; verifDraw(); });
-  const what = grp === 'cont' ? '' : grp === 'fss' ? ` vid ${num(thrs[ti])} mm på ${D.fss_km[vf.scale]} km` : ` vid minst ${num(thrs[ti])} mm under timmen`;
-  const facit = VFACIT[vf.obs];
-
-  // per ledtid
-  const series = keys.map(k => ({ key: k, ...vinfo(k), vals: D.leads.map((_, l) => vget(R[k], vf.metric, l)) }));
-  $('verif-lead-title').textContent = `${mname} per ledtid`;
-  $('verif-lead-meta').textContent = `Mot ${facit}${what}. Bandet är 90 %-intervallet över dygnen. ${mtext}`;
-  $('verif-lead-keys').innerHTML = series.map(s => `<span><i style="background:${s.color}${s.dash ? ';opacity:.6' : ''}"></i>${s.name}</span>`).join('');
-  vchart($('verif-lead-chart'), $('verif-lead-tip'), D.leads.map(l => `+${l} h`), series, vf.metric);
-
-  // dygn för dygn
-  const daily = D.daily?.[vf.obs] || {}, days = (D.daily?.days || []).map((d, i) => [d, i]).filter(([d]) => d >= W.from);
-  const dseries = keys.filter(k => daily[k]).map(k => ({ key: k, ...vinfo(k), vals: days.map(([, i]) => { const v = vdaily(daily[k], vf.metric, i, vf.lead); return v == null || !isFinite(v) ? null : [v, null, null]; }) }));
-  $('verif-day-title').textContent = `${mname} dygn för dygn`;
-  $('verif-day-meta').textContent = `Ledtid +${D.leads[vf.lead]} h, mot ${facit}${what}. Ett dygn är utgåvorna med heltimme det dygnet (UTC).`;
-  $('verif-day-keys').innerHTML = dseries.map(s => `<span><i style="background:${s.color}${s.dash ? ';opacity:.6' : ''}"></i>${s.name}</span>`).join('');
-  vchart($('verif-day-chart'), $('verif-day-tip'), days.map(([d]) => new Date(d + 'T12:00:00Z').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })), dseries, vf.metric);
-
-  // mot Tim-KNEP
-  const dg = vdig(vf.metric), diffKeys = keys.filter(k => O.diff?.[k]);
-  const verdict = v => {
-    if (!v || v[1] == null) return '<td class="verdict">för få dygn</td>';
-    if (typeof dir !== 'number') return '<td class="verdict">ingen dom</td>';
-    const better = dir > 0 ? v[1] > 0 : v[2] < 0, worse = dir > 0 ? v[2] < 0 : v[1] > 0;
-    return `<td class="verdict ${better ? 'better' : worse ? 'worse' : ''}">${better ? 'bättre' : worse ? 'sämre' : 'osäkert'}</td>`;
-  };
-  $('verif-diff-meta').textContent = `${mname}${what}, mot ${facit}: modellen minus Tim-KNEP, räknat på exakt samma rutor och timmar. `
-    + (typeof dir === 'number' ? `Bättre eller sämre står bara när hela 90 %-intervallet ligger på ena sidan om noll${dir < 0 ? ' (för det här måttet är lägre bättre)' : ''}.`
-      : `Målet för måttet är ${dir === 'one' ? '1' : '0'}, så en skillnad säger inte vilken som är bättre; jämför värdena i tabellen nedan.`);
-  $('verif-diff').innerHTML = diffKeys.length ? `<table><tr><th>Modell</th>${D.leads.map(l => `<th>+${l} h</th><th></th>`).join('')}</tr>`
-    + diffKeys.map(k => `<tr><td><span class="sw" style="display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:4px;vertical-align:3px;background:${vinfo(k).color}"></span>${vinfo(k).name}</td>`
-      + D.leads.map((_, l) => { const v = vget(O.diff[k], vf.metric, l); return v?.[0] == null ? '<td></td><td></td>'
-        : `<td>${v[0] > 0 ? '+' : ''}${vnum(v[0], dg)}${v[1] != null ? `<small>${vnum(v[1], dg)} till ${vnum(v[2], dg)}</small>` : ''}</td>${verdict(v)}`; }).join('') + '</tr>').join('') + '</table>'
-    : '<div class="status">Ingen annan modell har räknats på samma timmar än.</div>';
-
-  // alla mått vid en ledtid
-  $('verif-all-title').textContent = `Alla mått vid +${D.leads[vf.lead]} h`;
-  $('verif-all-meta').textContent = `Mot ${facit}. Tröskel ${num(thrs[ti])} mm för måtten på regn och torrt${vf.obs !== 'gauges' ? `, FSS på ${D.fss_km[vf.scale]} km` : ''}. Det bästa värdet bland prognoserna är fetstilt; persistens${R.a2t ? ', radarn och A2T' : ' och radarn'} är referenser och tävlar inte.${vf.obs === 'gauges' && R.a2t ? ' A2T har rättats mot samma mätare, så i mätarens ruta är A2T nästan mätaren.' : ''}`;
-  const rows = Object.entries(VM).filter(([k, m]) => vf.obs !== 'gauges' || m[0] !== 'fss');
-  const best = (k, vals) => {
-    const d = VM[k][1], cand = vals.map((v, i) => [v?.[0], i]).filter(([v, i]) => v != null && !VEXTRA[keys[i]]);
-    if (cand.length < 2) return -1;
-    const sc = v => d === 'one' ? -Math.abs(v - 1) : d === 'zero' ? -Math.abs(v) : d * v;
-    return cand.reduce((b, c) => sc(c[0]) > sc(b[0]) ? c : b)[1];
-  };
-  const thrSave = vf.thr;
-  let t = `<table><tr><th>Mått</th>${keys.map(k => `<th><span class="sw" style="background:${vinfo(k).color}"></span>${vinfo(k).name}</th>`).join('')}</tr>`;
-  for (const [k, m] of rows) {
-    const saved = vf.metric; vf.metric = k;
-    if (m[0] === 'fss' && !vf.doc.fss_thresholds.includes(vf.thr)) vf.thr = vf.doc.fss_thresholds[vthrIndex()];
-    const vals = keys.map(key => vget(R[key], k, vf.lead)), b = best(k, vals), d2 = vdig(k);
-    vf.metric = saved; vf.thr = thrSave;
-    t += `<tr><td title="${m[3]}">${m[2]}${m[0] === 'fss' ? ` (${D.fss_km[vf.scale]} km)` : ''}</td>` + vals.map((v, i) => `<td${i === b ? ' class="best"' : ''}>${v?.[0] == null ? '' : vnum(v[0], d2)}${v?.[1] != null ? `<small>${vnum(v[1], d2)} till ${vnum(v[2], d2)}</small>` : ''}</td>`).join('') + '</tr>';
+  $('verif-win').querySelectorAll('button').forEach(b => { b.disabled = b.dataset.win === 'egen' ? !ownOk : !D.windows[b.dataset.win]; });
+  for (const id of ['verif-from', 'verif-to']) {
+    const el = $(id);
+    el.disabled = !ownOk;
+    if (days.length) { el.min = days[0]; el.max = days[days.length - 1]; }
   }
-  const lead = vf.lead;
-  t += `<tr><td class="obs">Timmar</td>${keys.map(k => `<td class="obs">${num(R[k].hours[lead])}</td>`).join('')}</tr>`;
-  t += `<tr><td class="obs">${vf.obs !== 'gauges' ? 'Rutor' : 'Mätarvärden'}</td>${keys.map(k => `<td class="obs">${num(R[k].n[lead])}</td>`).join('')}</tr>`;
-  t += `<tr><td class="obs">Över tröskeln i facit</td>${keys.map(k => `<td class="obs">${num(R[k].events[lead][ti] ?? 0)}</td>`).join('')}</tr>`;
-  $('verif-all').innerHTML = t + '</table>';
+  $('verif-from').value = vf.from || ''; $('verif-to').value = vf.to || '';
+  const a2t = vhasA2T();
+  $('verif-obs').querySelector('[data-obs="a2t"]').hidden = !a2t;  // bara när A2T har räknats som facit
+  if ((vf.obs === 'a2t' && !a2t) || (vf.win !== 'egen' && !D.windows[vf.win][vf.obs]?.models?.ours)) vf.obs = 'radar';
+  pressed($('verif-obs'), 'obs', vf.obs);
+  const W = vperiod();
+  if (!W) return;  // räknar
+  if (W.empty) {
+    $('verif-body').hidden = true; $('verif-empty').hidden = false;
+    $('verif-meta').textContent = '';
+    $('verif-empty').textContent = `Inga verifierade dygn mellan ${vf.from} och ${vf.to}. Dygnen som finns är ${days[0]} till ${days[days.length - 1]}.`;
+    return;
+  }
+  $('verif-body').hidden = false; $('verif-empty').hidden = true;
+  const O = W[vf.obs] || { models: {}, diff: {} }, R = O.models;
+  const keys = [...VORDER.filter(k => R[k]), ...Object.keys(R).filter(k => !VORDER.includes(k))];
+  const facit = VFACIT[vf.obs], gauges = vf.obs === 'gauges';
+  $('verif-meta').textContent = `${W.custom ? 'Egen period: ' : ''}${W.days} dygn, ${day.format(new Date(W.from))} till ${day.format(new Date(W.to))} (UTC), ${num(W.issues)} utgåvor, mot ${facit}.`
+    + (W.custom ? ' Måtten är räknade här ur dygnens summor.' : ` Uppdaterad ${dayTime.format(new Date(D.updated))}.`);
 
+  const thrs = D.thresholds, fthrs = D.fss_thresholds, ti = vnear(thrs, vf.thr), fi = vnear(fthrs, vf.fthr);
+  vseg('verif-thr', thrs.map(t => [t, `≥ ${num(t)} mm`, 'Regn är minst så mycket under timmen']), thrs[ti], 'thr', v => { vf.thr = +v; store.set('vthr', vf.thr); verifDraw(); });
+  vseg('verif-fthr', fthrs.map(t => [t, `≥ ${num(t)} mm`, 'Regn är minst så mycket under timmen']), fthrs[fi], 'fthr', v => { vf.fthr = +v; store.set('vfthr', vf.fthr); verifDraw(); });
+  const series = (spec, src, band) => keys.filter(k => src[k]).map(k => ({ key: k, ...vinfo(k), band: band(k), vals: D.leads.map((_, l) => vval(src[k], spec, l)) }));
+  const cats = D.leads.map(l => `+${l} h`);
+  const pk = vf.pick;
+  const same = (a, b) => a && b && a.kind === b.kind && a.metric === b.metric && (a.ti ?? -1) === (b.ti ?? -1) && (a.si ?? -1) === (b.si ?? -1);
+  const minis = (host, specs) => {
+    $(host).innerHTML = specs.map((s, j) => `<div class="vmini${same(s, pk) ? ' picked' : ''}"><h3>${s.title}</h3><p>${s.hint}</p>`
+      + `<svg class="vchart small" id="${host}-${j}" role="img" aria-label="${s.title} per ledtid"></svg><div class="vtip" hidden></div></div>`).join('');
+    specs.forEach((s, j) => {
+      const svg = $(`${host}-${j}`);
+      vchart(svg, svg.nextElementSibling, cats, s.series, { ...s.opts, sel: same(s, pk) ? pk.lead : null, onpick: i => { vf.pick = { ...s, series: null, lead: i }; verifDraw(); } });
+    });
+  };
+  const mspec = (metric, extra = {}) => {
+    const [g, dir, name, text] = VM[metric];
+    const s = { kind: 'm', metric, ti: g === 'scores' ? ti : g === 'fss' ? fi : undefined, ...extra };
+    return { ...s, title: s.title || name, hint: s.hint || `${VHINT[dir][0].toUpperCase()}${VHINT[dir].slice(1)}. ${text}`, series: series(s, R, k => !VEXTRA[k]),
+             opts: { bounded: g !== 'cont', ref: dir === 'one' ? 1 : dir === 'zero' || g !== 'cont' ? 0 : null, digits: vdig(metric) } };
+  };
+
+  // träff och falsklarm, mängd och fel, form och läge
+  const keyList = keys.map(vinfo);
+  $('verif-hit-keys').innerHTML = $('verif-amount-keys').innerHTML = $('verif-shape-keys').innerHTML = vkeys(keyList);
+  minis('verif-hit', VGROUP.hit.map(m => mspec(m)));
+  minis('verif-hit-more', VGROUP.more.map(m => mspec(m)));
+  minis('verif-amount', VGROUP.amount.map(m => mspec(m)));
+  $('vg-shape').hidden = gauges;  // en mätare är en punkt, så FSS räknas inte mot mätarna
+  if (!gauges) minis('verif-shape', D.fss_km.map((km, si) => mspec('fss', { si, title: `FSS på ${km} km`,
+    hint: si ? `Fönster om ${km} km. Högre är bättre.` : `Ett block, alltså punktvis. Högre är bättre.` })));
+
+  // skillnaden mot Tim-KNEP
+  const dkeys = keys.filter(k => O.diff?.[k]);
+  const dspecs = [['csi'], ['ets'], ...(gauges ? [] : [['fss', { si: Math.min(1, D.fss_km.length - 1) }]]), ['mae']].map(([metric, extra = {}]) => {
+    const [g, dir, name] = VM[metric];
+    const s = { kind: 'd', metric, ti: g === 'scores' ? ti : g === 'fss' ? fi : undefined, ...extra };
+    const what = g === 'scores' ? ` vid ${num(thrs[ti])} mm` : g === 'fss' ? ` på ${D.fss_km[s.si]} km vid ${num(fthrs[fi])} mm` : '';
+    return { ...s, title: `${name}${what}`, hint: dir > 0 ? 'Över 0: modellen är bättre än Tim-KNEP.' : 'Under 0: modellen är bättre än Tim-KNEP.',
+             series: dkeys.map(k => ({ key: k, ...vinfo(k), band: true, vals: D.leads.map((_, l) => vval(O.diff[k], s, l)) })),
+             opts: { ref: 0, digits: vdig(metric), signed: true } };
+  });
+  $('verif-diff-meta').textContent = `Hur mycket bättre eller sämre än Tim-KNEP är persistensen${gauges ? ', radarn' : ''} och de andra modellerna? Modellen minus Tim-KNEP, räknat på exakt samma rutor och timmar. `
+    + 'Ligger hela bandet över eller under noll är skillnaden säker; tabellen sammanfattar det.';
+  $('verif-diff-keys').innerHTML = vkeys(dkeys.map(vinfo));
+  if (dkeys.length) minis('verif-diff', dspecs);
+  else $('verif-diff').innerHTML = '<div class="status">Ingen annan modell har räknats på samma timmar under perioden.</div>';
+  const verdict = (v, dir) => {
+    if (!v || v[0] == null) return '<td></td>';
+    if (v[1] == null) return `<td class="verdict">${W.days < 3 ? 'för få dygn' : 'osäkert'}</td>`;
+    const other = dir > 0 ? v[1] > 0 : v[2] < 0, ours = dir > 0 ? v[2] < 0 : v[1] > 0;
+    return `<td class="verdict ${ours ? 'better' : other ? 'worse' : ''}">${ours ? 'Tim-KNEP' : other ? 'modellen' : 'osäkert'}</td>`;
+  };
+  $('verif-verdict').innerHTML = dkeys.length ? `<table><caption class="meta" style="text-align:left;caption-side:top">Vem är säkert bättre, med hela 90 %-intervallet på ena sidan?</caption>`
+    + `<tr><th>Modell</th><th>Mått</th>${cats.map(c => `<th>${c}</th>`).join('')}</tr>`
+    + dkeys.flatMap(k => dspecs.map((s, j) => `<tr>${j ? '<td></td>' : `<td><span class="sw" style="background:${vinfo(k).color}"></span>${vinfo(k).name}</td>`}<td>${s.title}</td>`
+      + D.leads.map((_, l) => verdict(vval(O.diff[k], s, l), VM[s.metric][1])).join('') + '</tr>')).join('') + '</table>' : '';
+
+  verifDay(W, keys);
   verifBasis(D, W);
+}
+
+// dygn för dygn: måttet som valts genom att trycka i ett diagram, vid den ledtiden
+function verifDay(W, keys) {
+  const D = vf.doc, dl = D.daily, gauges = vf.obs === 'gauges';
+  let s = vf.pick;
+  if (!s || (gauges && s.metric === 'fss')) s = { kind: 'm', metric: 'csi', ti: vnear(D.thresholds, vf.thr), lead: 0 };
+  const src = dl?.[vf.obs] || {}, pairs = dl?.pairs?.[vf.obs] || {};
+  const days = (dl?.days || []).map((d, i) => [d, i]).filter(([d]) => d >= W.from && d <= W.to);
+  const [g, dir, name] = VM[s.metric];
+  const what = g === 'scores' ? ` vid ${num(D.thresholds[s.ti])} mm` : g === 'fss' ? ` på ${D.fss_km[s.si]} km vid ${num(D.fss_thresholds[s.ti])} mm` : '';
+  const ks = s.kind === 'd' ? keys.filter(k => k !== 'ours' && src[k] && pairs[k]) : keys.filter(k => src[k]);
+  const val = (k, i) => {
+    const v = vone(src[k], i, s, s.lead);
+    if (s.kind !== 'd') return v;
+    const v0 = vone(pairs[k], i, s, s.lead);
+    return v == null || v0 == null || !(src[k].hours?.[i]?.[s.lead] > 0) ? null : v - v0;
+  };
+  const series = ks.map(k => ({ key: k, ...vinfo(k), vals: days.map(([, i]) => { const v = val(k, i); return v == null ? null : [v, null, null]; }) }));
+  $('verif-day-title').textContent = `${s.kind === 'd' ? `${name}${what}, modellen minus Tim-KNEP` : `${name}${what}`} vid +${D.leads[s.lead]} h, dygn för dygn`;
+  $('verif-day-meta').textContent = `Mot ${VFACIT[vf.obs]}. Ett dygn är utgåvorna med heltimme det dygnet (UTC). Tryck i ett av diagrammen ovan för att välja ett annat mått och en annan ledtid.`;
+  $('verif-day-keys').innerHTML = vkeys(series);
+  vchart($('verif-day-chart'), $('verif-day-tip'), days.map(([d]) => vday(d)), series,
+    { bounded: g !== 'cont', ref: s.kind === 'd' ? 0 : dir === 'one' ? 1 : dir === 'zero' || g !== 'cont' ? 0 : null, digits: vdig(s.metric), signed: s.kind === 'd' });
+  $('verif-day-table').innerHTML = days.length && series.length ? `<details><summary>Som tabell</summary><table><tr><th>Dygn</th>${series.map(x => `<th><span class="sw" style="background:${x.color}"></span>${x.name}</th>`).join('')}</tr>`
+    + days.map(([d], j) => `<tr><td>${vday(d)}</td>${series.map(x => `<td>${x.vals[j] ? vnum(x.vals[j][0], vdig(s.metric)) : ''}</td>`).join('')}</tr>`).join('') + '</table></details>' : '';
 }
 
 function verifBasis(D, W) {
@@ -2120,8 +2341,8 @@ function verifBasis(D, W) {
     [num(W.issues), 'utgåvor, en per timme'],
     [num(W.obs_hours), 'timmar med radarn som facit'],
     [num(W.gauge_hours), 'timmar med mätarna som facit'],
-    ...(W.a2t ? [[num(W.a2t_hours), `timmar med A2T som facit, i medel ${num(W.a2t_gauges)} mätarvärden per timme`]] : []),
-    [num(W.stations.length), 'regnmätare med minst ett värde'],
+    ...(vhasA2T() ? [[num(W.a2t_hours), `timmar med A2T som facit, i medel ${num(W.a2t_gauges)} mätarvärden per timme`]] : []),
+    [num(W.stations.length), W.custom ? `regnmätare med minst ett värde de senaste ${W.refDays} dygnen` : 'regnmätare med minst ett värde'],
     [`${num(D.grid_km)} km`, 'rutornas storlek'],
   ].map(([b, s]) => `<div><b>${b}</b><span>${s}</span></div>`).join('')
     + lag('met', 'MET Norge') + lag('snow', 'SNOW:');
@@ -2130,7 +2351,8 @@ function verifBasis(D, W) {
     + st.map(([sid, lat, lon, name, n]) => `<tr><td>${name}</td><td>${sid}</td><td>${num(n)}</td><td>${vnum(lat, 3)}</td><td>${vnum(lon, 3)}</td></tr>`).join('') + '</table>'
     : '<div class="status">Inga mätare har använts under perioden.</div>';
   $('verif-map-keys').innerHTML = (D.area ? D.area.levels.map((l, i) => `<span><i style="background:rgba(31,111,235,${[.16, .31, .47, .63][i]});height:10px"></i>${i ? 'minst ' : ''}${Math.round(l * 100)} %</span>`).join('') + '<span>av timmarna med radarn som facit</span>' : '')
-    + '<span><i style="background:var(--gauge);height:8px;width:8px;border-radius:50%"></i>mätare, större ju fler timmar</span>';
+    + '<span><i style="background:var(--gauge);height:8px;width:8px;border-radius:50%"></i>mätare, större ju fler timmar</span>'
+    + (W.custom ? `<span>Kartan, mätarna och loppens ålder gäller de senaste ${W.refDays} dygnen, inte den egna perioden.</span>` : '');
   if (!vf.map) {
     vf.map = L.map('verif-map', { zoomControl: true, minZoom: 3, maxZoom: 10, attributionControl: true }).fitBounds(NORDEN);
     basemap('Karta &copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, &copy; OpenStreetMap · Mätare: <a href="https://www.smhi.se/data">SMHI</a>').addTo(vf.map);
@@ -2147,7 +2369,7 @@ function verifBasis(D, W) {
   $('verif-method').innerHTML = `
     <p><b>Vad som jämförs.</b> En gång i timmen, i första cykeln efter heltimmen, sparas prognoserna för de ${D.leads.length} kommande hela timmarna:
       Tim-KNEP, MET Norges senaste nowcast och SMHI:s SNOW, så som de fanns i den cykeln. Ledtiden +1 h är timmen som slutar en timme efter heltimmen,
-      lika för alla modeller. MET Norges och SNOW:s lopp är ofta en stund äldre än utgåvan; hur mycket står ovan. MET Norge räknar två timmar framåt,
+      +2 h timmen efter den och så vidare, lika för alla modeller; det är den som är axeln i diagrammen. MET Norges och SNOW:s lopp är ofta en stund äldre än utgåvan; hur mycket står ovan. MET Norge räknar två timmar framåt,
       så längre ledtider saknas där. Persistens är radarns timme före utgåvan, oförändrad, alltså att inte gissa alls.</p>
     <p><b>Facit, radarn.</b> Radarns timsumma, samma volymkorrigerade analys som kartorna visar, i rutor om ${num(D.grid_km)} km.
       En ruta räknas bara om den var uppmätt av radar (SMHI, OPERA eller enskilda radarvolymer) i minst ${D.min_frames} av timmens 12 bilder.
@@ -2155,8 +2377,9 @@ function verifBasis(D, W) {
       Tim-KNEP mot radarn de första timmarna. MET Norge och SNOW räknas om till samma rutor med medelvärden.</p>
     <p><b>Facit, regnmätarna.</b> SMHI:s timsummor (parameter 7, kvalitet kontrollerad eller misstänkt) mot prognosens värde i rutan där mätaren står.
       Värden över ${num(D.gauge_max)} mm räknas inte, eftersom arkivet har felaktiga mätvärden. Radarn verifieras också mot mätarna, som en jämförelse:
-      en prognos kan inte väntas träffa mätarna bättre än radarn gör. Mätarna är oberoende av radarn, så här gynnas ingen modell, men en mätare är en punkt och rutan ${num(D.grid_km)} km.</p>
-    ${W.a2t ? `<p><b>Facit, A2T.</b> Analysen rättad mot regnmätarna, samma som A2 i fliken Analys, vid sidan av radarn och inte i stället för den.
+      en prognos kan inte väntas träffa mätarna bättre än radarn gör. Mätarna är oberoende av radarn, så här gynnas ingen modell, men en mätare är en punkt och rutan ${num(D.grid_km)} km.
+      Därför finns ingen FSS mot mätarna.</p>
+    ${vhasA2T() ? `<p><b>Facit, A2T.</b> Analysen rättad mot regnmätarna, samma som A2 i fliken Analys, vid sidan av radarn och inte i stället för den.
       Den räknas på de rutor där radarn är facit och A2T finns, med den senaste versionen av timmen, eftersom A2T räknas om när fler mätare kommer in.
       Tim-KNEP utgår från radaranalysen och inte från A2T, så den gynnas mindre här än mot radarn.
       A2T har rättats mot samma mätare som facit ovan, så i mätarens ruta är A2T nästan mätaren: A2T och mätarna är inte två oberoende facit,
@@ -2165,13 +2388,27 @@ function verifBasis(D, W) {
       som den andra modellen, så att en modell som saknas en timme inte jämförs mot ett annat urval.</p>
     <p><b>Osäkerheten.</b> Intervallen är 90 % ur ${num(D.boot)} dragningar av dygnen med återläggning. Rutor och timmar samma dygn hänger ihop, så det är dygnen som räknas som oberoende.
       Med 7 dygn är intervallen breda, och med färre än 3 dygn finns inga.</p>
+    <p><b>Egen period.</b> 7 och 30 dygn är räknade på Pi:n. För en egen period räknar sidan måtten själv ur dygnens summor i verif.json, med samma formler,
+      så skattningarna blir desamma som Pi:ns för samma dygn. Intervallet räknas på samma sätt, med ${num(D.boot)} dragningar av dygnen och ett fast frö,
+      men med en annan slumpföljd än Pi:ns, så gränserna kan skilja något i sista decimalen. Dygnen finns för de senaste ${num((D.daily?.days || []).length)} dygnen.</p>
     <dl>${Object.values(VM).map(m => `<dt>${m[2]}</dt><dd>${m[3]}</dd>`).join('')}</dl>
     <p>Allt finns som tal i <a href="${DATA}verif.json">verif.json</a>, och koden i <code>src/knep/verify.py</code>.</p>`;
 }
 
-$('verif-win').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { if (b.disabled) return; vf.win = b.dataset.win; store.set('vwin', vf.win); verifDraw(); }));
+$('verif-win').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  if (b.disabled) return;
+  vf.win = b.dataset.win;  // Egen börjar med perioden som visas
+  if (vf.win !== 'egen') store.set('vwin', vf.win);
+  verifDraw();
+}));
+for (const id of ['verif-from', 'verif-to']) $(id).addEventListener('change', () => {
+  let a = $('verif-from').value, b = $('verif-to').value;
+  if (!a || !b) return;
+  if (a > b) [a, b] = [b, a];
+  vf.win = 'egen'; vf.from = a; vf.to = b;
+  verifDraw();
+});
 $('verif-obs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { vf.obs = b.dataset.obs; store.set('vobs', vf.obs); verifDraw(); }));
-$('verif-metric').addEventListener('change', e => { vf.metric = e.target.value; store.set('vmetric', vf.metric); verifDraw(); });
 
 /* ---------- flikar ---------- */
 // Prognos och Analys är samma vy med olika kartor (live.analys); bytet görs i liveTab
@@ -2244,7 +2481,7 @@ function located(e) {
 // förklaringen: visas första gången, och med ? uppe till höger
 // INTRO är förklaringen med A2T som facit i verifieringen (manifestet har verification.a2t);
 // med A2 men utan det INTRO - 1, och utan A2 som förut, INTRO - 2
-const INTRO = 6;  // höj när förklaringen ändras, så att den visas igen
+const INTRO = 7;  // höj när förklaringen ändras, så att den visas igen
 const hasA2T = m => !!m?.verification?.a2t;
 const introVer = () => hasA2T(live.manifest) ? INTRO : hasA2(live.manifest) ? INTRO - 1 : INTRO - 2;
 const introHere = () => !location.hash.startsWith('#handelser') && !location.hash.startsWith('#verifiering');
