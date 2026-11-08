@@ -1,7 +1,7 @@
 """Gemensamt för uppgift 0010 (glappet nordväst om Riksgränsen): rutnätet, de svenska radarernas
 strålhöjd och avstånd, de norska radarplatserna och OPERA-utsnitten.
 
-OPERA-utsnitten sparas under /data/riksgransen/opera/<dag>.npz: för varje 5-minutersbild ett
+OPERA-utsnitten sparas under /data/riksgransen/opera15/<dag>.npz: för varje 5-minutersbild ett
 uint8-fält över hela radarns rutnät (887 × 471) med samma kodning som SMHI:s
 komposit, dBZ = 0,4 · v − 30, 0 = inget eko (under 0 dBZ i OPERA eller -32), 255 = OPERA saknar
 data. Tider utan OPERA-fil har alla värden 255 och står i `saknas`.
@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from knep.analys import bias, composite  # noqa: E402
 
 OUT = Path("/data/riksgransen")
-OPERA_DIR = OUT / "opera"
+OPERA_DIR = OUT / "opera15"  # var 15:e minut (hamta.py --steg 15); äldre arkiv har inget tätare
 NO_SITES = {"Røst": (67.53, 12.10), "Andøya": (69.24, 16.00)}  # composite.RADARS norst, noand
 
 

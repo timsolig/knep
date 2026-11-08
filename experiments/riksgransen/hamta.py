@@ -1,6 +1,6 @@
 """OPERA-kompositen för hela dagar, utskuren till radarns rutnät (zon.encode) och sparad per dag.
 
-    uv run python experiments/riksgransen/hamta.py --steg 5 2019-03-08 ...    till /data/riksgransen/opera/
+    uv run python experiments/riksgransen/hamta.py --steg 5 2024-11-25 ...    till /data/riksgransen/opera5/ (bara från 2024)
     uv run python experiments/riksgransen/hamta.py --steg 15 2020-02-10 ...   till /data/riksgransen/opera15/
 
 Tiderna är domarens Radardag (00:00 − 30 min till 24:00) i steget. Originalfilen raderas direkt
@@ -30,7 +30,7 @@ def main():
     a = p.parse_args()
     import requests
     s = requests.Session()
-    out_dir = zon.OPERA_DIR if a.steg == 5 else zon.OUT / f"opera{a.steg}"
+    out_dir = zon.OUT / f"opera{a.steg}"
     out_dir.mkdir(parents=True, exist_ok=True)
     tmp = zon.OUT / f"tmp{a.steg}"
     grid = None
