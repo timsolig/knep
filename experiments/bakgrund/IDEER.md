@@ -6,7 +6,9 @@ Kandidaterna som planeraren väljer från, ungefär i den ordning de ger mest nu
 
 Användarens beslut 2026-11-07 (`MAL.md`) går först, i den här ordningen:
 
-- **Beslut e: testdelen en gång** (efter d och helst efter att kedjans ändringar nedan är bedömda på valideringen). A0, A1, kedjan, F4 och A2T, kommandona i `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md`, egen rapport. A0 körs utan `--opera-fjarr` (fälld i uppgift 0010).
+- **Beslut 8, del 1: fliken Verifiering görs om** (vald 2026-11-08 08:34). Alla mått samtidigt i grupper (träff och falsklarm, mängd och fel, form och läge, skillnaden mot persistensen och de andra), ledtiden som axel, egen period räknad i sidan ur dygnens råa summor i `verif.json`, provad i mobilformat. Ingen ny data. Nytta stor (beställd), kostnad 3 till 4 h, risk att webbläsaren inte går att köra på Pi:n.
+- **Beslut 8, del 2: händelserna in i Verifiering** (efter del 1). Bara svenska händelser (Hans 2023 i `cases.py`, stormen Johannes), allt framkört: prognosen (Tim-KNEP, persistensen, jämförelserna där de finns), A0, A1 och A2T och måtten; fliken Händelser bort och de utländska testfallen dolda. En händelse på en testdag först efter testdelen. Kräver disk (väntar på frågan om disken). Kostnad 3 till 4 h.
+- **Beslut e: testdelen en gång** (väntar på disken: under 3 GB ledigt 2026-11-08 08:34; efter d och helst efter att kedjans ändringar nedan är bedömda på valideringen). A0, A1, kedjan, F4 och A2T, kommandona i `experiments/natt/rapporter/2026-11-06/5-sammanfattning.md`, egen rapport. A0 körs utan `--opera-fjarr` (fälld i uppgift 0010).
 
 Övriga, ungefär i den ordning de ger mest:
 
