@@ -45,7 +45,26 @@ Tolkning: taket faller ungefär till hälften för varje fördubbling av blocket
 
 ## Del 2: kandidaten utan facit
 
-(pågår: `experiments/projektion/tillvaxt.py`, varianterna `TV_t30_b32`, `TV_t60_b32`, `TV_t120_b32`, `TV_t60_b64` på `snabb`.)
+`experiments/projektion/tillvaxt.py`: klassen `Tillvaxt` (ärver `domare.KedjaOm`) som tar kedjans fält och multiplicerar med exp(s · L · exp(−L/τ)). s är trenden (log-kvot per timme) per block av A0:s blockmedel (box, `block_km`) nu och för 30 och 60 min sedan, den äldre bilden flyttad fram till utgåvan med kedjans rörelsefält (`advect.displacements` och `warp`, bilinjärt, bara rutor där hela källan är giltig, block med under hälften giltiga rutor räknas inte); s = Σ(h·ΔL)/Σ h² med h = 0,5 och 1 h och ΔL = L_nu − L_äldre (eps 0,02 mm/h som i `block_ratio`), s klippt till ±3 per timme. Kvoten (L = kvartens mitt) klipps till [1/2, 2] och utjämnas med gauss sigma = block/4 som `block_ratio`. Där kedjan har noll blir resultatet noll. Inget facit och ingen vädermodell. Klasserna heter `TV_t<τ i min>_b<block i km>`.
+
+Fyra varianter på `snabb` (valda utifrån del 1: 64 km tappar inte mer än hälften jämfört med 32 km, och 128 km är för litet): `TV_t30_b32`, `TV_t60_b32`, `TV_t120_b32`, `TV_t60_b64`. Hela tabellerna i `/data/projektion/tillvaxt_snabb_tabell.md`. Skillnad mot `kedja_om`, positiv är bättre, intervall 95 % (bootstrap över sex dygn), `*` helt på bättre sidan:
+
+| variant | mått | 15 min | 30 min | 60 min | 120 min | 180 min | 300 min |
+|---|---|---|---|---|---|---|---|
+| t30 b32 | csi1 | +0,001 | +0,003* | +0,006* | +0,001* | 0,000 | 0,000 |
+| t60 b32 | csi1 | 0,000 | 0,000 | +0,009* | +0,005* | +0,003* | 0,000* |
+| t120 b32 | csi1 | 0,000 | −0,001 | +0,008* | +0,005 | +0,005* | +0,001 |
+| t60 b64 | csi1 | +0,001* | +0,003* | +0,010* [+0,006, +0,013] | +0,006* [+0,002, +0,012] | +0,002* | 0,000* |
+| t30 b32 | fss1_30 | 0,000 | +0,002* | +0,008* | +0,002* | 0,000 | 0,000* |
+| t60 b32 | fss1_30 | 0,000 | 0,000 | +0,010* | +0,010* | +0,006* | +0,001* |
+| t120 b32 | fss1_30 | 0,000 | −0,001 | +0,008* | +0,009 | +0,008 | +0,003* |
+| t60 b64 | fss1_30 | 0,000 | +0,002* | +0,011* [+0,006, +0,017] | +0,011* [+0,004, +0,023] | +0,005* | +0,001* |
+
+Kostnaden: csi5, fss5_10 och `hopp` (spärren: skillnaden mellan utgåvor för samma tid) blir säkert sämre vid 15 till 60 min i alla fyra. För t60 b64: csi5 −0,007 [−0,015, −0,002] vid 15 min, −0,012 vid 30 min, −0,005 vid 60 min; fss5_10 −0,007, −0,016, −0,009; hopp +0,012, +0,034, +0,035 (sämre, 1,45 till 1,48 mot 1,44 för kedja_om). Vid 2 till 5 h är csi5 och fss5_10 lika (inom ±0,006). `blockmax_q90` är inte säkert sämre i någon variant och säkert bättre vid 15 och 30 min för t60 b64 och t30 b32. `persistens` för jämförelse (skillnad mot `kedja_om`, csi1): −0,143, −0,151, −0,108, −0,068, −0,050, −0,036, alltså kandidatens vinst är liten mot hur långt kedjan redan ligger över persistensen (`kedja_om` csi1 0,734 / 0,575 / 0,414 / 0,271 / 0,207 / 0,146; `persistens` 0,590 / 0,424 / 0,306 / 0,204 / 0,157 / 0,110).
+
+**Vald variant: `TV_t60_b64`** (τ = 1 h, block 64 km): bäst csi1 vid 15 till 30 min och 60 min (delat med t120 b32 vid 120 min), bäst fss1_30 vid 30 till 60 min, och minst skada på hopp av de fyra. Skillnaden mellan varianterna är liten (några tusendelar), så valet är svagt. Vinsten är +0,010 CSI 1 mm vid 1 h, cirka 1,7 % av luckan till 1, att jämföra med taket vid 64 km på 10 %: historikens trend fångar ungefär en sjättedel av det som perfekt kvot vid 64 km ger.
+
+Körtid: `forecast_seconds` per utgåva är 4,40 s för `TV_t60_b32` mot 4,28 s för `kedja_om` på `snabb` (4 km), alltså cirka 0,12 s extra per utgåva (två rörelsebaserade förskjutningar, två boxmedel och 20 gaussfilter); ryms under en sekund. Vid 2 km räknas det cirka fyra gånger så stort, fortfarande under en sekund.
 
 ## Filer
 
