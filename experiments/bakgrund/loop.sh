@@ -375,9 +375,10 @@ while :; do
   fi
   plan_fel=0
 
-  natt_nyckel >> "$STATE/varv.txt"
   kor_uppgift
   journal
+  # en uppgift som dör direkt räknas inte mot nattens tak
+  if ! { [ "$STATUS" = misslyckad ] && [ $(( $(date +%s) - START )) -lt 300 ]; }; then natt_nyckel >> "$STATE/varv.txt"; fi
   pusha || logg "grenen pushades inte"
 
   # en uppgift som dör direkt flera gånger i rad (inloggningen, nätet) ska inte bränna varv
