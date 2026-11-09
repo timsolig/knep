@@ -153,12 +153,26 @@ class TakTillvaxt(_Tak):
     """Perfekt tillväxt och avtagande i skalan 32 km: regn som kedjan inte har någonstans (prognos 0) kan inte
     växa fram, bara det som finns förstärks eller dämpas."""
 
+    block_km = 32.0
+
     def cheat(self, fc, o, res, ctx, t):
         out = fc.copy()
         for k in range(NQ):
             if np.isfinite(o[k]).any():
-                out[k] = fc[k] * block_ratio(fc[k], o[k], res)
+                out[k] = fc[k] * block_ratio(fc[k], o[k], res, block_km=self.block_km)
         return out
+
+
+class TakTillvaxt64(TakTillvaxt):
+    """Som TakTillvaxt men block om 64 km (uppgift 0018): mindre av lägesfelet kan rättas."""
+
+    block_km = 64.0
+
+
+class TakTillvaxt128(TakTillvaxt):
+    """Som TakTillvaxt men block om 128 km (uppgift 0018)."""
+
+    block_km = 128.0
 
 
 # ---------- 4. utjämningen ----------
