@@ -1,23 +1,21 @@
 """Tak för kedjans delar: fuskvarianter av kedjan som får se facit, för domaren (uppgift 0016).
 
-SKRIVEN UTAN ATT HA KÖRTS. Ingen rad här är provkörd, inte ens importerad. Räkna med småfel vid
-första körningen (se rapporten 0016, avsnittet "Det jag är osäker på").
+Körd i uppgift 0017 (rapporten 0017-tak-korning.md); där står vad som rättades (TakMangd ersatt av TakVolym).
 
 Varje variant är kedjan körd som i drift (domare.KedjaOm, med platskartans tillstånd uppvärmt) där en
 del får facit i efterhand: radarns kvartsmedel för kvartarna som slutar 15 min till 5 h efter
 utgåvetiden, det som domaren mäter mot. Resultatet är ett tak: hur bra kedjan hade blivit om just
 den delen vore perfekt. Det är inget system som kan köras i drift och bedöms aldrig som "bättre".
 
-    cd experiments/projektion
-    python domare.py kör --läge snabb --system tak:TakMangd --dagar 2020-02-10 --procs 1   # prov
-    python domare.py kör --läge snabb --system tak:TakRorelse tak:TakMangd tak:TakTillvaxt \\
-        tak:TakUtjamningFast tak:TakUtjamningBast
-    python domare.py tabell --läge snabb --system tak:TakMangd ...      # mot kedja_om
+    uv run python experiments/projektion/domare.py kör --läge snabb --system tak:TakVolym --dagar 2020-02-10 --procs 1   # prov
+    uv run python experiments/projektion/domare.py kör --läge snabb --procs 2 --system tak:TakRorelse tak:TakVolym \\
+        tak:TakTillvaxt tak:TakUtjamningFast tak:TakUtjamningBast
+    (kör inte `tabell`: den skriver över resultat/snabb.md)
 
 Systemnamnet blir klassen: tak:TakRorelse sparas som /data/projektion/domare/snabb/tak_TakRorelse/.
 
   TakRorelse          rörelsefältet skattat ur facit (radarbilderna från utgåvan till 5 h) i stället för historiken
-  TakMangd            fältet skalat per ledtid så att volymen över domänen stämmer med facit
+  TakVolym            fältet skalat per ledtid så att volymen över domänen stämmer med facit
   TakTillvaxt         fältet gånger kvoten facit/kedja i block om ca 32 km (utjämnad, kvoten högst 4 och minst 1/4)
   TakUtjamningFast    gaussisk utjämning med fast schema, sigma 0, 2, 4, 8, 12 km vid +1 till +5 h
   TakUtjamningBast    gaussisk utjämning med bästa sigma per utgåva och ledtid, vald mot facit (FSS 1 mm/h, 10 km)
@@ -112,16 +110,27 @@ class TakRorelse(_Tak):
 
 # ---------- 2. mängden ----------
 
-class TakMangd(_Tak):
-    """Varje ledtids fält gånger summa(facit) / summa(prognos) över rutorna där båda finns."""
+class TakVolym(_Tak):
+    """Varje ledtids fält skalat så att summan efter domarens kodning stämmer med facit över domarens mask.
+    (Första versionen, TakMangd, skalade före kodningen och över fel mask och gav volymkvot 0,73 till 0,985
+    i stället för 1; dess summor ligger kvar i tak_TakMangd och ska inte användas.)"""
 
     def cheat(self, fc, o, res, ctx, t):
         out = fc.copy()
+        cov = np.isfinite(ctx.frame(t))  # domarens mask: analysens täckning och facit
         for k in range(NQ):
-            m = np.isfinite(fc[k]) & np.isfinite(o[k])
-            sf = float(fc[k][m].sum())
-            if m.any() and sf > 0:
-                out[k] = fc[k] * (float(o[k][m].sum()) / sf)
+            m = cov & np.isfinite(o[k])
+            if not m.any():
+                continue
+            target, s = float(o[k][m].sum()), 1.0
+            # domaren kodar prognosen (värden under 0,1 mm/h blir 0), så skalan söks mot volymen efter kodningen
+            for _ in range(4):
+                f = D.render.decode_values(D.render.encode_values(fc[k] * s))
+                v = float(np.nan_to_num(f)[m].sum())
+                if v <= 0:
+                    break
+                s *= target / v
+            out[k] = fc[k] * s
         return out
 
 
