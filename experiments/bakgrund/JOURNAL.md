@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0017 · 2026-11-09 23:02 · tak-korning · klar
+- Varför: Taket för kedjans delar (användarens beslut 9) är skrivet i tak.py men aldrig kört, och nu när Bash fungerar igen är det det som avgör vilka ändringar av prognosen som är värda att pröva med domaren.
+- Resultat: Tillväxt och avtagande i block om 32 km har klart störst tak (CSI 1 mm +0,035 till +0,120 mot kedja_om, 11 till 18 procent av luckan till 1, intervallen helt över noll), utjämning vald i efterhand tar 2 till 6 procent (+0,010 till +0,044 vid 30 min till 3 h) men fast schema nästan inget, och rörelse (ett fält) och volym har inget tak (alla intervall innehåller noll).
+- Rapport: [rapporter/2026-11-09/0017-tak-korning.md](rapporter/2026-11-09/0017-tak-korning.md), 56 min
+
 ### 0016 · 2026-11-08 23:42 · tak-skrivbord · klar
 - Varför: Taket för kedjans delar (användarens beslut 9) har misslyckats två gånger för att Bash nekades, så den här delen görs med bara läsning och skrivning av filer och lämnar en färdig modul och körplan till nästa session som har skal.
 - Resultat: `tak.py` med fem fuskvarianter (rörelse, mängd, tillväxt, fast och bästa utjämning) och en körplan är skrivna och genomlästa mot domaren men inte körda; inga siffror finns, och FSS 1 mm vid 10 och 40 km finns inte i domaren (närmaste är `fss1_30`, `fss5_10`).
