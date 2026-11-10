@@ -51,9 +51,20 @@ Ingen variant uppfyller kriteriet: `blockmax_q90` blir säkert sämre i alla fyr
 
 ## `traning` (12 dagar, 2 km)
 
-Se nedan (fylls i när körningen är klar).
+Den frysta `V_ab_f2_al95` på samma 12 träningsdagar som i 0018 (96 utgåvor, 2 km; `kedja_om` och `persistens` återanvända ur 0018). Tabell: `/data/projektion/utjamning_traning_tabell.md`. Poäng variant − `kedja_om` (plus bättre för csi och fss), `*` bättre och `!` sämre enligt domaren:
 
-PENDING_TRANING
+| mått | 15 min | 30 min | 60 min | 120 min | 180 min | 300 min |
+|---|---|---|---|---|---|---|
+| csi1 (`kedja_om` 0,674 / 0,513 / 0,359 / 0,219 / 0,159 / 0,107) | 0 | 0 | +0,024* | +0,025* | +0,021* | +0,018* |
+| csi5 | 0 | 0 | +0,013* | +0,012* | +0,011* | +0,008 |
+| fss1_30 (0,978 / 0,922 / 0,807 / 0,613 / 0,486 / 0,354) | 0 | 0 | −0,015 sämre | −0,009 | −0,005 | +0,004 |
+| fss5_10 (0,892 / 0,747 / 0,534 / 0,314 / 0,217 / 0,120) | 0 | 0 | +0,001 | +0,014* | +0,019* | +0,018 |
+| blockmax_q90 (|log kvot|, + är sämre) | 0 | 0 | +0,057 sämre | +0,061 sämre | +0,064 sämre | +0,089 sämre |
+| hopp (1,442 / 1,453 / 1,457 / 1,476) | −0,074* | −0,075* | −0,137* | −0,170* | | |
+
+(fss5_10 här: domarens tabell visar träffmått med omvänt tecken; variantens fss5_10 är högre än kedjans vid 2 och 3 h, 0,328 mot 0,314 och 0,236 mot 0,217, och markeras `*`.) Resultatet från `snabb` håller på de andra dagarna och är större: csi1 +0,018 till +0,025 vid 1 till 5 h (6 till 11 % av luckan till 1 vid 1 h: 0,024 av 0,641), hopp klart bättre (−0,07 till −0,17, även vid 15 och 30 min där inget utjämnas, eftersom prognoserna för samma tid hänger ihop), men `blockmax_q90` säkert sämre vid 1 till 5 h (+0,057 till +0,089) och fss1_30 sämre vid 1 h.
+
+Körtid på 2 km: `forecast_seconds` per utgåva 15,3 s för `kedja_om` mot 51,8 s för kandidaten (genomsnitt för två av dygnen, två processer, Pi:n delad med driften), alltså cirka 36 s extra. **Det är långt över målet på 5 s** och skulle med en cykel på under två minuter vara oacceptabelt (kedjan ensam ligger på 15 s). Orsaken är sannolikt de normaliserade gaussfiltren (`smooth` gör två filter per nivå, sigma upp till 12 pixlar, fyra nivåer, 18 kvartar) plus en extra Lucas-Kanade; det är inte profilerat. Billigare vägar: filtrera på 4 km och interpolera upp, färre nivåer, utjämna bara var 2:a kvart och interpolera mellan dem, eller använd `cv2.GaussianBlur` utan normalisering.
 
 ## Jämförelse med taken
 
@@ -67,12 +78,12 @@ Nej, inte som den är. Spärren `blockmax_q90` blir säkert sämre och fss1_30 s
 
 ## Kostnad på Pi:n
 
-Cirka 0,4 s per utgåva på 4 km, uppskattat 1,5 till 2 s på 2 km i cykeln. Ingen extra kedjekörning. Max två processer användes; körtiden på `traning` var cirka 650 s per dygn med två processer.
+Cirka 0,4 s per utgåva på 4 km men mätt cirka 36 s extra per utgåva på 2 km (15,3 s för kedjan mot 51,8 s), så den skalade inte med 4 som väntat; tidsuppskattningen i provkörningen ovan (1,5 till 2 s) var fel. Ingen extra kedjekörning. Max två processer användes; körtiden på `traning` var cirka 650 s per dygn med två processer.
 
 ## Filer
 
 `experiments/projektion/utjamning.py`, `experiments/projektion/test_utjamning.py`, denna rapport. Summor under `/data/projektion/domare/{snabb,traning}/utjamning_*`, tabeller `/data/projektion/utjamning_snabb_*.md` och `utjamning_traning_tabell.md`.
 
-Kort: Utjämning efter osäkerhet (två rörelsefält plus start 30 min tidigare, topp skyddad med α 0,95) ger på `snabb` csi1 +0,012 till +0,018 och csi5 +0,007 till +0,013 vid 1 till 5 h och säkert lägre hopp (−0,04 till −0,08), men blockmax_q90 blir säkert sämre (+0,057 till +0,069) och fss1_30 svagt sämre, så den klarar inte spärren.
+Kort: På 12 träningsdagar (2 km) ger den frysta utjämningen csi1 +0,018 till +0,025 och csi5 +0,008 till +0,013 vid 1 till 5 h och säkert lägre hopp (−0,07 till −0,17), men blockmax_q90 blir säkert sämre (+0,057 till +0,089), fss1_30 sämre vid 1 h och kostnaden är 36 s extra per utgåva på 2 km (mot 5 s-målet), så den klarar varken spärren eller tiden. Utjämning efter osäkerhet (två rörelsefält plus start 30 min tidigare, topp skyddad med α 0,95) ger på `snabb` csi1 +0,012 till +0,018 och csi5 +0,007 till +0,013 vid 1 till 5 h och säkert lägre hopp (−0,04 till −0,08), men blockmax_q90 blir säkert sämre (+0,057 till +0,069) och fss1_30 svagt sämre, så den klarar inte spärren.
 Säkerställd förbättring: nej
 Status: delvis
