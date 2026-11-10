@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0018 · 2026-11-10 01:15 · tillvaxt-historik · klar
+- Varför: Taket i uppgift 0017 visar att tillväxt och avtagande i stor skala är den enda del av kedjan med en stor möjlig vinst (CSI 1 mm +0,035 till +0,120), så nästa steg är att skilja tillväxt från läge i taket och pröva en kandidat utan facit.
+- Resultat: Trenden ur A0:s blockmedel (64 km, dämpning 1 h) ger bara CSI 1 mm +0,008 [+0,006, +0,010] vid 1 h och FSS 1 mm +0,011 vid 2 h mot `kedja_om` (12 träningsdagar, 2 km; liknande på `snabb`), vilket är cirka en sjättedel av taket vid 64 km (+0,059), taket faller från +0,12 (32 km) via +0,076 (64 km) till +0,042 (128 km) CSI 1 mm vid 2 h, och hopp, csi5 och fss5_10 vid 15 till 60 min blir säkert sämre.
+- Rapport: [rapporter/2026-11-09/0018-tillvaxt-historik.md](rapporter/2026-11-09/0018-tillvaxt-historik.md), 130 min
+
 ### 0017 · 2026-11-09 23:02 · tak-korning · klar
 - Varför: Taket för kedjans delar (användarens beslut 9) är skrivet i tak.py men aldrig kört, och nu när Bash fungerar igen är det det som avgör vilka ändringar av prognosen som är värda att pröva med domaren.
 - Resultat: Tillväxt och avtagande i block om 32 km har klart störst tak (CSI 1 mm +0,035 till +0,120 mot kedja_om, 11 till 18 procent av luckan till 1, intervallen helt över noll), utjämning vald i efterhand tar 2 till 6 procent (+0,010 till +0,044 vid 30 min till 3 h) men fast schema nästan inget, och rörelse (ett fält) och volym har inget tak (alla intervall innehåller noll).
