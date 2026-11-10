@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0019 · 2026-11-10 03:28 · utjamning-osakerhet · delvis
+- Varför: Uppgift 0018 visade att två tredjedelar av kedjans största tak (tillväxt i block om 32 km) egentligen är lägesfel i skalan 32 till 128 km, och utjämning där kedjans läge är osäkert är den kandidat med störst återstående tak (CSI 1 mm +0,03 till +0,04 vid 1 till 3 h i efterhand) som går att få utan facit.
+- Resultat: På 12 träningsdagar (2 km) ger den frysta utjämningen csi1 +0,018 till +0,025 och csi5 +0,008 till +0,013 vid 1 till 5 h och säkert lägre hopp (−0,07 till −0,17), men blockmax_q90 blir säkert sämre (+0,057 till +0,089), fss1_30 sämre vid 1 h och kostnaden är 36 s extra per utgåva på 2 km (mot 5 s-målet), så den klarar varken spärren eller tiden.
+- Rapport: [rapporter/2026-11-10/0019-utjamning-osakerhet.md](rapporter/2026-11-10/0019-utjamning-osakerhet.md), 131 min
+
 ### 0018 · 2026-11-10 01:15 · tillvaxt-historik · klar
 - Varför: Taket i uppgift 0017 visar att tillväxt och avtagande i stor skala är den enda del av kedjan med en stor möjlig vinst (CSI 1 mm +0,035 till +0,120), så nästa steg är att skilja tillväxt från läge i taket och pröva en kandidat utan facit.
 - Resultat: Trenden ur A0:s blockmedel (64 km, dämpning 1 h) ger bara CSI 1 mm +0,008 [+0,006, +0,010] vid 1 h och FSS 1 mm +0,011 vid 2 h mot `kedja_om` (12 träningsdagar, 2 km; liknande på `snabb`), vilket är cirka en sjättedel av taket vid 64 km (+0,059), taket faller från +0,12 (32 km) via +0,076 (64 km) till +0,042 (128 km) CSI 1 mm vid 2 h, och hopp, csi5 och fss5_10 vid 15 till 60 min blir säkert sämre.
