@@ -1,6 +1,6 @@
 # 0018 tillväxt och avtagande ur historiken
 
-(Delrapport efter del 1; del 2 fylls i därefter.)
+Del 1 (taket vid 32, 64 och 128 km) och del 2 (kandidat utan facit, `snabb` och `traning`) är gjorda. Disken sist: 2 478 MB ledigt (över 2 000 MB).
 
 ## Disken
 
@@ -64,7 +64,23 @@ Kostnaden: csi5, fss5_10 och `hopp` (spärren: skillnaden mellan utgåvor för s
 
 **Vald variant: `TV_t60_b64`** (τ = 1 h, block 64 km): bäst csi1 vid 15 till 30 min och 60 min (delat med t120 b32 vid 120 min), bäst fss1_30 vid 30 till 60 min, och minst skada på hopp av de fyra. Skillnaden mellan varianterna är liten (några tusendelar), så valet är svagt. Vinsten är +0,010 CSI 1 mm vid 1 h, cirka 1,7 % av luckan till 1, att jämföra med taket vid 64 km på 10 %: historikens trend fångar ungefär en sjättedel av det som perfekt kvot vid 64 km ger.
 
-Körtid: `forecast_seconds` per utgåva är 4,40 s för `TV_t60_b32` mot 4,28 s för `kedja_om` på `snabb` (4 km), alltså cirka 0,12 s extra per utgåva (två rörelsebaserade förskjutningar, två boxmedel och 20 gaussfilter); ryms under en sekund. Vid 2 km räknas det cirka fyra gånger så stort, fortfarande under en sekund.
+Körtid: `forecast_seconds` per utgåva är 4,40 s för `TV_t60_b32` mot 4,28 s för `kedja_om` på `snabb` (4 km), alltså cirka 0,12 s extra. På `traning` (2 km) är det 21,9 s mot 17,8 s, alltså cirka 4 s extra. Det är mer än "någon sekund", men mätningen delade Pi:n med driften och två processer, så den är grov; de 20 gaussfiltren (sigma 8 px vid 2 km) är troligen den största delen och kan sänkas genom att utjämna trenden en gång i stället för kvoten per kvart.
+
+### Den frysta varianten på `traning`
+
+`TV_t60_b64` (inte ändrad efter `snabb`) kördes på 12 av de 28 träningsdagarna (varannan: 2020-02-10, 2020-07-24, 2020-10-07, 2020-12-27, 2021-04-05, 2022-05-21, 2023-01-04, 2023-04-25, 2023-08-02, 2024-01-24, 2024-07-28, 2024-09-26; 96 utgåvor, 2 km), eftersom `kedja_om` och `persistens` också behövde köras för `traning` och tiden inte räckte för alla 28. Valideringen och testdelen är inte rörda. Tabellen: `/data/projektion/tillvaxt_traning_tabell.md`. Skillnad mot `kedja_om`, positiv är bättre:
+
+| mått | 15 min | 30 min | 60 min | 120 min | 180 min | 300 min |
+|---|---|---|---|---|---|---|
+| csi1 (`kedja_om`) | 0,675 | 0,516 | 0,367 | 0,225 | 0,161 | 0,107 |
+| csi1 (skillnad) | +0,001 [−0,000, +0,002] | +0,003* [+0,000, +0,005] | +0,008* [+0,006, +0,010] | +0,006* [+0,004, +0,007] | +0,002* | +0,000* |
+| fss1_30 (skillnad) | 0,000 | 0,000 | +0,008* [+0,005, +0,012] | +0,011* [+0,008, +0,015] | +0,006* [+0,004, +0,008] | +0,001* |
+| csi5 (skillnad) | −0,004* (sämre) | −0,004 | +0,001 | +0,003* | +0,001* | 0,000 |
+| fss5_10 (skillnad) | −0,005* (sämre) | −0,012* (sämre) | −0,004 | +0,005 | +0,003 | +0,001* |
+| blockmax_q90 (|log kvot|, negativ är bättre) | −0,021* | −0,070* | −0,078* | −0,012 | −0,002 | −0,001 |
+| hopp (spärr, positiv är sämre) | +0,009 (sämre) | +0,027 (sämre) | +0,031 (sämre) | +0,014 (sämre) | | |
+
+Resultatet håller alltså på de andra dagarna: csi1 och fss1_30 är säkert bättre vid 30 min till 5 h (största vinst +0,008 csi1 vid 1 h, +0,011 fss1 vid 2 h), blockmaxet är säkert bättre vid 15 till 60 min och aldrig sämre. Men det är små tal (csi1 +0,8 punkter av 0,367; cirka 1,3 % av luckan till 1 vid 1 h), och kandidaten är säkert sämre på hopp vid 15 min till 2 h (utgåvorna för samma tid hoppar mer, `kedja_om` 1,44 till 1,46 mot 1,45 till 1,49) och på fss5_10 och csi5 vid 15 till 30 min. `persistens` (jämförelse): csi1 0,505 / 0,344 / 0,239 / 0,152 / 0,116 / 0,073, alltså långt under båda.
 
 ## Filer
 
@@ -72,8 +88,11 @@ Körtid: `forecast_seconds` per utgåva är 4,40 s för `TV_t60_b32` mot 4,28 s 
 
 ## Nästa steg
 
-(fylls i)
+- Trenden bär lite: den fångar cirka en sjättedel av taket vid 64 km (csi1 +0,008 mot +0,059 vid 1 h) och sedan ingenting efter 3 h. Det mesta av taket vid 32 km är lägesfel, inte tillväxt.
+- Hoppet mellan utgåvor försämras eftersom trenden varierar från utgåva till utgåva. Pröva trenden utjämnad i tiden (medel över de senaste utgåvornas trender, eller längre bakåt än 60 min) eller dämpad efter osäkerhet (liten kvot där blockmedlet är lågt eller trenden är brusig), så att hopp och csi5 inte försämras.
+- Bedömning på `validering` först när hoppet är lagat; som den är ger den inget som väger upp ett säkert sämre hopp. Ingen rekommendation till användaren om drift.
+- Köra klart de 16 återstående träningsdagarna är inte motiverat förrän varianten ändrats.
 
-Kort: (pågår)
+Kort: Trenden ur A0:s blockmedel (64 km, dämpning 1 h) ger bara CSI 1 mm +0,008 [+0,006, +0,010] vid 1 h och FSS 1 mm +0,011 vid 2 h mot `kedja_om` (12 träningsdagar, 2 km; liknande på `snabb`), vilket är cirka en sjättedel av taket vid 64 km (+0,059), taket faller från +0,12 (32 km) via +0,076 (64 km) till +0,042 (128 km) CSI 1 mm vid 2 h, och hopp, csi5 och fss5_10 vid 15 till 60 min blir säkert sämre.
 Säkerställd förbättring: nej
-Status: delvis
+Status: klar
