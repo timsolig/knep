@@ -48,7 +48,7 @@ def test_forecast_med_noll_ar_kedjan(monkeypatch):
         def frame(self, t):
             return None
 
-    for name in ("U_noll", "U_a1"):
+    for name in ("U_noll", "V_a1"):
         s = getattr(U, name)()
         assert np.array_equal(s.forecast(datetime(2020, 1, 1, 12), Ctx()), fc, equal_nan=True)
 

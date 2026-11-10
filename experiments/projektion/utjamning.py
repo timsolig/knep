@@ -44,7 +44,7 @@ EPS = 0.1
 
 def blend_levels(fc: np.ndarray, sigma_km: np.ndarray, res: float) -> np.ndarray:
     """fc (H, W) utjämnad med sigma (H, W) i km, linjärt mellan LEVELS; NaN som i tak.smooth."""
-    s = np.clip(sigma_km, 0, LEVELS[-1])
+    s = np.clip(np.nan_to_num(sigma_km), 0, LEVELS[-1])
     if float(s.max()) <= 0.05:
         return fc
     idx = np.clip(np.searchsorted(LEVELS, s, side="right") - 1, 0, len(LEVELS) - 2)
@@ -70,8 +70,8 @@ class Utjamning(D.KedjaOm):
 
     # ---- måtten ----
     def sigma_a(self, t, ctx, motion):
-        obs = ctx.history(t, 4)
-        if obs is None or len(obs) < 3:
+        obs = ctx.history(t)
+        if obs is None:
             return None
         xy, uv = model._quiet(model.dense_lucaskanade, model._db(obs[-3:]), dense=False)
         v2 = model.dense_motion(np.asarray(xy, np.float64), np.asarray(uv, np.float64), obs[-1].shape,
@@ -93,8 +93,8 @@ class Utjamning(D.KedjaOm):
         out = []
         za, zb = np.nan_to_num(now).astype(np.float32), np.nan_to_num(old).astype(np.float32)
         for (ax, ay, ao), (bx, by, bo) in zip(advect.displacements(motion, times), advect.displacements(m0, times0)):
-            a = advect.warp(za, ax, ay, ao, 1)
-            b = advect.warp(zb, bx, by, bo, 1)
+            a = advect.warp(za, ax, ay, ao, 1, 0.0)
+            b = advect.warp(zb, bx, by, bo, 1, 0.0)
             num = D._box(np.abs(a - b), size)
             den = D._box((a + b) / 2, size) + EPS * size * size
             u = (num / den).astype(np.float32)
@@ -129,12 +129,12 @@ def _make(name, **kw):
     return c
 
 
-_make("U_a1", maatt="a", ka=1.0, alfa=0.8)
-_make("U_a2", maatt="a", ka=2.0, alfa=0.8)
-_make("U_b8", maatt="b", kb=8.0, alfa=0.8)
-_make("U_b16", maatt="b", kb=16.0, alfa=0.8)
-_make("U_ab", maatt="ab", ka=1.0, kb=8.0, alfa=0.8)
-_make("U_a1_a6", maatt="a", ka=1.0, alfa=0.6)
-_make("U_a1_a9", maatt="a", ka=1.0, alfa=0.9)
-_make("U_a1_f2", maatt="a", ka=1.0, alfa=0.8, fri=2)
+# V: efter rättelsen av två fel (historikens längd i a, NaN utanför bilden i b); U_* i /data är ogiltiga
+_make("V_a1", maatt="a", ka=1.0, alfa=0.8)
+_make("V_a2", maatt="a", ka=2.0, alfa=0.8)
+_make("V_b8", maatt="b", kb=8.0, alfa=0.8)
+_make("V_b16", maatt="b", kb=16.0, alfa=0.8)
+_make("V_ab", maatt="ab", ka=1.0, kb=8.0, alfa=0.8)
+_make("V_a1_al6", maatt="a", ka=1.0, alfa=0.6)
+_make("V_a1_f2", maatt="a", ka=1.0, alfa=0.8, fri=2)
 _make("U_noll", maatt="ab", ka=0.0, kb=0.0, alfa=0.8)
