@@ -84,6 +84,6 @@ Cirka 0,4 s per utgåva på 4 km men mätt cirka 36 s extra per utgåva på 2 km
 
 `experiments/projektion/utjamning.py`, `experiments/projektion/test_utjamning.py`, denna rapport. Summor under `/data/projektion/domare/{snabb,traning}/utjamning_*`, tabeller `/data/projektion/utjamning_snabb_*.md` och `utjamning_traning_tabell.md`.
 
-Kort: På 12 träningsdagar (2 km) ger den frysta utjämningen csi1 +0,018 till +0,025 och csi5 +0,008 till +0,013 vid 1 till 5 h och säkert lägre hopp (−0,07 till −0,17), men blockmax_q90 blir säkert sämre (+0,057 till +0,089), fss1_30 sämre vid 1 h och kostnaden är 36 s extra per utgåva på 2 km (mot 5 s-målet), så den klarar varken spärren eller tiden. Utjämning efter osäkerhet (två rörelsefält plus start 30 min tidigare, topp skyddad med α 0,95) ger på `snabb` csi1 +0,012 till +0,018 och csi5 +0,007 till +0,013 vid 1 till 5 h och säkert lägre hopp (−0,04 till −0,08), men blockmax_q90 blir säkert sämre (+0,057 till +0,069) och fss1_30 svagt sämre, så den klarar inte spärren.
+Kort: På 12 träningsdagar (2 km) ger den frysta utjämningen csi1 +0,018 till +0,025 och csi5 +0,008 till +0,013 vid 1 till 5 h och säkert lägre hopp (−0,07 till −0,17), men blockmax_q90 blir säkert sämre (+0,057 till +0,089), fss1_30 sämre vid 1 h och kostnaden är 36 s extra per utgåva på 2 km (mot 5 s-målet), så den klarar varken spärren eller tiden.
 Säkerställd förbättring: nej
 Status: delvis
