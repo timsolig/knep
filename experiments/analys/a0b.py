@@ -117,15 +117,11 @@ class A0B_ton2(A0B_g0):
 
 
 class A0B_k2(A0B_g0):
-    """K klippt vid 2, tonad som varianten i KNEP_A0B_K2_TON ("lo,hi", tom = ingen tonad)."""
+    """K klippt vid 2 på A0B_ton2 (den med minst falska ekon av g0, ton och ton2 på träningen)."""
 
     namn = "A0B_k2"
     kmax = 2.0
-
-    @property
-    def ton(self):  # type: ignore[override]
-        v = os.environ.get("KNEP_A0B_K2_TON", "")
-        return tuple(float(x) for x in v.split(",")) if v else None
+    ton = (0.5, 2.0)
 
 
 for _c in (A0B_g0, A0B_ton, A0B_ton2, A0B_k2):

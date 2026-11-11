@@ -113,23 +113,15 @@ def test_ton2_threshold():
     assert np.allclose(out[0][strong], 2 * raw[0][strong], rtol=1e-5)
 
 
-def test_k2_clips_factor(monkeypatch):
-    monkeypatch.setenv("KNEP_A0B_K2_TON", "")
+def test_k2_clips_factor_and_tones():
     out, raw = _run(M.A0B_k2, _corr(np.log(5.0)))
     ok = np.isfinite(raw[0])
-    assert np.allclose(out[0][ok], 2 * raw[0][ok], rtol=1e-5)
-    out, _ = _run(M.A0B_k2, _corr(np.log(1.5)))
-    assert np.allclose(out[0][ok], 1.5 * raw[0][ok], rtol=1e-5)
-
-
-def test_k2_with_ton(monkeypatch):
-    monkeypatch.setenv("KNEP_A0B_K2_TON", "0.3,1")
-    out, raw = _run(M.A0B_k2, _corr(np.log(5.0)))
-    ok = np.isfinite(raw[0])
-    weak = ok & (raw[0] <= 0.3)
+    weak = ok & (raw[0] <= 0.5)
+    strong = ok & (raw[0] >= 2.0)
     assert np.array_equal(out[0][weak], raw[0][weak])
-    strong = ok & (raw[0] >= 1.0)
     assert np.allclose(out[0][strong], 2 * raw[0][strong], rtol=1e-5)
+    out, _ = _run(M.A0B_k2, _corr(np.log(1.5)))
+    assert np.allclose(out[0][strong], 1.5 * raw[0][strong], rtol=1e-5)
 
 
 def test_registered():
