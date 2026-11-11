@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0022 · 2026-11-11 02:36 · tak-rorelse-tid · klar
+- Varför: Rumslig utjämning är vilande efter uppgift 0019 till 0021, och det största kvarvarande taket (lägesfel på 32 till 128 km, uppgift 0018) kan vara rörelse som ändras med ledtiden, vilket 0017:s tak med ett enda fält ur 5 h inte kunde skilja från en grov skattning.
+- Resultat: Rörelse som ändras med ledtiden tar cirka 9 % av lägestaket vid 2 h (TakRorelseTid CSI 1 mm +0,007 [+0,002, +0,011] mot +0,078 för tillväxt 32 minus 128 km; TakRorelse1h +0,005 [+0,001, +0,010]); rörelsespåret läggs vilande.
+- Rapport: [rapporter/2026-11-11/0022-tak-rorelse-tid.md](rapporter/2026-11-11/0022-tak-rorelse-tid.md), 35 min
+
 ### 0021 · 2026-11-11 01:58 · utjamning-matchning · klar
 - Varför: Utjämningen efter osäkerhet är den enda kandidaten utan facit som ger csi1 cirka +0,02 och säkert lägre hopp, och den fälls av blockmax_q90 och q99,9, som är fördelningsmått som en fördelningsmatchning efter utjämningen ska återställa per konstruktion, vilket inte är prövat.
 - Resultat: Matchning av den utjämnade prognosen mot kedjans fördelning kostar ingen extra tid och bevarar q99 och q99,9, men den frysta `M_hel_gol` ger på `traning` csi1 +0,016 till +0,008 och hopp −0,05 till −0,07 mot en säker försämring av blockmax_q50 (+0,02 till +0,04), fss1_30 och formen, så domaren säger inte bättre och valideringen kördes inte.
