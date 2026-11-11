@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0024 · 2026-11-11 22:34 · bias-v1-domare · klar
+- Varför: Kartan bias-v1 är tränad och korsvaliderad utan valideringens dygn (uppgift 0023) och rättar volymbristen på 12 % vid mätarna, så nästa steg är att analysens domare avgör en gång på valideringen om A0 med kartan är bättre än A0 utan att falska ekon och terrängen blir sämre.
+- Resultat: A0B fälls av domarens regel på alla 16 valideringsdygn: kvot våt i kvartar 0,793 mot 0,704 (+0,119, intervall +0,054 till +0,178) och FSS 0,5 och CSI 0,5 och 1 per timme blir bättre, men falska ekon blir sämre (kvart 0,031 mot 0,026, intervall helt på fel sida) och FSS 5 per timme faller (0,182 mot 0,302), så ingen säkerställd förbättring.
+- Rapport: [rapporter/2026-11-11/0024-bias-v1-domare.md](rapporter/2026-11-11/0024-bias-v1-domare.md), 19 min
+
 ### 0023 · 2026-11-11 22:13 · bias-v1-trana-cv · klar
 - Varför: Taken för kedjans delar är körda och ger bara tusendelar, medan underlaget för volymkorrektionen är komplett sedan 2026-11-10 och radarns egen kvot mot mätarna (0,941) är det största kända felet vid +1 h.
 - Resultat: Kartan närmar volymen 1 (stationsvis korsvalidering 1,027 mot 0,883 utan karta, per år 0,99 till 1,06 mot 0,88 till 0,89) och fler stationer hamnar inom 20 % (0,45 mot 0,33), men radarns övre kvantiler (q99, q99,5) blir sämre (1,20 och 1,18 mot 1,03 och 1,08 av mätarnas) och per år är andelen inom 20 % sämre 2023 och 2025; värd att döma i analysens domare, med förbehåll.
