@@ -30,6 +30,8 @@ else:
     sys.modules["analys_domare"] = domare
     _spec.loader.exec_module(domare)
 
+import numpy as np  # noqa: E402
+
 from knep.analys import bias  # noqa: E402
 
 KARTA = Path(os.environ.get("KNEP_BIAS_V1", "/dev/shm/bias_v1/full/bias_v1.npz"))
@@ -59,6 +61,75 @@ class A0B(domare.A0):
 
 
 domare.SYSTEMS["A0B"] = A0B
+
+
+# Varianter (uppgift 0025): samma frysta karta, bara annan påläggning.
+def tone(r, K, lo: float, hi: float):
+    """r * K^w, w = 0 under lo mm/h, 1 över hi, linjärt i log r däremellan. Eko under lo förblir orört."""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        w = np.clip((np.log(np.maximum(r, 1e-6)) - np.log(lo)) / (np.log(hi) - np.log(lo)), 0.0, 1.0)
+        out = r * np.power(K, w)
+    return np.where(w > 0, out, r).astype(np.float32)
+
+
+class A0B_g0(A0B):
+    """Nivåfaktorn utan svans (gamma 0)."""
+
+    namn = "A0B_g0"
+    ton: tuple[float, float] | None = None
+    kmax: float | None = None
+
+    def _lay(self, r, K):
+        if self.kmax is not None:
+            K = np.minimum(K, np.float32(self.kmax))
+        if self.ton is not None:
+            return tone(r, K, *self.ton)
+        return (r * K).astype(np.float32)
+
+    def frames(self):
+        if hasattr(self, "_frames"):
+            return self._frames
+        corr = self.corr or bias.Correction.load(KARTA)
+        assert corr is not None, f"kartan saknas: {KARTA}"
+        rd = self.rd
+        assert corr.beam.shape == rd.grid.shape, (corr.beam.shape, rd.grid.shape)
+        rd.sparse_motion()
+        K = None
+        for k in range(len(rd.times)):
+            if k % HOUR == 0:
+                K = corr.factor(rd.times[k])
+            rd.rain[k] = self._lay(rd.rain[k], K)  # aldrig svansen
+        return domare.A0.frames(self)
+
+
+class A0B_ton(A0B_g0):
+    """K tonad: w = 0 under 0,3 mm/h, 1 över 1 mm/h."""
+
+    namn = "A0B_ton"
+    ton = (0.3, 1.0)
+
+
+class A0B_ton2(A0B_g0):
+    """K tonad: w = 0 under 0,5 mm/h, 1 över 2 mm/h."""
+
+    namn = "A0B_ton2"
+    ton = (0.5, 2.0)
+
+
+class A0B_k2(A0B_g0):
+    """K klippt vid 2, tonad som varianten i KNEP_A0B_K2_TON ("lo,hi", tom = ingen tonad)."""
+
+    namn = "A0B_k2"
+    kmax = 2.0
+
+    @property
+    def ton(self):  # type: ignore[override]
+        v = os.environ.get("KNEP_A0B_K2_TON", "")
+        return tuple(float(x) for x in v.split(",")) if v else None
+
+
+for _c in (A0B_g0, A0B_ton, A0B_ton2, A0B_k2):
+    domare.SYSTEMS[_c.namn] = _c
 
 
 def main() -> None:

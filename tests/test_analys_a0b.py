@@ -66,5 +66,73 @@ def test_factor_two_doubles_before_fill():
     assert np.allclose(s._frames[0][ok], 2 * raw[0][ok], rtol=1e-5)
 
 
+def _run(cls, corr, kmax_env=None):
+    s = cls(RD())
+    s.corr = corr
+    s.frames()
+    return s._frames, RD().rain
+
+
+def test_g0_ignores_tail():
+    out, raw = _run(M.A0B_g0, _corr(np.log(2.0), gamma=-0.2))
+    ok = np.isfinite(raw[0])
+    assert np.allclose(out[0][ok], 2 * raw[0][ok], rtol=1e-5)
+
+
+def test_g0_factor_one_is_a0():
+    base = M.domare.A0(RD()).frames().copy()
+    out, _ = _run(M.A0B_g0, _corr(0.0, gamma=-0.2))
+    assert np.array_equal(base, out, equal_nan=True)
+
+
+def test_ton_leaves_weak_echo_untouched():
+    out, raw = _run(M.A0B_ton, _corr(np.log(2.0)))
+    ok = np.isfinite(raw[0])
+    weak = ok & (raw[0] <= 0.3)
+    strong = ok & (raw[0] >= 1.0)
+    assert weak.any() and strong.any()
+    assert np.array_equal(out[0][weak], raw[0][weak])
+    assert np.allclose(out[0][strong], 2 * raw[0][strong], rtol=1e-5)
+    mid = ok & (raw[0] > 0.3) & (raw[0] < 1.0)
+    assert np.all(out[0][mid] > raw[0][mid]) and np.all(out[0][mid] < 2 * raw[0][mid])
+
+
+def test_ton_factor_one_is_a0():
+    base = M.domare.A0(RD()).frames().copy()
+    for cls in (M.A0B_ton, M.A0B_ton2):
+        out, _ = _run(cls, _corr(0.0))
+        assert np.array_equal(base, out, equal_nan=True)
+
+
+def test_ton2_threshold():
+    out, raw = _run(M.A0B_ton2, _corr(np.log(2.0)))
+    ok = np.isfinite(raw[0])
+    weak = ok & (raw[0] <= 0.5)
+    strong = ok & (raw[0] >= 2.0)
+    assert np.array_equal(out[0][weak], raw[0][weak])
+    assert np.allclose(out[0][strong], 2 * raw[0][strong], rtol=1e-5)
+
+
+def test_k2_clips_factor(monkeypatch):
+    monkeypatch.setenv("KNEP_A0B_K2_TON", "")
+    out, raw = _run(M.A0B_k2, _corr(np.log(5.0)))
+    ok = np.isfinite(raw[0])
+    assert np.allclose(out[0][ok], 2 * raw[0][ok], rtol=1e-5)
+    out, _ = _run(M.A0B_k2, _corr(np.log(1.5)))
+    assert np.allclose(out[0][ok], 1.5 * raw[0][ok], rtol=1e-5)
+
+
+def test_k2_with_ton(monkeypatch):
+    monkeypatch.setenv("KNEP_A0B_K2_TON", "0.3,1")
+    out, raw = _run(M.A0B_k2, _corr(np.log(5.0)))
+    ok = np.isfinite(raw[0])
+    weak = ok & (raw[0] <= 0.3)
+    assert np.array_equal(out[0][weak], raw[0][weak])
+    strong = ok & (raw[0] >= 1.0)
+    assert np.allclose(out[0][strong], 2 * raw[0][strong], rtol=1e-5)
+
+
 def test_registered():
+    for n in ("A0B_g0", "A0B_ton", "A0B_ton2", "A0B_k2"):
+        assert M.domare.SYSTEMS[n].namn == n
     assert M.domare.SYSTEMS["A0B"] is M.A0B
