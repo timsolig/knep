@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0025 · 2026-11-12 00:05 · bias-v1-varianter · klar
+- Varför: A0B (bias-v1) gav den största förbättringen av mängden i A0 som domaren har visat men fälldes av falska ekon och FSS 5, och båda felen pekar på bestämda delar av korrektionen (nivån lyfter svagt eko, svansen trycker ned toppen) som går att välja om på träningsdagarna.
+- Resultat: Ingen av fyra varianter klarar domaren på de 28 träningsdagarna: alla förbättrar kvot våt per kvart (+0,078 till +0,137 mot A0) men falskt vid torr mätare blir sämre med intervallet helt på fel sida i alla (bäst A0B_k2: 0,024 mot 0,024, skillnad -0,000 (-0,001 till -0,000)), så ingen frystes och valideringen kördes inte.
+- Rapport: [rapporter/2026-11-11/0025-bias-v1-varianter.md](rapporter/2026-11-11/0025-bias-v1-varianter.md), 88 min
+
 ### 0024 · 2026-11-11 22:34 · bias-v1-domare · klar
 - Varför: Kartan bias-v1 är tränad och korsvaliderad utan valideringens dygn (uppgift 0023) och rättar volymbristen på 12 % vid mätarna, så nästa steg är att analysens domare avgör en gång på valideringen om A0 med kartan är bättre än A0 utan att falska ekon och terrängen blir sämre.
 - Resultat: A0B fälls av domarens regel på alla 16 valideringsdygn: kvot våt i kvartar 0,793 mot 0,704 (+0,119, intervall +0,054 till +0,178) och FSS 0,5 och CSI 0,5 och 1 per timme blir bättre, men falska ekon blir sämre (kvart 0,031 mot 0,026, intervall helt på fel sida) och FSS 5 per timme faller (0,182 mot 0,302), så ingen säkerställd förbättring.
