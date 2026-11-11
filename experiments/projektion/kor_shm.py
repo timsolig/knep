@@ -18,7 +18,7 @@ import domare as D  # noqa: E402
 
 SHM = Path("/dev/shm/knep_domare")
 REAL = D.OUT
-KEEP = ["kedja_om", "persistens", "utjamning_V_ab_f2_al95"]
+KEEP = ["kedja_om", "persistens", "utjamning_V_ab_f2_al95", "tak_TakRorelse"]
 
 
 def cache_files() -> int:
