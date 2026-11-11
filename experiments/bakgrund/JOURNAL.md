@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0021 · 2026-11-11 01:58 · utjamning-matchning · klar
+- Varför: Utjämningen efter osäkerhet är den enda kandidaten utan facit som ger csi1 cirka +0,02 och säkert lägre hopp, och den fälls av blockmax_q90 och q99,9, som är fördelningsmått som en fördelningsmatchning efter utjämningen ska återställa per konstruktion, vilket inte är prövat.
+- Resultat: Matchning av den utjämnade prognosen mot kedjans fördelning kostar ingen extra tid och bevarar q99 och q99,9, men den frysta `M_hel_gol` ger på `traning` csi1 +0,016 till +0,008 och hopp −0,05 till −0,07 mot en säker försämring av blockmax_q50 (+0,02 till +0,04), fss1_30 och formen, så domaren säger inte bättre och valideringen kördes inte.
+- Rapport: [rapporter/2026-11-11/0021-utjamning-matchning.md](rapporter/2026-11-11/0021-utjamning-matchning.md), 106 min
+
 ### 0020 · 2026-11-11 00:09 · utjamning-snabb-blockmax · delvis
 - Varför: Utjämningen efter osäkerhet (uppgift 0019) är den enda kandidaten utan facit som både ger csi1 cirka +0,02 vid 1 till 5 h och gör hoppet säkert bättre, och den fälls bara av blockmaxet och tiden, som båda ser ut att gå att laga.
 - Resultat: Den snabba utjämningen kostar cirka 5 till 6 s extra per utgåva på 2 km (mot cirka 19 s i 0019, målet 5 s nästan nått), men inget av de tre toppskydden (a, b, c) bevarar blockmax_q90 (+0,08 till +0,38 sämre i `snabb`); det frysta S_ab_b ger csi1 +0,031 till +0,020 och hopp −0,11 till −0,26 på `traning` men blockmax_q90 +0,09 till +0,13 och q99,9 säkert sämre, så den är inte redo för validering.
