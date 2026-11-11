@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0023 · 2026-11-11 22:13 · bias-v1-trana-cv · klar
+- Varför: Taken för kedjans delar är körda och ger bara tusendelar, medan underlaget för volymkorrektionen är komplett sedan 2026-11-10 och radarns egen kvot mot mätarna (0,941) är det största kända felet vid +1 h.
+- Resultat: Kartan närmar volymen 1 (stationsvis korsvalidering 1,027 mot 0,883 utan karta, per år 0,99 till 1,06 mot 0,88 till 0,89) och fler stationer hamnar inom 20 % (0,45 mot 0,33), men radarns övre kvantiler (q99, q99,5) blir sämre (1,20 och 1,18 mot 1,03 och 1,08 av mätarnas) och per år är andelen inom 20 % sämre 2023 och 2025; värd att döma i analysens domare, med förbehåll.
+- Rapport: [rapporter/2026-11-11/0023-bias-v1-trana-cv.md](rapporter/2026-11-11/0023-bias-v1-trana-cv.md), 10 min
+
 ### 0022 · 2026-11-11 02:36 · tak-rorelse-tid · klar
 - Varför: Rumslig utjämning är vilande efter uppgift 0019 till 0021, och det största kvarvarande taket (lägesfel på 32 till 128 km, uppgift 0018) kan vara rörelse som ändras med ledtiden, vilket 0017:s tak med ett enda fält ur 5 h inte kunde skilja från en grov skattning.
 - Resultat: Rörelse som ändras med ledtiden tar cirka 9 % av lägestaket vid 2 h (TakRorelseTid CSI 1 mm +0,007 [+0,002, +0,011] mot +0,078 för tillväxt 32 minus 128 km; TakRorelse1h +0,005 [+0,001, +0,010]); rörelsespåret läggs vilande.
