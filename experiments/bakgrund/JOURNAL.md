@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0027 · 2026-11-13 23:57 · bias-v1-ton-summa-2 · klar
+- Varför: Uppgift 0026 prövade inget eftersom Bash nekades, och att tona bias-v1 efter rutans bakåtblickande summa är fortfarande det enda försöket som angriper mekanismen bakom de falska ekona som fällde 0024 och 0025.
+- Resultat: Ingen av tre varianter (A0B_s15, A0B_s60, A0B_smin) klarar domaren på de 28 träningsdagarna: alla förbättrar kvot våt per kvart (+0,097, +0,085, +0,080 mot A0) men falskt vid torr mätare blir sämre med intervallet helt på fel sida per timme (och för s15 och s60 per kvart), så ingen frystes och valideringen kördes inte.
+- Rapport: [rapporter/2026-11-13/0027-bias-v1-ton-summa-2.md](rapporter/2026-11-13/0027-bias-v1-ton-summa-2.md), 81 min
+
 ### 0026 · 2026-11-13 22:04 · bias-v1-ton-summa · misslyckad
 - Varför: Uppgift 0025 visade att bias-v1 fälls för att nivåfaktorn lyfter kvartar och timmar strax under regngränsen över den, och att tona K efter rutans bakåtblickande summa i stället för bildens intensitet angriper just den mekanismen.
 - Resultat: ingen rapport skrevs (loggen på Pi:n: ~/.bakgrund/logg/0026-bias-v1-ton-summa.txt)
