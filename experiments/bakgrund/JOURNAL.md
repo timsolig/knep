@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0028 · 2026-11-14 00:29 · opera-ring-rost-andoya · delvis
+- Varför: bias-v1 är vilande efter fyra fällda försök, testdelen och fliken Verifiering väntar på användaren, och ringen vid Røst och Andøya är en artefakt som användaren har sett på sidan och som går att rätta med OPERA-data som redan finns på disken.
+- Resultat: Ringen finns vid Røst (andel eko 0,71 inom 4 km i torra bilder mot 0,004 vid 25 till 30 km) och i mindre kärnor vid fem andra OPERA-radarer, men inte vid Andøya på träningsdagarna; en fast mask (r 8 till 16 km) tar bort den men också 5,1 % av den våta OPERA-volymen i regnstimmar (13,1 % kring Røst), och klotterkartan (b) tar bara cirka 0,01 % men lämnar kärnan; valet `--opera-ring` finns avstängt med tester, ingen säkerställd förbättring.
+- Rapport: [rapporter/2026-11-13/0028-opera-ring-rost-andoya.md](rapporter/2026-11-13/0028-opera-ring-rost-andoya.md), 29 min
+
 ### 0027 · 2026-11-13 23:57 · bias-v1-ton-summa-2 · klar
 - Varför: Uppgift 0026 prövade inget eftersom Bash nekades, och att tona bias-v1 efter rutans bakåtblickande summa är fortfarande det enda försöket som angriper mekanismen bakom de falska ekona som fällde 0024 och 0025.
 - Resultat: Ingen av tre varianter (A0B_s15, A0B_s60, A0B_smin) klarar domaren på de 28 träningsdagarna: alla förbättrar kvot våt per kvart (+0,097, +0,085, +0,080 mot A0) men falskt vid torr mätare blir sämre med intervallet helt på fel sida per timme (och för s15 och s60 per kvart), så ingen frystes och valideringen kördes inte.
