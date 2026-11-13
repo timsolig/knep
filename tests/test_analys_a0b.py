@@ -124,6 +124,73 @@ def test_k2_clips_factor_and_tones():
     assert np.allclose(out[0][strong], 1.5 * raw[0][strong], rtol=1e-5)
 
 
+class RDc(RD):
+    """Konstant regn r mm/h överallt, utan luckor."""
+
+    def __init__(self, r):
+        super().__init__()
+        self.rain = np.full((30, H, W), r, np.float32)
+
+
+def _runc(cls, r, K=2.0):
+    s = cls(RDc(r))
+    s.corr = _corr(np.log(K))
+    s.frames()
+    return s._frames
+
+
+def test_summa_factor_one_is_a0():
+    base = M.domare.A0(RD()).frames().copy()
+    for cls in (M.A0B_s15, M.A0B_s60, M.A0B_smax, M.A0B_smin):
+        out, _ = _run(cls, _corr(0.0))
+        assert np.array_equal(base, out, equal_nan=True)
+
+
+def test_summa_under_gransen_is_untouched():
+    # 0,4 mm/h: 15 min ger 0,1 mm (< 0,125), 60 min ger 0,4 mm (< 0,5)
+    for cls in (M.A0B_s15, M.A0B_s60):
+        out = _runc(cls, 0.4)
+        assert np.allclose(out[20], 0.4)
+
+
+def test_summa_vid_dubbla_gransen_ger_full_k():
+    # 1 mm/h: 15 min ger 0,25 mm (2 * 0,125), 60 min ger 1 mm (2 * 0,5, från bild 12)
+    assert np.allclose(_runc(M.A0B_s15, 1.0)[20], 2.0)
+    assert np.allclose(_runc(M.A0B_s60, 1.0)[20], 2.0)
+
+
+def test_summa_mellan_gransen_ar_delvis():
+    # 15 min: 0,7 mm/h ger 0,175 mm, w = log2(1,4) och K = 2 ger faktorn 1,4
+    out = _runc(M.A0B_s15, 0.7)[20]
+    assert np.allclose(out, 0.7 * 1.4, rtol=1e-4)
+
+
+def test_summa_smax_smin():
+    # kort stark skur i tre bilder
+    class RDs(RDc):
+        def __init__(self):
+            super().__init__(0.0)
+            self.rain[18:21] = 2.0  # 3 bilder: s15 = 0,5 mm (w = 1), s60 = 0,5 mm (w = 0 till gränsen)
+
+    s = M.A0B_smax(RDs())
+    s.corr = _corr(np.log(2.0))
+    s.frames()
+    assert np.allclose(s._frames[20], 4.0)  # max: w = 1 från s15
+    s = M.A0B_smin(RDs())
+    s.corr = _corr(np.log(2.0))
+    s.frames()
+    assert np.allclose(s._frames[20], 2.0 * 2.0 ** 0.0)  # min: s60 = 0,5 mm ger w = 0
+
+
+def test_summa_ar_kausal():
+    base = _run(M.A0B_s60, _corr(np.log(2.0)))[0][:15].copy()
+    s = M.A0B_s60(RD())
+    s.corr = _corr(np.log(2.0))
+    s.rd.rain[15:] = 50.0  # ändra bara framtida bilder
+    s.frames()
+    assert np.array_equal(base, s._frames[:15], equal_nan=True)
+
+
 def test_registered():
     for n in ("A0B_g0", "A0B_ton", "A0B_ton2", "A0B_k2"):
         assert M.domare.SYSTEMS[n].namn == n

@@ -124,7 +124,95 @@ class A0B_k2(A0B_g0):
     ton = (0.5, 2.0)
 
 
-for _c in (A0B_g0, A0B_ton, A0B_ton2, A0B_k2):
+# Varianter (uppgift 0027): K tonad efter rutans bakåtblickande summa av de råa bilderna.
+# Domarens regngränser (domare.ECHO) är 0,125 mm per kvart och 0,5 mm per timme, alltså också
+# den vanliga gränsen mellan regn och uppehåll. w = 0 under gränsen, 1 vid dubbla gränsen.
+FONSTER = {"s15": (3, 0.125), "s60": (12, 0.5)}  # bilder, gräns i mm
+
+
+def summa_vikt(S, lim: float):
+    """w = 0 när summan S (mm) är under lim, 1 vid 2 * lim, linjärt i log däremellan."""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        w = np.log(np.maximum(S, 1e-9) / lim) / np.log(2.0)
+    return np.clip(w, 0.0, 1.0).astype(np.float32)
+
+
+class A0B_summa(A0B_g0):
+    """r * K^w, w ur den bakåtblickande summan över `fonster` (nycklar i FONSTER), kombinerade med
+    `komb` (max eller min) om det är två. Summan tas på de råa bilderna (NaN räknas som 0; i början
+    av dagen finns färre bilder, summan blir mindre, vilket är försiktigt). Bara bilder bakåt i tiden."""
+
+    namn = "A0B_summa"
+    fonster: tuple[str, ...] = ("s15",)
+    komb = staticmethod(np.maximum)
+
+    def weights(self, hist):
+        """hist: de råa bilderna (mm/h) nyast sist, högst 12. Vikten för den nyaste."""
+        ws = []
+        for f in self.fonster:
+            n, lim = FONSTER[f]
+            S = sum(hist[-n:]) / 12.0
+            ws.append(summa_vikt(S, lim))
+        w = ws[0]
+        for x in ws[1:]:
+            w = self.komb(w, x)
+        return w
+
+    def frames(self):
+        if hasattr(self, "_frames"):
+            return self._frames
+        from collections import deque
+
+        corr = self.corr or bias.Correction.load(KARTA)
+        assert corr is not None, f"kartan saknas: {KARTA}"
+        rd = self.rd
+        assert corr.beam.shape == rd.grid.shape, (corr.beam.shape, rd.grid.shape)
+        rd.sparse_motion()
+        hist: deque = deque(maxlen=max(FONSTER[f][0] for f in self.fonster))
+        K = None
+        for k in range(len(rd.times)):
+            if k % HOUR == 0:
+                K = corr.factor(rd.times[k])
+            r = rd.rain[k]
+            hist.append(np.nan_to_num(r, nan=0.0).astype(np.float32))
+            w = self.weights(list(hist))
+            with np.errstate(invalid="ignore"):
+                out = r * np.power(K, w)
+            rd.rain[k] = np.where(w > 0, out, r).astype(np.float32)
+        return domare.A0.frames(self)
+
+
+class A0B_s15(A0B_summa):
+    """Tonen på summan över 15 min (3 bilder), gräns 0,125 mm."""
+
+    namn = "A0B_s15"
+    fonster = ("s15",)
+
+
+class A0B_s60(A0B_summa):
+    """Tonen på summan över 60 min (12 bilder), gräns 0,5 mm."""
+
+    namn = "A0B_s60"
+    fonster = ("s60",)
+
+
+class A0B_smax(A0B_summa):
+    """Största av de två vikterna (15 och 60 min)."""
+
+    namn = "A0B_smax"
+    fonster = ("s15", "s60")
+    komb = staticmethod(np.maximum)
+
+
+class A0B_smin(A0B_summa):
+    """Minsta av de två vikterna (15 och 60 min)."""
+
+    namn = "A0B_smin"
+    fonster = ("s15", "s60")
+    komb = staticmethod(np.minimum)
+
+
+for _c in (A0B_g0, A0B_ton, A0B_ton2, A0B_k2, A0B_s15, A0B_s60, A0B_smax, A0B_smin):
     domare.SYSTEMS[_c.namn] = _c
 
 
