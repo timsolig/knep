@@ -267,6 +267,28 @@ def far_zone(grid: TargetGrid, h_km: float, radars=None) -> np.ndarray:
     return np.isfinite(beam) & (beam > h_km)
 
 
+#: Radien i km kring de icke-svenska OPERA-radarer där kompositen har en ring av falskt eko
+#: (experiments/riksgransen/ring_kand.py, uppgift 0028, valt på träningsdagarna).
+OPERA_RING_KM = {"nohfj": 16.0, "nosmn": 12.0, "norst": 12.0, "fikor": 8.0, "fivim": 8.0, "fiuta": 16.0}
+
+
+def mask_opera_ring(extra, grid: TargetGrid, radii=None, radars=None):
+    """OPERA-lagret (mm/h) med NaN inom radien kring radarplatserna där ringen sitter, så att
+    `layer`, `layer_far` och utfyllnaden kan använda något annat där. Ändrar inte indata."""
+    radii = OPERA_RING_KM if radii is None else radii
+    radars = RADARS if radars is None else radars
+    X, Y = grid.centres()
+    to_grid = Transformer.from_crs(CRS.from_epsg(4326), CRS.from_epsg(3006), always_xy=True)
+    out = extra.copy()
+    for code, km in radii.items():
+        if code not in radars:
+            continue
+        lat, lon = radars[code][:2]
+        x0, y0 = to_grid.transform(lon, lat)
+        out[np.hypot(X - x0, Y - y0) < km * 1000] = np.nan
+    return out
+
+
 def layer_far(rain, source, extra, code, far, min_extra=0.1, mode="torr"):
     """Inom zonen `far` (bool): ta reservkällan där den har minst min_extra mm/h och analysen är
     torr (0, mode="torr") eller lägre (mode="max"). Utanför zonen ändras inget; NaN tas av `layer`."""
