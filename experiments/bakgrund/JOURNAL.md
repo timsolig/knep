@@ -6,6 +6,11 @@ Vad bakgrunden har kört, nyast först. Loopen skriver en post efter varje uppgi
 
 <!-- nya poster här -->
 
+### 0029 · 2026-11-14 01:12 · opera-ring-villkorad · delvis
+- Varför: Uppgift 0028 belade ringen vid sex OPERA-radarer men den fasta masken tar 4 till 5 % av det verkliga regnet kring platserna, och en mask som bara verkar när omgivningen är torr kan ta ringen utan det priset med data som redan finns.
+- Resultat: Den villkorade masken (eko inom r NaN bara när ringen r + 4 till 40 km är torr) tar kärnorna vid alla sex platser ner till omgivningens nivå och tar bara 0,009 % av den våta volymen på träningen och 0,005 % på valideringen, mot 5,1 % och 4,4 % för den fasta masken, men den frysta radien 8 km är för liten för skivan vid Røst den 7 november (den ligger kvar; en radie på 24 km tar bort den i 9 av 10 bilder, men valdes inte); lagd bakom `--opera-ring villkor`, avstängd som standard, ingen säkerställd förbättring.
+- Rapport: [rapporter/2026-11-14/0029-opera-ring-villkorad.md](rapporter/2026-11-14/0029-opera-ring-villkorad.md), 41 min
+
 ### 0028 · 2026-11-14 00:29 · opera-ring-rost-andoya · delvis
 - Varför: bias-v1 är vilande efter fyra fällda försök, testdelen och fliken Verifiering väntar på användaren, och ringen vid Røst och Andøya är en artefakt som användaren har sett på sidan och som går att rätta med OPERA-data som redan finns på disken.
 - Resultat: Ringen finns vid Røst (andel eko 0,71 inom 4 km i torra bilder mot 0,004 vid 25 till 30 km) och i mindre kärnor vid fem andra OPERA-radarer, men inte vid Andøya på träningsdagarna; en fast mask (r 8 till 16 km) tar bort den men också 5,1 % av den våta OPERA-volymen i regnstimmar (13,1 % kring Røst), och klotterkartan (b) tar bara cirka 0,01 % men lämnar kärnan; valet `--opera-ring` finns avstängt med tester, ingen säkerställd förbättring.
