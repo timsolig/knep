@@ -654,19 +654,42 @@ def _window(days: list[Day], seed: int = 0) -> dict:
     return res
 
 
+DAY_META = ("issues", "obs_hours", "gauge_hours", "a2t_hours", "a2t_n")
+
+
 def _daily(days: list[Day]) -> dict:
-    """Råa summor per dygn för diagrammet över tiden (sidan räknar måtten med samma formler)."""
+    """Råa summor per dygn, så att sidan kan räkna måtten för en egen period med samma formler.
+
+    Per modell kontingenstabellerna, de kontinuerliga summorna, FSS-summorna och antalet timmar.
+    Under pairs Tim-KNEP:s summor på den andra modellens urval (nyckeln ours@modell i dygnen), så att
+    skillnaden mot Tim-KNEP går att räkna; under meta underlaget per dygn.
+    """
     out = {"days": [d.path.stem for d in days], "radar": {}, "gauges": {}}
+    pairs: dict[str, dict] = {}
+
+    def sums(obs: str, key: str) -> dict:
+        e = {"ct": _stack(days, f"{obs}/{key}/ct", (LEADS, len(THRESHOLDS), 4), np.int64).tolist(),
+             "c": _round(_stack(days, f"{obs}/{key}/c", (LEADS, len(CONT)), np.float64), 3)}
+        if obs != "gauges":
+            e["fss"] = _round(_stack(days, f"{obs}/{key}/fss", (LEADS, len(FSS_THRESHOLDS), len(FSS_KM), 2), np.float64), 2)
+        e["hours"] = _stack(days, f"{obs}/{key}/hours", (LEADS,), np.int64).tolist()
+        return e
+
     for obs in OBS:
-        keys = sorted({k.split("/")[1] for d in days for k in d.arrays if k.startswith(obs + "/") and "@" not in k})
+        found = sorted({k.split("/")[1] for d in days for k in d.arrays if k.startswith(obs + "/")})
+        keys = [k for k in found if "@" not in k]
         if keys:
             out.setdefault(obs, {})  # a2t bara när den finns
         for key in keys:
-            e = {"ct": _stack(days, f"{obs}/{key}/ct", (LEADS, len(THRESHOLDS), 4), np.int64).tolist(),
-                 "c": _round(_stack(days, f"{obs}/{key}/c", (LEADS, len(CONT)), np.float64), 3)}
-            if obs != "gauges":
-                e["fss"] = _round(_stack(days, f"{obs}/{key}/fss", (LEADS, len(FSS_THRESHOLDS), len(FSS_KM), 2), np.float64), 2)
-            out[obs][key] = e
+            out[obs][key] = sums(obs, key)
+        for key in found:
+            if key.startswith("ours@"):
+                pairs.setdefault(obs, {})[key.split("@", 1)[1]] = sums(obs, key)
+    out["pairs"] = pairs
+    meta = {k: [int(d.meta.get(k, 0)) for d in days] for k in DAY_META}
+    meta["first"] = [min(d.meta["issued"]) if d.meta.get("issued") else None for d in days]
+    meta["last"] = [max(d.meta["issued"]) if d.meta.get("issued") else None for d in days]
+    out["meta"] = meta
     return out
 
 

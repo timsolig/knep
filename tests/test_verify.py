@@ -233,6 +233,82 @@ def test_summary_reads_old_days_without_a2t(tmp_path):
     assert "a2t" not in v and "a2t" not in doc["windows"]["7"] and "a2t" not in doc["daily"]
 
 
+def _scores_from_daily(daily: dict, obs: str, key: str, idx: list[int], pair: bool = False) -> dict:
+    """Som sidan gör för en egen period: summera dygnen idx ur verif.json:s råa summor och räkna måtten."""
+    e = (daily["pairs"] if pair else daily)[obs][key]
+    ct = np.array(e["ct"], np.float64)[idx].sum(0)
+    c = np.array(e["c"], np.float64)[idx].sum(0)
+    out = {"scores": verify.dichotomous(ct), "cont": verify.continuous_scores(c), "hours": np.array(e["hours"])[idx].sum(0)}
+    if "fss" in e:
+        out["fss"] = verify.fss_scores(np.array(e["fss"], np.float64)[idx].sum(0))
+    return out
+
+
+def _close(a, b, tol):
+    a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
+    assert np.array_equal(np.isfinite(a), np.isfinite(b))
+    assert np.allclose(a[np.isfinite(a)], b[np.isfinite(b)], atol=tol)
+
+
+def test_daily_sums_give_the_windows_numbers(tmp_path):
+    """Dygnens råa summor i verif.json räcker för alla mått och skillnaderna i 7 och 30 dygn."""
+    shape = verify.vgrid(GRID).shape
+    rng = np.random.default_rng(4)
+    now = datetime(2026, 11, 3, 12, tzinfo=UTC)
+    for k in range(34):  # fler dygn än 30, så att perioderna skär
+        day = verify.Day(tmp_path / "days" / f"{(now - timedelta(days=k)).date()}.npz", shape)
+        for lead in range(1, verify.LEADS + 1):
+            o = rng.gamma(0.4, 2, 800)
+            f = o * rng.lognormal(0, 0.4 + 0.1 * lead, o.size)
+            p = rng.permutation(o)
+            fss = lambda: np.sort(rng.uniform(0, 50, (len(verify.FSS_THRESHOLDS), len(verify.FSS_KM), 2)), -1)  # noqa: E731
+            for obs in ("radar", "a2t"):
+                day.add(obs, "ours", lead, f, o, fss())
+                day.add(obs, "persistens", lead, p, o, fss())
+                day.add(obs, "ours@persistens", lead, f, o, fss())
+                if lead <= 2 and k % 3:
+                    day.add(obs, "met", lead, f[:500] * 1.1, o[:500], fss())
+                    day.add(obs, "ours@met", lead, f[:500], o[:500], fss())
+            day.add("gauges", "ours", lead, f[:40], o[:40])
+            day.add("gauges", "radar", lead, o[:40] * 0.9, o[:40])
+            day.add("gauges", "ours@radar", lead, f[:40], o[:40])
+        day.meta.update(issues=24, obs_hours=110, gauge_hours=100, a2t_hours=90, a2t_n=900 + k,
+                        issued=[f"{(now - timedelta(days=k)).date()}T{h:02d}:05:00Z" for h in range(24)])
+        day.save()
+    out = tmp_path / "out"
+    verify.summary(tmp_path, out, GRID, now)
+    doc = json.loads((out / "verif.json").read_text())
+    daily = doc["daily"]
+    assert len(daily["days"]) == 30 and set(daily["pairs"]) == {"radar", "a2t", "gauges"}
+    assert set(daily["pairs"]["radar"]) == {"persistens", "met"} and set(daily["pairs"]["gauges"]) == {"radar"}
+    assert daily["meta"]["issues"] == [24] * 30 and daily["meta"]["a2t_n"][-1] == 900
+    assert daily["meta"]["first"][-1] == "2026-11-03T00:05:00Z" and daily["meta"]["last"][-1] == "2026-11-03T23:05:00Z"
+    for w in ("7", "30"):
+        W = doc["windows"][w]
+        idx = [i for i, d in enumerate(daily["days"]) if W["from"] <= d <= W["to"]]
+        assert len(idx) == W["days"] == int(w)
+        assert sum(daily["meta"]["issues"][i] for i in idx) == W["issues"]
+        assert sum(daily["meta"]["obs_hours"][i] for i in idx) == W["obs_hours"]
+        for obs in ("radar", "gauges", "a2t"):
+            for key, e in W[obs]["models"].items():
+                s = _scores_from_daily(daily, obs, key, idx)
+                assert s["hours"].tolist() == e["hours"]
+                for m in verify.DICHOTOMOUS:
+                    _close(s["scores"][m], np.array(e["scores"][m], dtype=float)[..., 0], 1e-4)
+                for m in verify.CONTINUOUS:
+                    _close(s["cont"][m], np.array(e["cont"][m], dtype=float)[..., 0], 1e-3)
+                if obs != "gauges":
+                    _close(s["fss"], np.array(e["fss"], dtype=float)[..., 0], 2e-3)
+            for key, e in W[obs]["diff"].items():
+                s, s0 = _scores_from_daily(daily, obs, key, idx), _scores_from_daily(daily, obs, key, idx, pair=True)
+                for m in verify.DICHOTOMOUS:
+                    _close(s["scores"][m] - s0["scores"][m], np.array(e["scores"][m], dtype=float)[..., 0], 2e-4)
+                for m in verify.CONTINUOUS:
+                    _close(s["cont"][m] - s0["cont"][m], np.array(e["cont"][m], dtype=float)[..., 0], 2e-3)
+                if obs != "gauges":
+                    _close(s["fss"] - s0["fss"], np.array(e["fss"], dtype=float)[..., 0], 4e-3)
+
+
 def test_bootstrap_interval_with_several_days(tmp_path):
     shape = (20, 30)
     rng = np.random.default_rng(1)

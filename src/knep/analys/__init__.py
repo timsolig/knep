@@ -64,7 +64,7 @@ def far_zone(tgt: composite.TargetGrid, h_km: float) -> np.ndarray:
     return _FAR[key]
 
 
-def _analyses(times, cache, state_dir, session, fallback, opera_fjarr=None):
+def _analyses(times, cache, state_dir, session, fallback, opera_fjarr=None, opera_ring=False):
     """Analyser för times (äldst först): sparade om de redan byggts, annars SMHI plus reserv och utfyllnad.
 
     Returnerar också tiderna för de analyser som finns, eftersom en tid hoppas över när SMHI-bilden
@@ -105,6 +105,9 @@ def _analyses(times, cache, state_dir, session, fallback, opera_fjarr=None):
             if path is not None:
                 try:
                     op = srcs.read_opera(path, tgt)
+                    if opera_ring:
+                        mask = composite.mask_opera_ring_villkor if opera_ring == "villkor" else composite.mask_opera_ring
+                        op = mask(op, tgt)
                     rain, src = composite.layer(rain, src, op, composite.SOURCE_OPERA)
                     if far:
                         rain, src = composite.layer_far(rain, src, op, composite.SOURCE_OPERA, far_zone(tgt, opera_fjarr))
@@ -136,7 +139,8 @@ def _analyses(times, cache, state_dir, session, fallback, opera_fjarr=None):
 
 def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requests.Session, *,
          fallback: bool = False, bias_path: Path | None = None, collect: bool = False,
-         klotter_path: Path | None = None, opera_fjarr: float | None = None) -> Analys | None:
+         klotter_path: Path | None = None, opera_fjarr: float | None = None,
+         opera_ring: bool = False) -> Analys | None:
     """Analyserna för de `history` senaste bilderna fram till t0, eller None om för få finns.
 
     bias_path: låst karta för volymkorrektionen (None stänger av). collect: samla radarns värden
@@ -145,9 +149,12 @@ def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requ
     Filtret verkar före volymkorrektionen och ändrar inte de sparade analyserna i state_dir.
     opera_fjarr: OPERA där SMHI är torr inom zonen med svensk stråle över så många km (kräver
     fallback); None, standard, stänger av (se _analyses).
+    opera_ring: tar bort ringen av falskt eko kring de norska och finska radarplatserna ur
+    OPERA-lagret: True eller "fast" med fast mask (composite.mask_opera_ring), "villkor" bara i bilder där
+    ringen utanför är torr (composite.mask_opera_ring_villkor); av som standard.
     """
     times = [t0 - k * radar.STEP for k in range(history)][::-1]
-    fields, kept, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback, opera_fjarr)
+    fields, kept, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback, opera_fjarr, opera_ring)
     if len(fields) < 2 or grid is None:
         log.error("för få radarbilder bakåt från %s", t0)
         return None
