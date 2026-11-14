@@ -72,9 +72,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--opera-fjarr", type=float, default=None, metavar="KM",
                    help="med --fallback: OPERA där SMHI är torr inom zonen där de svenska radarernas lägsta "
                         "stråle ligger över KM km (glappet nordväst om Kiruna); av utan värde")
-    p.add_argument("--opera-ring", action="store_true",
+    p.add_argument("--opera-ring", nargs="?", const="fast", choices=("fast", "villkor"), default=None,
                    help="med --fallback: ta bort ringen av falskt eko kring de norska och finska OPERA-radarerna "
-                        "ur OPERA-lagret (av som standard)")
+                        "ur OPERA-lagret, med fast mask (fast, utan värde) eller bara i bilder där ringen "
+                        "utanför är torr (villkor); av som standard")
     p.add_argument("--reference", action="store_true", help="kör referensmodellen i stället för kedjan")
     p.add_argument("--keep-cache", action="store_true", help="rensa inte gamla radarbilder")
     p.add_argument("--no-compare", action="store_true", help="hämta inte MET Norges nowcast och SNOW till mosaiken")

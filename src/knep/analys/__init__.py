@@ -106,7 +106,8 @@ def _analyses(times, cache, state_dir, session, fallback, opera_fjarr=None, oper
                 try:
                     op = srcs.read_opera(path, tgt)
                     if opera_ring:
-                        op = composite.mask_opera_ring(op, tgt)
+                        mask = composite.mask_opera_ring_villkor if opera_ring == "villkor" else composite.mask_opera_ring
+                        op = mask(op, tgt)
                     rain, src = composite.layer(rain, src, op, composite.SOURCE_OPERA)
                     if far:
                         rain, src = composite.layer_far(rain, src, op, composite.SOURCE_OPERA, far_zone(tgt, opera_fjarr))
@@ -149,7 +150,8 @@ def bygg(t0: datetime, history: int, cache: Path, state_dir: Path, session: requ
     opera_fjarr: OPERA där SMHI är torr inom zonen med svensk stråle över så många km (kräver
     fallback); None, standard, stänger av (se _analyses).
     opera_ring: tar bort ringen av falskt eko kring de norska och finska radarplatserna ur
-    OPERA-lagret (composite.mask_opera_ring); av som standard.
+    OPERA-lagret: True eller "fast" med fast mask (composite.mask_opera_ring), "villkor" bara i bilder där
+    ringen utanför är torr (composite.mask_opera_ring_villkor); av som standard.
     """
     times = [t0 - k * radar.STEP for k in range(history)][::-1]
     fields, kept, grid, sources, missing = _analyses(times, cache, state_dir, session, fallback, opera_fjarr, opera_ring)

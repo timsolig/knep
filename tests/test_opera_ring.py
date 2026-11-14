@@ -37,6 +37,34 @@ def test_mask_is_nan_so_layer_can_fill_from_elsewhere():
     assert np.isnan(rain[r, c]) and rain[0, 0] == 2.0
 
 
+def test_villkor_masks_core_only_when_outer_ring_is_dry():
+    grid = composite.TargetGrid(**GRID)
+    r, c = _pixel(grid, 12.1, 67.53)  # Røst
+    op = np.zeros(grid.shape, np.float32)
+    op[r - 1:r + 2, c - 1:c + 2] = 3.0  # kärnan
+    out = composite.mask_opera_ring_villkor(op, grid)
+    assert np.isnan(out[r, c]) and np.isnan(out[r + 2, c])   # inom 8 km
+    assert out[r + 8, c] == 0                                  # utanför radien orört
+    assert (op[r, c] == 3.0)                                   # indata orörd
+
+
+def test_villkor_keeps_core_when_it_rains_around():
+    grid = composite.TargetGrid(**GRID)
+    r, c = _pixel(grid, 12.1, 67.53)
+    op = np.full(grid.shape, 1.0, np.float32)  # regn överallt
+    out = composite.mask_opera_ring_villkor(op, grid)
+    assert out[r, c] == 1.0 and np.isfinite(out).all()
+
+
+def test_villkor_needs_covered_ring():
+    grid = composite.TargetGrid(**GRID)
+    r, c = _pixel(grid, 12.1, 67.53)
+    op = np.full(grid.shape, np.nan, np.float32)
+    op[r - 1:r + 2, c - 1:c + 2] = 3.0                         # inget täckt utanför: ingen maskering
+    out = composite.mask_opera_ring_villkor(op, grid)
+    assert out[r, c] == 3.0
+
+
 def test_custom_radii_and_unknown_codes_are_ignored():
     grid = composite.TargetGrid(**GRID)
     op = np.ones(grid.shape, np.float32)
