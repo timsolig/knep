@@ -682,6 +682,8 @@ def fetch_archive(t: datetime, folder: Path, session, takt: Takt, tries: int = 6
             sleep(wait)
             wait = min(wait * 2, 120.0)
             continue
+        if r.status_code == 200 and not r.content:
+            return None, "saknas"  # SMHI svarar ibland 200 med en tom fil för en bild som inte finns
         if r.status_code == 200:
             tmp = path.with_suffix(".part")
             tmp.write_bytes(r.content)
@@ -774,7 +776,16 @@ def main(argv=None) -> int:
                 path, hur = fetch_archive(t, tifs, session, takt)
                 utfall[hur] += 1
             if path is not None:
-                rain, _ = radar.read_rain(path)
+                try:
+                    rain, _ = radar.read_rain(path)
+                except Exception as e:  # noqa: BLE001  en trasig fil ska inte stoppa hämtningen
+                    log.warning("radar %s: kunde inte läsas (%s), hoppar över", t, e)
+                    if a.download:
+                        path.unlink(missing_ok=True)
+                        utfall["ok"] -= 1
+                        utfall["fel"] += 1
+                    path = None
+            if path is not None:
                 grid = grid or _grid_from_tif(path)
                 store.add_radar(t, rain, None, stations, grid, keep=True)
                 if a.download:

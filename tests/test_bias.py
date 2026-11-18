@@ -174,3 +174,16 @@ def test_fetch_archive_saknas_och_ger_upp(tmp_path):
     assert bias.fetch_archive(t, tmp_path, _Session([404]), bias.Takt(0), sleep=lambda s: None) == (None, "saknas")
     path, hur = bias.fetch_archive(t, tmp_path, _Session([429] * 3), bias.Takt(0), tries=3, sleep=lambda s: None)
     assert (path, hur) == (None, "fel")
+
+
+def test_fetch_archive_tom_fil_ar_saknad(tmp_path):
+    """SMHI svarar ibland 200 med en tom fil (2024-09-13 14:55); den räknas som saknad och skrivs inte."""
+
+    class Tom(_Session):
+        def get(self, url, timeout=None):
+            self.anrop.append(url)
+            return _Svar(200, b"", {})
+
+    t = datetime(2024, 9, 13, 14, 55, tzinfo=UTC)
+    assert bias.fetch_archive(t, tmp_path, Tom([]), bias.Takt(0), sleep=lambda s: None) == (None, "saknas")
+    assert not list(tmp_path.iterdir())

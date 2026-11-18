@@ -14,6 +14,10 @@ Tim-KNEP är en nowcast för nederbörd över Sverige som bara bygger på observ
 
 Läs `CLAUDE.md` i repots rot för hur koden hänger ihop.
 
+## Skalet
+
+Du står redan i arbetskopian, så börja aldrig ett kommando med `cd` och använd inte `pwd` eller `git -C`. Det som inte står bland de tillåtna kommandona nekas, och en enda sådan del (till exempel ett `cd` före `&&`) gör att hela kommandot nekas; sessionen kan inte fråga. Tillåtet är bland annat `uv run python`, `uv run pytest`, `git status/diff/log/show/add/commit`, läsning (`cat`, `head`, `tail`, `grep`, `find`, `sed -n`, `awk`, `ls`, `wc`, `du`, `df`) och `mkdir`. Skriv filer med Write och Edit, inte med `cat >` eller `echo >`. Nekas ett kommando, skriv om det utan prefix eller dela upp det, i stället för att ge upp uppgiften.
+
 ## Principer
 
 Principerna gäller före allt annat, också före `MAL.md`.
