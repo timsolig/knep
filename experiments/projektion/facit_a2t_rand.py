@@ -1,14 +1,17 @@
 """Kedjans mängd per kvart mot radarns kvart, nära randen av täckningen och inne i den (uppgift 0006).
 
-    uv run python experiments/projektion/facit_a2t_rand.py
+    uv run python experiments/projektion/facit_a2t_rand.py [--system konservering:Inflode25]
 
 Ur de sparade kvartarna i /data/projektion/facit_a2t/kvartar/kedja/ (prognosen q<hh> och radarns egna
 kvartar obs<hh>). Randen: rutor inom 50 km (25 rutor på 2 km) från en ruta utan radar i analysen vid
-utgåvan (NaN i prognosen). Bara träningsdagarna i facit_a2t.dagar().
+utgåvan (NaN i prognosen). Bara träningsdagarna i facit_a2t.dagar(). Med --system jämförs ett annat
+systems kvartar (kvartar/<system>/) med radarns kvartar ur kedjans fil, med kedjans rand och rutor
+(uppgift 0013).
 """
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import sys
 from pathlib import Path
@@ -26,17 +29,22 @@ RAND_RUTOR = 25
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--system", default="kedja")
+    a = ap.parse_args()
     tot = {"rand": np.zeros((4, 2)), "inne": np.zeros((4, 2))}
     for day in F.dagar():
         z = np.load(F.UT / "kvartar" / "kedja" / f"{day}.npz")
+        zs = z if a.system == "kedja" else np.load(F.UT / "kvartar" / a.system / f"{day}.npz")
         for hh in F.ISSUES:
-            if f"q{hh:02d}" not in z.files:
+            if f"q{hh:02d}" not in z.files or f"q{hh:02d}" not in zs.files:
                 continue
-            q, o = z[f"q{hh:02d}"].astype(np.float32), z[f"obs{hh:02d}"].astype(np.float32)
-            cov = np.isfinite(q[0])
+            qk = z[f"q{hh:02d}"].astype(np.float32)
+            q, o = zs[f"q{hh:02d}"].astype(np.float32), z[f"obs{hh:02d}"].astype(np.float32)
+            cov = np.isfinite(qk[0])
             inne = distance_transform_edt(cov) > RAND_RUTOR
             for j in range(4):
-                ok = np.isfinite(q[j]) & np.isfinite(o[j])
+                ok = np.isfinite(qk[j]) & np.isfinite(q[j]) & np.isfinite(o[j])
                 for name, m in (("rand", ok & ~inne), ("inne", ok & inne)):
                     tot[name][j] += [q[j][m].sum(dtype=np.float64), o[j][m].sum(dtype=np.float64)]
     for name, v in tot.items():

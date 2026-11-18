@@ -267,6 +267,59 @@ def far_zone(grid: TargetGrid, h_km: float, radars=None) -> np.ndarray:
     return np.isfinite(beam) & (beam > h_km)
 
 
+#: Radien i km kring de icke-svenska OPERA-radarer där kompositen har en ring av falskt eko
+#: (experiments/riksgransen/ring_kand.py, uppgift 0028, valt på träningsdagarna).
+OPERA_RING_KM = {"nohfj": 16.0, "nosmn": 12.0, "norst": 12.0, "fikor": 8.0, "fivim": 8.0, "fiuta": 16.0}
+
+
+def mask_opera_ring(extra, grid: TargetGrid, radii=None, radars=None):
+    """OPERA-lagret (mm/h) med NaN inom radien kring radarplatserna där ringen sitter, så att
+    `layer`, `layer_far` och utfyllnaden kan använda något annat där. Ändrar inte indata."""
+    radii = OPERA_RING_KM if radii is None else radii
+    radars = RADARS if radars is None else radars
+    X, Y = grid.centres()
+    to_grid = Transformer.from_crs(CRS.from_epsg(4326), CRS.from_epsg(3006), always_xy=True)
+    out = extra.copy()
+    for code, km in radii.items():
+        if code not in radars:
+            continue
+        lat, lon = radars[code][:2]
+        x0, y0 = to_grid.transform(lon, lat)
+        out[np.hypot(X - x0, Y - y0) < km * 1000] = np.nan
+    return out
+
+
+#: Den villkorade masken (experiments/riksgransen/ring_villkor.py, uppgift 0029, vald på träningsdagarna):
+#: radien i km, ringen utanför går från radien + RING_GAP_KM till RING_MAX_KM och villkoret är att andelen eko
+#: där är under RING_ANDEL.
+OPERA_RING_VILLKOR_KM = {code: 8.0 for code in OPERA_RING_KM}
+RING_GAP_KM, RING_MAX_KM, RING_ANDEL, RING_MIN_RUTOR = 4.0, 40.0, 0.10, 30
+
+
+def mask_opera_ring_villkor(extra, grid: TargetGrid, radii=None, radars=None, andel=RING_ANDEL):
+    """Som `mask_opera_ring`, men en plats maskeras bara i bilder där ringen utanför (radien + 4 till 40 km)
+    är torr: andelen rutor med eko (minst 0,1 mm/h) bland de täckta är under `andel`. Regnar det runt platsen
+    är ekot vid den verkligt regn och lämnas. Mindre än 30 täckta rutor i ringen utanför ger ingen maskering."""
+    radii = OPERA_RING_VILLKOR_KM if radii is None else radii
+    radars = RADARS if radars is None else radars
+    X, Y = grid.centres()
+    to_grid = Transformer.from_crs(CRS.from_epsg(4326), CRS.from_epsg(3006), always_xy=True)
+    out = extra.copy()
+    cov = np.isfinite(extra)
+    eko = cov & (np.nan_to_num(extra) >= 0.1)
+    for code, km in radii.items():
+        if code not in radars:
+            continue
+        lat, lon = radars[code][:2]
+        x0, y0 = to_grid.transform(lon, lat)
+        d = np.hypot(X - x0, Y - y0) / 1000
+        ring = (d >= km + RING_GAP_KM) & (d < RING_MAX_KM) & cov
+        n = int(ring.sum())
+        if n >= RING_MIN_RUTOR and eko[ring].sum() / n < andel:
+            out[d < km] = np.nan
+    return out
+
+
 def layer_far(rain, source, extra, code, far, min_extra=0.1, mode="torr"):
     """Inom zonen `far` (bool): ta reservkällan där den har minst min_extra mm/h och analysen är
     torr (0, mode="torr") eller lägre (mode="max"). Utanför zonen ändras inget; NaN tas av `layer`."""

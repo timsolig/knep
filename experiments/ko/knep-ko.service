@@ -1,0 +1,18 @@
+[Unit]
+Description=knep: kön, experiment som körs utan Claude (se experiments/ko/README.md)
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=PATH=@PATH@
+WorkingDirectory=%h/ko
+ExecStart=%h/.local/bin/uv run python experiments/ko/ko.py kör
+Restart=always
+RestartSec=300
+Nice=15
+# driften är avstängd; kön får tre av fyra kärnor och viker undan för allt annat
+CPUQuota=300%
+CPUWeight=20
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,8 @@
+{
+  "id": "0000-prov-f4",
+  "spar": "prov",
+  "syfte": "Provar kedjan i kön: analysens domare räknar om F4 mot A0 på träningen ur de sparade dagfilerna (ingen ny räkning).",
+  "kor": [["uv", "run", "python", "experiments/analys/domare.py", "tabell", "F4", "--mot", "A0", "--del", "traning"]],
+  "dom": {"domare": "analys", "fil": "/data/analys/domare_v2/tabell_F4_mot_A0_traning.json"},
+  "max_min": 30
+}
