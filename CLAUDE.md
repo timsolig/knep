@@ -55,10 +55,10 @@ Claude Code körs direkt på Pi:n. Repot ligger i `~/knep` och radararkivet i `~
 
 Claude öppnar och slår ihop sina egna pull requests. `main` är skyddad: kontrollerna `pytest` och `docker` måste gå igenom och grenen måste vara à jour med `main`, även för administratören.
 
-- Kör `uv run pytest` lokalt innan grenen pushas. Ändringar av modellen kräver dessutom att experimenten körs om (se Regler).
+- Förkontrollen `.githooks/pre-push` körs vid varje push (`git config core.hooksPath .githooks`, gäller alla arbetskopior): grenen à jour med main, inga lokalt spärrade ord, sökvägar eller nycklar (listorna i `~/.bakgrund/`), release-filerna går att hämta (annars faller kontrollen docker) och `uv run pytest`. Användaren vill inte ha mejl om misslyckade körningar, så pusha inte förbi den (`--no-verify` bara på användarens begäran). Ändringar av modellen kräver dessutom att experimenten körs om (se Regler).
 - Öppna med `gh pr create` och slå ihop med `gh pr merge --auto --merge --delete-branch`, så att GitHub väntar på kontrollerna. Aldrig `--admin`, aldrig push direkt till `main` eller `data`, aldrig `--force`.
 - Följ upp efter sammanslagningen: kontrollera att driften har bytt till den nya commiten och att nästa cykel publicerar. Om den inte fungerar, öppna en PR som återställer.
-- Fråga användaren först om ändringen tar bort data, ändrar vad sidan visar på ett sätt som inte är beställt, eller släpper en ny modellversion.
+- Fråga användaren först om ändringen ändrar vad sidan visar på ett sätt som inte är beställt. Det som har visat en förbättring hos domaren på valideringen slås ihop utan att fråga, också att slå på ett val och att släppa en modell, och data och dokumentation som inte längre är relevant städas löpande (användarens beslut 2026-11-18, se `experiments/ko/vecka.md`).
 
 ## Regler
 
