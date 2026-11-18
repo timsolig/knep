@@ -27,3 +27,4 @@ Instruktionen för den schemalagda sessionen, en gång i veckan med Opus. Kön (
 - Bara observationer i analysen och prognosen (principerna i `CLAUDE.md`).
 - Ändra aldrig en domare för att ett system ska se bättre ut, och kör aldrig testdelen.
 - Håll sessionen kort: läs sammanfattningen, inte loggarna.
+- Repot är publikt. Före varje push: `git diff origin/main...HEAD` får inte innehålla något ur `~/.bakgrund/lokala-ord.txt` eller sökvägarna i `~/.bakgrund/lokala-spärrar.txt`, inget ur `extern/` och ingen nyckel ur `~/.config/eumetsat/`.
