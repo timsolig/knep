@@ -32,7 +32,9 @@ def test_hel_foljer_g_rang():
     m = M.match_hel(f, g)
     ok = np.isfinite(f)
     a, b = g[ok], m[ok]
-    o = np.argsort(a, kind="stable")
+    # lika värden i g får komma i vilken ordning som helst (sorteringen skiljer mellan x86 och arm),
+    # så ordna efter g och sedan efter m: m ska vara icke-avtagande i g
+    o = np.lexsort((b, a))
     assert (np.diff(b[o]) >= -1e-6).all()
 
 
