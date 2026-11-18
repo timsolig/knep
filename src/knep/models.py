@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 MANIFEST = Path("models/models.json")
@@ -49,6 +50,23 @@ def _repo(m: dict) -> str:
     return repo
 
 
+def _get(requests, url: str, tries: int = 6, sleep=time.sleep):
+    """GET med omförsök när GitHub svarar 5xx, 429 eller inte alls (504 och 503 för release-filerna
+    händer i perioder och fällde kontrollen docker). Ger svaret, eller None om inget kom."""
+    wait, r = 5.0, None
+    for i in range(tries):
+        try:
+            r = requests.get(url, timeout=120)
+        except requests.RequestException:
+            r = None
+        if r is not None and r.status_code < 500 and r.status_code != 429:
+            return r
+        if i < tries - 1:
+            sleep(wait)
+            wait = min(wait * 2, 60.0)
+    return r
+
+
 def fetch(manifest: Path = MANIFEST) -> int:
     import requests
 
@@ -60,9 +78,9 @@ def fetch(manifest: Path = MANIFEST) -> int:
             print(f"{name}: {e['tag']} finns redan")
             continue
         url = f"https://github.com/{_repo(m)}/releases/download/{e['tag']}/{e['file']}"
-        r = requests.get(url, timeout=120)
-        if r.status_code != 200:
-            print(f"{name}: kunde inte hämta {url} ({r.status_code})", file=sys.stderr)
+        r = _get(requests, url)
+        if r is None or r.status_code != 200:
+            print(f"{name}: kunde inte hämta {url} ({r.status_code if r is not None else 'inget svar'})", file=sys.stderr)
             bad += 1
             continue
         tmp = dst.with_suffix(dst.suffix + ".part")

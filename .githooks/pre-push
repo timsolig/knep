@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Förkontrollen före varje push (git config core.hooksPath .githooks): det som annars fäller
+# kontrollerna på GitHub och ger användaren ett mejl om en misslyckad körning. Hoppa över i nödfall
+# med git push --no-verify (bara på användarens begäran).
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+fel() { echo "förkontrollen: $*" >&2; exit 1; }
+
+# bara grenar som får en PR; att ta bort en gren eller pusha en tagg kontrolleras inte
+while read -r lref lsha rref rsha; do
+  [ "$lsha" = 0000000000000000000000000000000000000000 ] && exit 0
+  case "$rref" in refs/heads/main|refs/heads/data) fel "pusha aldrig direkt till ${rref#refs/heads/}";; esac
+done
+
+git fetch -q origin main || fel "kunde inte hämta origin/main"
+
+# 1. grenen är à jour med main (annars blockeras sammanslagningen och kontrollerna körs om)
+git merge-base --is-ancestor origin/main HEAD || fel "grenen är inte à jour med main: git merge origin/main"
+
+# 2. inget som inte får stå i det publika repot
+andrade=$(git diff --name-only origin/main...HEAD)
+diffen=$(git diff origin/main...HEAD)
+for f in "$HOME/.bakgrund/lokala-ord.txt"; do
+  [ -s "$f" ] || continue
+  while IFS= read -r ord; do
+    [ -n "$ord" ] || continue
+    printf '%s' "$diffen" | grep -qiF -- "$ord" && fel "ett lokalt spärrat ord ur $f står i ändringen"
+    echo "$andrade" | grep -qiF -- "$ord" && fel "en fil med ett lokalt spärrat ord i sökvägen är med"
+  done < "$f"
+done
+if [ -s "$HOME/.config/eumetsat/credentials" ]; then
+  while IFS= read -r rad; do
+    [ -n "$rad" ] && printf '%s' "$diffen" | grep -qF -- "$rad" && fel "EUMETSAT-nyckeln står i ändringen"
+  done < "$HOME/.config/eumetsat/credentials"
+fi
+
+# 3. release-filerna går att hämta (kontrollen docker hämtar dem; GitHub svarar ibland 503/504 i perioder)
+if [ -f models/models.json ]; then
+  urls=$(python3 - <<'PY'
+import json
+m = json.load(open("models/models.json"))
+repo = m.get("repo", "timsolig/knep")
+for e in m.get("models", {}).values():
+    print(f"https://github.com/{repo}/releases/download/{e['tag']}/{e['file']}")
+PY
+)
+  for u in $urls; do
+    kod=$(curl -s -o /dev/null -w '%{http_code}' -I -L -m 30 "$u")
+    [ "$kod" = 200 ] || fel "GitHub levererar inte $u just nu (svar $kod); kontrollen docker skulle falla, vänta och pusha igen"
+  done
+fi
+
+# 4. testerna, om något annat än text har ändrats
+if echo "$andrade" | grep -qvE '\.md$'; then
+  echo "förkontrollen: kör testerna" >&2
+  uv run pytest -q -p no:cacheprovider >/tmp/forkontroll-pytest.log 2>&1 \
+    || { tail -20 /tmp/forkontroll-pytest.log >&2; fel "testerna går inte igenom (hela loggen i /tmp/forkontroll-pytest.log)"; }
+fi
+echo "förkontrollen: klar" >&2
