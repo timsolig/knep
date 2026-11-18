@@ -1,4 +1,4 @@
-# Målen för bakgrunden
+# Målen för bakgrunden (arkiv, se experiments/ko/SPAR.md)
 
 Planeraren läser den här filen före varje uppgift. Användaren äger **Principer**. Planeraren får ändra **Prioriteringar** när resultaten säger att något annat är viktigare, och skriver då varför under **Ändringar**. Frågor som bara användaren kan avgöra står under **Frågor till användaren**.
 

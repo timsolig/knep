@@ -14,8 +14,9 @@ Instruktionen för den schemalagda sessionen, en gång i veckan med Opus. Kön (
 2. **Laga det som gick fel** (status fel eller tidsgräns): rätta experimentfilen eller koden, ta bort resultatfilen och låt kön köra om.
 3. **Ompröva spåren enligt reglerna i `SPAR.md`**: budget, mättat, en tredjedel till andra spår, var fjärde vecka från grunden. Uppdatera tabellerna.
 4. **Fyll på kön för minst en vecka** (Pi:n räknar cirka 150 processortimmar i veckan med tre kärnor). Ett experiment söker på `traning` eller `snabb`; bara en frusen kandidat körs på `validering`, en gång per spår och kandidat. Testdelen körs aldrig. Skriv ny kod för ett nytt spår om det behövs, med test.
-5. **Committa** kön, koden och `SPAR.md` på en gren, `uv run pytest`, PR mot `main`, `gh pr merge --auto --merge --delete-branch`. Kön hämtar `main` själv mellan experimenten.
-6. **Rapportera kort till användaren**: vad kön gav i veckan, vad som slogs ihop, vilka spår som stängdes eller öppnades och varför, och om något väntar på användaren.
+5. **Städa löpande** (användaren 2026-11-18: data och gammal dokumentation som inte längre är relevant får tas bort utan att fråga). Ta bort det som hör till stängda spår och inte behövs för en baslinje: dagfiler för fällda varianter under `/data/analys/domare_v2/` och `/data/projektion/domare/`, mellanresultat och bilder från experiment som är avgjorda, gamla loggar i `/data/ko/logg/`, och dokumentation som beskriver något som inte finns längre. Behåll alltid radararkivet (`/data/radar/`), mätarna (`/data/bortfall/matare/`, `/work/cache/bias/`), baslinjernas dagfiler (A0, A1, A2T, F4, `kedja`, `kedja_om`, `persistens`), rörelsecachen, modellerna, rapporterna och allt som kön har kvar att köra. Skriv i rapporten vad som togs bort och hur mycket plats det gav. Kön pausar själv under 1,5 GB ledigt.
+6. **Committa** kön, koden och `SPAR.md` på en gren, `uv run pytest`, PR mot `main`, `gh pr merge --auto --merge --delete-branch`. Kön hämtar `main` själv mellan experimenten.
+7. **Rapportera kort till användaren**: vad kön gav i veckan, vad som slogs ihop, vilka spår som stängdes eller öppnades och varför, och om något väntar på användaren.
 
 ## Experimentfilen
 
@@ -26,3 +27,4 @@ Instruktionen för den schemalagda sessionen, en gång i veckan med Opus. Kön (
 - Bara observationer i analysen och prognosen (principerna i `CLAUDE.md`).
 - Ändra aldrig en domare för att ett system ska se bättre ut, och kör aldrig testdelen.
 - Håll sessionen kort: läs sammanfattningen, inte loggarna.
+- Repot är publikt. Före varje push: `git diff origin/main...HEAD` får inte innehålla något ur `~/.bakgrund/lokala-ord.txt` eller sökvägarna i `~/.bakgrund/lokala-spärrar.txt`, inget ur `extern/` och ingen nyckel ur `~/.config/eumetsat/`.

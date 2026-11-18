@@ -41,7 +41,7 @@ Koden är delad i två produkter och det som bygger sidan av dem. `cli.py` kör 
 - `deploy/` driften som en container: `Dockerfile` (bara verktygen), `compose.yaml`, `drift.sh` (följer `main` och installerar varje ny commit, med återgång om den inte fungerar), `cycle.sh` (en cykel) och `publish.sh` som tvingar grenen `data`
 - `.github/workflows/pages.yml` slår ihop `web/` och grenen `data` och publicerar
 - `experiments/` jämförelsen mot en KNEP-proxy på öppna radarfall, med resultat i `experiments/results/`. Kör om den innan en ändring av modellen tas in
-- `experiments/ko/` kön: experiment som körs utan Claude dygnet runt (tjänsten `knep-ko` i arbetskopian `~/ko`), domen sätts mekaniskt ur domarnas regel, och en genomgång med Opus en gång i veckan (`vecka.md`) väljer nästa experiment och omprövar spåren (`SPAR.md`). Ersätter `experiments/bakgrund/`, som är avstängd. Sidan för den omgjorda fliken Verifiering (bakgrundens uppgift 0012) ligger på grenen `bakgrund/2026-11-08-0834` tills den kan provas i en webbläsare
+- `experiments/ko/` kön: experiment som körs utan Claude dygnet runt (tjänsten `knep-ko` i arbetskopian `~/ko`), domen sätts mekaniskt ur domarnas regel, och en genomgång med Opus en gång i veckan (`vecka.md`) väljer nästa experiment och omprövar spåren (`SPAR.md`). Ersätter `experiments/bakgrund/` och `experiments/natt/`, som är avvecklade (kvar som arkiv med rapporterna). Sidan för den omgjorda fliken Verifiering (bakgrundens uppgift 0012) ligger på grenen `bakgrund/2026-11-08-0834` tills den kan provas i en webbläsare
 
 ## Mål
 
@@ -49,7 +49,7 @@ Tim-KNEP bygger bara på observationer: radarn och regnmätarna, och på sikt sa
 
 ## Miljö
 
-Claude Code körs direkt på Pi:n. Repot ligger i `~/knep` och radararkivet i `~/radar-arkiv`; experimenten och bakgrunden (`experiments/bakgrund/`) använder de gamla sökvägarna `/work` och `/data`, som ska vara symlänkar dit. Driften går i containern från `deploy/compose.yaml` och följer `main` av sig själv (en sammanslagning är i drift inom fem minuter), så ändringar går via grenar och pull requests, aldrig direkt mot driften. Rör aldrig driftens container eller volymer. **Driften är avstängd sedan 2026-11-11** (`docker stop knep`, användarens beslut: den behövs inte förrän modellen är bra nog att använda, och den konkurrerade med bakgrunden om Pi:n). Sidan visar sista körningen. En sammanslagning går alltså inte i drift och ingen publicering ska väntas in; uppföljningen nedan gäller när driften är igång igen (`docker start knep`, bara på användarens begäran).
+Claude Code körs direkt på Pi:n. Repot ligger i `~/knep` och radararkivet i `~/radar-arkiv`; experimenten och kön (`experiments/ko/`) använder de gamla sökvägarna `/work` och `/data`, som ska vara symlänkar dit. Driften går i containern från `deploy/compose.yaml` och följer `main` av sig själv (en sammanslagning är i drift inom fem minuter), så ändringar går via grenar och pull requests, aldrig direkt mot driften. Rör aldrig driftens container eller volymer. **Driften är avstängd sedan 2026-11-11** (`docker stop knep`, användarens beslut: den behövs inte förrän modellen är bra nog att använda, och den konkurrerade med bakgrunden om Pi:n). Sidan visar sista körningen. En sammanslagning går alltså inte i drift och ingen publicering ska väntas in; uppföljningen nedan gäller när driften är igång igen (`docker start knep`, bara på användarens begäran).
 
 ## Pull requests
 

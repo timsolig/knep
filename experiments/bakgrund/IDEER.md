@@ -1,4 +1,4 @@
-# Idéer
+# Idéer (arkiv, se experiments/ko/SPAR.md)
 
 Kandidaterna som planeraren väljer från, ungefär i den ordning de ger mest nu. Varje idé har förväntad nytta, kostnad och risk. Det som är avgjort flyttas till **Avgjort** med en rad om utfallet och en länk till rapporten.
 
