@@ -1,0 +1,27 @@
+{
+ "id": "0010-lokal-forskjutning32",
+ "spar": "lokal-forskjutning",
+ "syfte": "Tak: kedjan flyttad mot facit per kvart med ett tätt fält (32 km). Hur mycket av lägestaket (+0,078 CSI 1 mm vid 2 h) är lokal förskjutning?",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "tak_lokal:TakForskjutning32"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "tak_lokal:TakForskjutning32"
+ },
+ "max_min": 240,
+ "tak": true
+}

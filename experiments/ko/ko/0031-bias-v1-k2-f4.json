@@ -1,0 +1,38 @@
+{
+ "id": "0031-bias-v1-k2-f4",
+ "spar": "bias-v1-filter",
+ "syfte": "bias-v1-varianten k2 (minst falska ekon i 0025) med F4 efter, på träningen mot A0.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/a0b_f4.py",
+   "kor",
+   "A0Bk2F4",
+   "--del",
+   "traning",
+   "--ut",
+   "/data/bias_v1/domare_tr"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/a0b_f4.py",
+   "tabell",
+   "A0Bk2F4",
+   "--mot",
+   "A0",
+   "--del",
+   "traning",
+   "--ut",
+   "/data/bias_v1/domare_tr"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/bias_v1/domare_tr/tabell_A0Bk2F4_mot_A0_traning.json"
+ },
+ "max_min": 480
+}

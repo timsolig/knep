@@ -1,0 +1,26 @@
+{
+ "id": "0022-terrang-riktning",
+ "spar": "terrangkvot",
+ "syfte": "Kandidat: terrängkvoten per vindriktning (8 sektorer och svag vind), krympt mot kvoten för alla riktningar.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "terrang:KedjaTerrangRiktning"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "terrang:KedjaTerrangRiktning"
+ },
+ "max_min": 240
+}

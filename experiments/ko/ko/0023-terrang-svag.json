@@ -1,0 +1,26 @@
+{
+ "id": "0023-terrang-svag",
+ "spar": "terrangkvot",
+ "syfte": "Kandidat: terrängkvoten klippt till [0,75, 1,33], mindre risk för blockmaxet.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "terrang:KedjaTerrangSvag"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "terrang:KedjaTerrangSvag"
+ },
+ "max_min": 240
+}

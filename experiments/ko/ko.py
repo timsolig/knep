@@ -11,6 +11,9 @@ Ett experiment är en JSON-fil i experiments/ko/ko/ (namnet bestämmer ordningen
      "dom": {"domare": "analys", "fil": "/data/analys/domare_v2/tabell_A0O_r24_mot_A0_traning.json"},
      "max_min": 300}
 
+Ett tak (en fuskvariant som ser facit, "tak": true) räknas aldrig som en förbättring; dess största säkra
+vinst är svaret på hur mycket en del av kedjan kan ge.
+
 eller med prognosens domare:
 
      "dom": {"domare": "prognos", "läge": "snabb", "system": "modul:Klass", "ref": null}
@@ -131,7 +134,7 @@ def disk_gb(path: Path) -> float:
 
 def kor_ett(s: dict) -> dict:
     LOGG.mkdir(parents=True, exist_ok=True)
-    res = {"id": s["id"], "spar": s.get("spar", "?"), "syfte": s.get("syfte", ""), "start": nu()}
+    res = {"id": s["id"], "spar": s.get("spar", "?"), "syfte": s.get("syfte", ""), "tak": bool(s.get("tak")), "start": nu()}
     if "fel" in s:
         return res | {"status": "fel", "fel": s["fel"], "slut": nu()}
     t0 = time.monotonic()
@@ -207,7 +210,7 @@ def summera() -> str:
     kvar = [s for s in alla if s["id"] not in klara]
     lines = [f"# Kön, {nu()}", "",
              f"{len(rs)} experiment med resultat, {len(kvar)} kvar i kön. Ledigt på /data: {disk_gb(DATA if DATA.exists() else Path('/')):.1f} GB.", ""]
-    ja = [r for r in rs if (r.get("dom") or {}).get("battre")]
+    ja = [r for r in rs if (r.get("dom") or {}).get("battre") and not r.get("tak")]
     lines += ["## Säkerställd förbättring", ""]
     lines += [f"- **{r['id']}** ({r['spar']}): {', '.join(r['dom'].get('battre_i', [])[:6])}; största säkra vinst "
               f"{r['dom']['storsta_sakra_vinst']:+.4f} i {r['dom']['storsta_vinst_i']}" for r in ja] or ["- ingen"]
@@ -219,6 +222,7 @@ def summera() -> str:
     for r in sorted(rs, key=lambda r: r.get("slut", ""), reverse=True)[:25]:
         d = r.get("dom") or {}
         dom = "bättre" if d.get("battre") else ("inte bättre" if d else "–")
+        dom = f"tak, {d.get('storsta_sakra_vinst', 0):+.4f} i {d.get('storsta_vinst_i')}" if r.get("tak") and d else dom
         lines.append(f"| {r['id']} | {r['spar']} | {r['status']}{' ' + r.get('fel', '') if r['status'] != 'klar' else ''} | "
                      f"{dom} | {r.get('minuter', '')} | {', '.join(d.get('samre_i', [])[:4])} |")
     lines += ["", "## Kvar i kön", ""] + ([f"- {s['id']} ({s.get('spar', '?')}): {s.get('syfte', '')}" for s in kvar] or ["- tom"])
