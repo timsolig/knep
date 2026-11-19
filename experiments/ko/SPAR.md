@@ -14,15 +14,21 @@ Syftet är att kön inte ska justera små saker inom en idé i veckor och sluta 
 
 ## Aktiva
 
+Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret, och de slås aldrig på.
+
 | spår | idé | tak (källa) | startad | budget kvar | läge |
 |---|---|---|---|---|---|
-| (fylls av veckans genomgång) | | | | | |
+| lokal-forskjutning (nytt, tak) | dela lägestaket på 32 till 128 km i lokal förskjutning och nybildning, så att nästa spår väljs efter rätt del | lägestaket CSI 1 mm +0,078 vid 2 h (0017, 0018 minus 0022) | 2026-11-19 | 5 experiment, 1 vecka | i kön (0010 till 0012, 0040, 0041) |
+| terrangkvot (nytt, tränad modell) | en kvot facit/kedja per ruta, ledtimme och vindriktning, lärd på 22 träningsdagar och bedömd på de 6 i snabb; projektets mål om nederbörd bunden till terrängen | del av tillväxttaket 32 km (+0,035 till +0,120), ren tillväxt i 128 km är +0,010 till +0,050 (0018) | 2026-11-19 | 12 experiment, 3 veckor | i kön (0020 till 0023) |
+| bias-v1-filter (öppnat igen, nytt skäl) | bias-v1 fälldes bara av falska ekon; F4 tar bort klotter som korrektionen förstärker | kvot våt per kvart +0,12 (0024) | 2026-11-19 | 6 experiment, 2 veckor (sista budgeten för bias-v1) | i kön (0030, 0031) |
 
 ## Vilande eller stängda
 
 | spår | varför | största säkra vinst | rapport |
 |---|---|---|---|
-| bias-v1 | fyra försök fällda av falska ekon vid torra mätare | kvot våt kvart +0,12 men spärren | uppgift 0024, 0025, 0027 |
+| bias-v1 (ensam) | fyra försök fällda av falska ekon vid torra mätare; fortsätter bara som bias-v1-filter | kvot våt kvart +0,12 men spärren | uppgift 0024, 0025, 0027 |
+| ringen vid Røst (OPERA) | villkorad mask finns avstängd (`--opera-ring villkor`), ingen dom vid svenska mätare möjlig; vilande tills den stora skivan behövs | | 0028, 0029 |
+| tillväxt ur historiken | trenden ur blockmedlet gav +0,008 mot taket +0,059 (64 km) | CSI 1 mm +0,008 | 0018 |
 | utjämning efter osäkerhet | fälld av blockmaxet i alla varianter | csi1 +0,02 på träningen | 0019 till 0021 |
 | rörelse som ändras med ledtiden | 9 % av lägestaket | CSI 1 mm +0,007 | 0022 |
 | kedjan utan fördelningsmatchning | inte bättre på valideringen | | 0013 |
@@ -30,4 +36,8 @@ Syftet är att kön inte ska justera små saker inom en idé i veckor och sluta 
 
 ## Omprövningar
 
-(veckans genomgång skriver här var fjärde vecka)
+### 2026-11-19, den första
+
+Taken (0017, 0018, 0022) i CSI 1 mm vid 2 h mot `kedja_om`: tillväxt i block om 32 km +0,120, om 64 km +0,076, om 128 km +0,042; rörelse med ett fält 0, rörelse som ändras med ledtiden +0,007; utjämning vald i efterhand +0,044, med fast schema +0,003. Det mesta som är kvar är alltså **lägesfelet på 32 till 128 km (+0,078)**, som en stel rörelse inte förklarar, och **tillväxt i stor skala (+0,042)**. Hemtaget hittills: utjämningen gav +0,02 på träningen men fälldes av blockmaxet, trenden ur historiken +0,008; inget av det har gått igenom domaren.
+
+Valet: (1) dela lägestaket med två tak (lokal förskjutning och nybildning), billigt och avgörande för vad som är värt en kandidat; (2) terrängkvoten som en tränad modell, eftersom den angriper både läge (regn som rörelsen flyttar bort från lovartsidan) och tillväxt (fjällen), och är projektets uttalade mål; (3) bias-v1 med F4, eftersom den största vinst som domaren någonsin har visat (+0,12 i mängd) bara fälldes av en spärr som F4 är byggt för. Utjämningen och rörelsen förblir vilande tills taken i (1) säger något annat. Satelliten (nybildning ur molnen) väljs om TakNybildning visar att nya celler är en stor del av lägestaket.

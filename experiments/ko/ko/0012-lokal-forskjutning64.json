@@ -1,0 +1,27 @@
+{
+ "id": "0012-lokal-forskjutning64",
+ "spar": "lokal-forskjutning",
+ "syfte": "Tak: förskjutning i fönster 64 km, för att se hur skalberoende förskjutningen är.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "tak_lokal:TakForskjutning64"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "tak_lokal:TakForskjutning64"
+ },
+ "max_min": 240,
+ "tak": true
+}

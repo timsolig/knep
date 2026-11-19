@@ -1,0 +1,51 @@
+{
+ "id": "0020-terrang-samla",
+ "spar": "terrangkvot",
+ "syfte": "Träning: kvoten facit/kedja per ruta, ledtimme och vindriktning på de 22 träningsdagarna utanför snabb, och kartan.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "traning",
+   "--procs",
+   "2",
+   "--system",
+   "terrang:TerrangSamla",
+   "--dagar",
+   "2020-05-01",
+   "2020-07-24",
+   "2020-08-29",
+   "2020-10-07",
+   "2020-10-22",
+   "2020-12-27",
+   "2021-01-23",
+   "2021-04-05",
+   "2022-05-21",
+   "2022-12-20",
+   "2023-01-04",
+   "2023-03-17",
+   "2023-04-25",
+   "2023-08-02",
+   "2023-11-22",
+   "2024-01-24",
+   "2024-04-14",
+   "2024-08-09",
+   "2024-11-25",
+   "2025-06-23",
+   "2025-09-15",
+   "2025-10-24"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/terrang.py",
+   "karta"
+  ]
+ ],
+ "max_min": 600
+}

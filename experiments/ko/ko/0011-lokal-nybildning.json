@@ -1,0 +1,27 @@
+{
+ "id": "0011-lokal-nybildning",
+ "spar": "lokal-forskjutning",
+ "syfte": "Tak: perfekt nybildning (regn där kedjan inget har inom 16 km). Hur mycket av lägestaket är nya celler?",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "tak_lokal:TakNybildning"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "tak_lokal:TakNybildning"
+ },
+ "max_min": 240,
+ "tak": true
+}

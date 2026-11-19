@@ -1,0 +1,26 @@
+{
+ "id": "0021-terrang",
+ "spar": "terrangkvot",
+ "syfte": "Kandidat: kedjan gånger terrängkvoten per ledtimme, bedömd på snabb (dagar som träningen inte har sett).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "terrang:KedjaTerrang"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "terrang:KedjaTerrang"
+ },
+ "max_min": 240
+}

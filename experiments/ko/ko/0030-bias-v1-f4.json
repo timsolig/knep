@@ -1,0 +1,40 @@
+{
+ "id": "0030-bias-v1-f4",
+ "spar": "bias-v1-filter",
+ "syfte": "bias-v1 med F4 efter: tar F4 bort de falska ekon som fällde bias-v1, utan att vinsten i mängd (kvot våt +0,12) försvinner? Träningen, mot A0.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/a0b_f4.py",
+   "kor",
+   "A0BF4",
+   "--del",
+   "traning",
+   "--ut",
+   "/data/bias_v1/domare_tr",
+   "--bit",
+   "0/1"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/a0b_f4.py",
+   "tabell",
+   "A0BF4",
+   "--mot",
+   "A0",
+   "--del",
+   "traning",
+   "--ut",
+   "/data/bias_v1/domare_tr"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/bias_v1/domare_tr/tabell_A0BF4_mot_A0_traning.json"
+ },
+ "max_min": 480
+}
