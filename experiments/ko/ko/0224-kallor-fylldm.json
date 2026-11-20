@@ -1,0 +1,26 @@
+{
+ "id": "0224-kallor-fylldm",
+ "spar": "kallor-bortfall",
+ "syfte": "Utfyllnaden gånger en kvot ur timmätarna i hålet (som kommer en timme sent).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldM",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldM",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

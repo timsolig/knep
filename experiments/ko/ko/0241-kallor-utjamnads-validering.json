@@ -1,0 +1,29 @@
+{
+ "id": "0241-kallor-utjamnads-validering",
+ "spar": "kallor-bortfall",
+ "syfte": "UtjamnadS på bortfallens valideringsfall, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:UtjamnadS",
+   "--del",
+   "validering",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:UtjamnadS",
+  "mot": "fylld",
+  "del": "validering"
+ },
+ "max_min": 600,
+ "om_battre": [
+  "0221-kallor-utjamnads"
+ ]
+}

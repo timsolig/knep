@@ -1,0 +1,29 @@
+{
+ "id": "0243-kallor-fylldos-validering",
+ "spar": "kallor-bortfall",
+ "syfte": "FylldOS på bortfallens valideringsfall, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOS",
+   "--del",
+   "validering",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOS",
+  "mot": "fylld",
+  "del": "validering"
+ },
+ "max_min": 600,
+ "om_battre": [
+  "0223-kallor-fylldos"
+ ]
+}

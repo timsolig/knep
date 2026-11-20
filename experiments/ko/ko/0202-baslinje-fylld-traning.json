@@ -1,0 +1,21 @@
+{
+ "id": "0202-baslinje-fylld-traning",
+ "spar": "baslinjer",
+ "syfte": "Driftens utfyllnad (fylld) och utjamnad på bortfallens träningsfall, baslinjen för kallor-bortfall.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "fylld",
+   "utjamnad",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "max_min": 600
+}

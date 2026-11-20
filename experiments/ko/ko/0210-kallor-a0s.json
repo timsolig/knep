@@ -1,0 +1,34 @@
+{
+ "id": "0210-kallor-a0s",
+ "spar": "kallor-analys",
+ "syfte": "Satellitens molnmask som torrmask i A0: eko tas bort där den senaste masken (som fanns i realtid) säger klart.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "kor",
+   "A0S",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "tabell",
+   "A0S",
+   "--mot",
+   "A0",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_A0S_mot_A0_traning.json"
+ },
+ "max_min": 600
+}

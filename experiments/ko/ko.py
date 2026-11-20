@@ -20,6 +20,7 @@ vinst är svaret på hur mycket en del av kedjan kan ge.
 eller med prognosens domare:
 
      "dom": {"domare": "prognos", "läge": "snabb", "system": "modul:Klass", "ref": null}
+     "dom": {"domare": "bortfall", "system": "kallor:FylldS", "mot": "fylld", "del": "traning"}
 
 Kommandona i "kor" körs i tur och ordning i repots rot (ingen shell). Sedan sätts domen mekaniskt
 ur domarens egen regel: analysens `verdict` (fältet "dom" i tabellens JSON) eller prognosens
@@ -143,8 +144,31 @@ def dom_prognos(d: dict) -> dict:
             "storsta_vinst_i": vinst[0][1] if vinst else None, "dagar": len(days)}
 
 
+def dom_bortfall(d: dict) -> dict:
+    """Bortfallsdomaren (experiments/bortfall/bortfallsdomare.py) har ingen samlad dom; här samma bootstrap
+    per åldersklass, och bättre om FSS eller CSI är bättre i någon klass och inget mått sämre i någon."""
+    sys.path.insert(0, str(ROOT / "experiments" / "bortfall"))
+    import bortfallsdomare as B  # noqa: PLC0415
+
+    las = lambda namn: json.loads((B.RESULTAT / d["del"] / f"{namn.replace(':', '_')}.json").read_text())  # noqa: E731
+    a, b = B.per_dag(las(d["system"])), B.per_dag(las(d.get("mot", "fylld")))
+    battre, samre, vinst = [], [], []
+    for kl in range(len(B.KLASSER)):
+        for k, r in B.bootstrap(a, b, kl).items():
+            namn = f"{B.klassnamn(kl)} {k}"
+            if r["dom"] == "sämre":
+                samre.append(namn)
+            elif r["dom"] == "bättre" and (k.startswith("fss") or k.startswith("csi")):
+                battre.append(namn)
+                vinst.append((r["lo"] if B.HOGRE_BATTRE[k] else -r["hi"], namn))
+    vinst.sort(reverse=True)
+    return {"battre": bool(battre) and not samre, "battre_i": battre, "samre_i": samre,
+            "storsta_sakra_vinst": vinst[0][0] if vinst else 0.0, "storsta_vinst_i": vinst[0][1] if vinst else None,
+            "dagar": len(set(a) & set(b))}
+
+
 def doma(d: dict) -> dict:
-    return {"analys": dom_analys, "prognos": dom_prognos}[d["domare"]](d)
+    return {"analys": dom_analys, "prognos": dom_prognos, "bortfall": dom_bortfall}[d["domare"]](d)
 
 
 # ---------- körningen ----------

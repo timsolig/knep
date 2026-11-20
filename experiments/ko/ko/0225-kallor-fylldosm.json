@@ -1,0 +1,26 @@
+{
+ "id": "0225-kallor-fylldosm",
+ "spar": "kallor-bortfall",
+ "syfte": "OPERA, satelliten och mätarnas kvot tillsammans.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOSM",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOSM",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

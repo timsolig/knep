@@ -1,0 +1,29 @@
+{
+ "id": "0245-kallor-fylldosm-validering",
+ "spar": "kallor-bortfall",
+ "syfte": "FylldOSM på bortfallens valideringsfall, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOSM",
+   "--del",
+   "validering",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOSM",
+  "mot": "fylld",
+  "del": "validering"
+ },
+ "max_min": 600,
+ "om_battre": [
+  "0225-kallor-fylldosm"
+ ]
+}

@@ -18,6 +18,8 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 
 | spår | idé | tak (källa) | startad | budget kvar | läge |
 |---|---|---|---|---|---|
+| kallor-analys (nytt, användarens beställning 2026-11-20) | andra källor i analyssteget: satellitens molnmask som torrmask (A0S, A0S2, A1S) och OPERA i glappet bara där satelliten ser moln (A0OS) | falska ekon är spärren som fällt både bias-v1 och A0O; masken angriper just dem | 2026-11-20 | 4 experiment och 3 valideringar på villkor, 3 veckor | i kön (0210 till 0213, 0230 till 0232) |
+| kallor-bortfall (nytt, användarens beställning 2026-11-20) | robusthet när en radar saknas: OPERA i hålet, satellitens torrmask och mätarnas kvot, ensamma och tillsammans, mot driftens utfyllnad | bortfallsdomaren, FSS och CSI per åldersklass | 2026-11-20 | 6 experiment och 6 valideringar på villkor, 3 veckor | i kön (0220 till 0225, 0240 till 0245) |
 | rorelse-lokal (nytt, kandidater) | ett rörelsefält som varierar över ytan (färre grannar och högre potens i interpoleringen, eller Farnebäck på historiken) i stället för kedjans nästan stela | lokal förskjutning CSI 1 mm +0,045 till +0,101 vid 15 min till 2 h (kön 0010) | 2026-11-20 | 12 experiment kvar av 18 (sex på snabb, sex på träningen, validering bara för de bättre), 3 veckor | i kön (0110 till 0135) |
 | lokal-forskjutning (tak) | lägestaket delat: förskjutning dominerar till 2 h, nybildning efter 2 h (+0,087 vid 2 h, +0,149 vid 5 h) | | 2026-11-19 | 2 experiment (samma tak på alla träningsdagar) | i kön (0140, 0141) |
 
@@ -36,6 +38,10 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 | glappet vid Riksgränsen (domaren) | fälld på falska ekon; H = 3 är på efter användarens beslut | | 0010 |
 
 ## Omprövningar
+
+### 2026-11-20, andra källor
+
+Användaren beställde tio experiment med andra källor i analyssteget, med målet robusthet när radarn saknas och ett bättre analyssteg. Satellitens molnmask från MSG (SEVIRI, sedan 2004) hämtas och projiceras till SMHI:s rutnät (`experiments/kallor/satellit.py`, orienteringen kontrollerad mot land och hav en klar dag; norr om cirka 66 N beräknas ingen mask). OPERA finns i EUMETNET:s arkiv sedan 2012. Fyra experiment på analysens domare och sex på bortfallsdomaren; valideringen körs bara för det som är bättre på träningen. Strålhöjden (sannolikheten att strålen går över nederbörden) är redan med genom A0O:s zon; FCI och blixtar från MTG finns bara från 2025 och väljs inte nu.
 
 ### 2026-11-20, efter taken
 

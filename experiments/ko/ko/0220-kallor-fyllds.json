@@ -1,0 +1,26 @@
+{
+ "id": "0220-kallor-fyllds",
+ "spar": "kallor-bortfall",
+ "syfte": "Utfyllnaden vid bortfall med satellitens torrmask: 0 i hålet där det är klart.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldS",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldS",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

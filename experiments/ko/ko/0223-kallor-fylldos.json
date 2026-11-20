@@ -1,0 +1,26 @@
+{
+ "id": "0223-kallor-fylldos",
+ "spar": "kallor-bortfall",
+ "syfte": "OPERA i hålet och satellitens torrmask.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOS",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOS",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}
