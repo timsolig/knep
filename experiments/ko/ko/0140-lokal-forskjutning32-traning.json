@@ -1,0 +1,28 @@
+{
+ "id": "0140-lokal-forskjutning32-traning",
+ "spar": "lokal-forskjutning",
+ "syfte": "Taket för förskjutning på alla träningsdagar (0040 föll på den saknade baslinjen).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "traning",
+   "--procs",
+   "2",
+   "--system",
+   "tak_lokal:TakForskjutning32"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "traning",
+  "system": "tak_lokal:TakForskjutning32",
+  "ref": "kedja_om"
+ },
+ "max_min": 600,
+ "tak": true
+}

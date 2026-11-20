@@ -53,3 +53,14 @@ def test_mattat_spar(tmp_path, monkeypatch):
     assert ko.spar_lage(rs)["s"]["mattat"]
     rs[-1]["dom"]["storsta_sakra_vinst"] = 0.05
     assert not ko.spar_lage(rs)["s"]["mattat"]
+
+
+def test_om_battre_vantar_kor_eller_hoppar(tmp_path, monkeypatch):
+    ko = _ko(tmp_path, monkeypatch)
+    (ko.KO / "0001-tr.json").write_text(json.dumps({"spar": "x", "kor": []}))
+    (ko.KO / "0002-va.json").write_text(json.dumps({"spar": "x", "kor": [], "om_battre": ["0001-tr"]}))
+    ko.spara({"id": "0001-tr", "status": "klar", "dom": {"battre": True}})
+    assert ko.nasta(ko.specs())["id"] == "0002-va"
+    ko.spara({"id": "0001-tr", "status": "klar", "dom": {"battre": False}})
+    assert ko.nasta(ko.specs()) is None
+    assert json.loads((ko.RES / "0002-va.json").read_text())["status"] == "hoppad"

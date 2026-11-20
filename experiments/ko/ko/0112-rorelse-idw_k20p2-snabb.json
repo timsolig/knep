@@ -1,0 +1,26 @@
+{
+ "id": "0112-rorelse-idw_k20p2-snabb",
+ "spar": "rorelse-lokal",
+ "syfte": "Rörelsefält som varierar över ytan (20 grannar, potens 2) i stället för kedjans nästan stela, på snabb.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "rorelse_lokal:IDW_k20p2"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "rorelse_lokal:IDW_k20p2"
+ },
+ "max_min": 120
+}

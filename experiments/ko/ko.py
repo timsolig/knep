@@ -11,6 +11,9 @@ Ett experiment är en JSON-fil i experiments/ko/ko/ (namnet bestämmer ordningen
      "dom": {"domare": "analys", "fil": "/data/analys/domare_v2/tabell_A0O_r24_mot_A0_traning.json"},
      "max_min": 300}
 
+"om_battre": ["id", ...] kör experimentet bara när de experimenten är klara och bättre enligt domaren
+(annars "hoppad"), så att valideringen av en kandidat kan ligga i kön redan när sökningen läggs.
+
 Ett tak (en fuskvariant som ser facit, "tak": true) räknas aldrig som en förbättring; dess största säkra
 vinst är svaret på hur mycket en del av kedjan kan ge.
 
@@ -65,9 +68,28 @@ def specs() -> list[dict]:
     return out
 
 
+def villkor(s: dict) -> str:
+    """"kör", "vänta" eller "hoppa" för ett experiment med "om_battre": [id, ...] (körs bara om alla de
+    experimenten är klara och bättre enligt domaren, till exempel valideringen efter träningen)."""
+    for dep in s.get("om_battre", []):
+        p = RES / f"{dep}.json"
+        if not p.exists():
+            return "vänta"
+        if not (json.loads(p.read_text()).get("dom") or {}).get("battre"):
+            return "hoppa"
+    return "kör"
+
+
 def nasta(alla: list[dict]) -> dict | None:
     for s in alla:
-        if not (RES / f"{s['id']}.json").exists():
+        if (RES / f"{s['id']}.json").exists():
+            continue
+        v = villkor(s)
+        if v == "hoppa":
+            spara({"id": s["id"], "spar": s.get("spar", "?"), "syfte": s.get("syfte", ""), "status": "hoppad",
+                   "fel": f"inte bättre: {', '.join(s['om_battre'])}", "start": nu(), "slut": nu()})
+            continue
+        if v == "kör":
             return s
     return None
 

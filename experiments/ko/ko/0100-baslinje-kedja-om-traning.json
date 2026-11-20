@@ -1,0 +1,21 @@
+{
+ "id": "0100-baslinje-kedja-om-traning",
+ "spar": "baslinjer",
+ "syfte": "kedja_om på alla 28 träningsdagar (12 fanns), baslinjen för allt som söks på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "traning",
+   "--procs",
+   "2",
+   "--system",
+   "kedja_om"
+  ]
+ ],
+ "max_min": 600
+}

@@ -1,0 +1,30 @@
+{
+ "id": "0131-rorelse-idw_k8p2-validering",
+ "spar": "rorelse-lokal",
+ "syfte": "Valideringen (8 grannar, potens 2), bara om den är bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "validering",
+   "--procs",
+   "2",
+   "--system",
+   "rorelse_lokal:IDW_k8p2"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "validering",
+  "system": "rorelse_lokal:IDW_k8p2",
+  "ref": "kedja_om"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0121-rorelse-idw_k8p2-traning"
+ ]
+}
