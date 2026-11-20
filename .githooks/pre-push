@@ -51,10 +51,15 @@ PY
   done
 fi
 
-# 4. testerna, om något annat än text har ändrats
-if echo "$andrade" | grep -qvE '\.md$'; then
+# 4. testerna, om något annat än text har ändrats. Ett träd som redan gått igenom körs inte om: GitHub
+# stänger anslutningen efter cirka 10 minuter, och med kön igång kan testerna ta längre tid än så, så
+# pushen dör. Kör då `uv run pytest` först (eller pusha igen; andra gången hoppas testerna över).
+klara="$(git rev-parse --git-common-dir)/forkontroll-klara"
+trad=$(git rev-parse 'HEAD^{tree}')
+if echo "$andrade" | grep -qvE '\.md$' && ! grep -qx "$trad" "$klara" 2>/dev/null; then
   echo "förkontrollen: kör testerna" >&2
   uv run pytest -q -p no:cacheprovider >/tmp/forkontroll-pytest.log 2>&1 \
     || { tail -20 /tmp/forkontroll-pytest.log >&2; fel "testerna går inte igenom (hela loggen i /tmp/forkontroll-pytest.log)"; }
+  echo "$trad" >> "$klara"
 fi
 echo "förkontrollen: klar" >&2

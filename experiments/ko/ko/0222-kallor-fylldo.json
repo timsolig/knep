@@ -1,0 +1,26 @@
+{
+ "id": "0222-kallor-fylldo",
+ "spar": "kallor-bortfall",
+ "syfte": "OPERA i hålet där grannländernas radarer når in, annars utfyllnaden.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldO",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldO",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

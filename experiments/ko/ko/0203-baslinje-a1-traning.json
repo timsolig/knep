@@ -1,0 +1,18 @@
+{
+ "id": "0203-baslinje-a1-traning",
+ "spar": "baslinjer",
+ "syfte": "A1 på alla 28 träningsdagar (13 fanns), baslinjen för A1S.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "kor",
+   "A1",
+   "--del",
+   "traning"
+  ]
+ ],
+ "max_min": 600
+}

@@ -1,0 +1,26 @@
+{
+ "id": "0221-kallor-utjamnads",
+ "spar": "kallor-bortfall",
+ "syfte": "Den utjämnade utfyllnaden med satellitens torrmask.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:UtjamnadS",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:UtjamnadS",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

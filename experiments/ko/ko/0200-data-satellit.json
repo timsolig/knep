@@ -1,0 +1,18 @@
+{
+ "id": "0200-data-satellit",
+ "spar": "kallor-data",
+ "syfte": "Molnmasken från MSG var 15:e minut för analysens och bortfallens 44 dagar, på SMHI:s rutnät (cirka 5 min och 0,5 MB per dag).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "--with",
+   "eccodes",
+   "python",
+   "experiments/kallor/satellit.py",
+   "hamta",
+   "--alla"
+  ]
+ ],
+ "max_min": 600
+}

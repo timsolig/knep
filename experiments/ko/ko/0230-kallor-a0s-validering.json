@@ -1,0 +1,37 @@
+{
+ "id": "0230-kallor-a0s-validering",
+ "spar": "kallor-analys",
+ "syfte": "A0S på valideringen, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "kor",
+   "A0S",
+   "--del",
+   "validering"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "tabell",
+   "A0S",
+   "--mot",
+   "A0",
+   "--del",
+   "validering"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_A0S_mot_A0_validering.json"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0210-kallor-a0s"
+ ]
+}
