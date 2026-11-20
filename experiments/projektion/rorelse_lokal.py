@@ -26,7 +26,24 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import domare as D  # noqa: E402
+
+
+def _projektionens_domare():
+    """Projektionens domare, också när analysens (samma modulnamn) redan är laddad, som i pytest."""
+    import importlib.util  # noqa: PLC0415
+
+    m = sys.modules.get("domare")
+    if m is not None and Path(getattr(m, "__file__", "")).resolve() == HERE / "domare.py":
+        return m
+    if "projektion_domare" not in sys.modules:
+        spec = importlib.util.spec_from_file_location("projektion_domare", HERE / "domare.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["projektion_domare"] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules["projektion_domare"]
+
+
+D = _projektionens_domare()
 
 model = D.model
 
