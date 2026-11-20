@@ -1,0 +1,30 @@
+{
+ "id": "0135-rorelse-farneback64-validering",
+ "spar": "rorelse-lokal",
+ "syfte": "Valideringen (Farnebäck på historiken, 64 km), bara om den är bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "validering",
+   "--procs",
+   "2",
+   "--system",
+   "rorelse_lokal:Farneback64"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "validering",
+  "system": "rorelse_lokal:Farneback64",
+  "ref": "kedja_om"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0125-rorelse-farneback64-traning"
+ ]
+}

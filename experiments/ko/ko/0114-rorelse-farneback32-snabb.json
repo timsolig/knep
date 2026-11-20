@@ -1,0 +1,26 @@
+{
+ "id": "0114-rorelse-farneback32-snabb",
+ "spar": "rorelse-lokal",
+ "syfte": "Rörelsefält som varierar över ytan (Farnebäck på historiken, 32 km) i stället för kedjans nästan stela, på snabb.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "rorelse_lokal:Farneback32"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "rorelse_lokal:Farneback32"
+ },
+ "max_min": 120
+}

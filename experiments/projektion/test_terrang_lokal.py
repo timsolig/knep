@@ -67,3 +67,25 @@ def test_nybildning_tar_bara_regn_langt_fran_kedjans():
 
     out = L.TakNybildning.cheat(SimpleNamespace(ny_km=16.0), fc, o, 4, Ctx(), None)
     assert out[0, 31, 31] == 4.0 and out[0, 8, 8] == 0.0 and out[0, 6, 6] == 2.0
+
+
+def test_idw_som_kedjan_med_kedjans_val():
+    import rorelse_lokal as R
+
+    rng = np.random.default_rng(0)
+    xy = rng.uniform(0, 60, (40, 2))
+    uv = rng.normal(0, 1, (40, 2))
+    a = R.idw(xy, uv, (64, 64), 20, 0.5, 20, 4)
+    b = R.model.dense_motion(xy, uv, (64, 64), 4)
+    assert np.allclose(a, b)
+
+
+def test_farneback_ger_ratt_riktning():
+    import rorelse_lokal as R
+
+    a = np.zeros((64, 64), np.float32)
+    b = np.zeros((64, 64), np.float32)
+    a[20:30, 20:30] = 5.0
+    b[20:30, 23:33] = 5.0            # 3 rutor österut
+    f = R.farneback(a, b, 9)
+    assert 1.5 < f[0, 25, 26] < 4.5 and abs(f[1, 25, 26]) < 1.0

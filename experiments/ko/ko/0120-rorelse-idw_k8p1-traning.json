@@ -1,0 +1,27 @@
+{
+ "id": "0120-rorelse-idw_k8p1-traning",
+ "spar": "rorelse-lokal",
+ "syfte": "Samma (8 grannar, potens 1) på alla 28 träningsdagar, 2 km, mot kedja_om.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "traning",
+   "--procs",
+   "2",
+   "--system",
+   "rorelse_lokal:IDW_k8p1"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "traning",
+  "system": "rorelse_lokal:IDW_k8p1",
+  "ref": "kedja_om"
+ },
+ "max_min": 600
+}

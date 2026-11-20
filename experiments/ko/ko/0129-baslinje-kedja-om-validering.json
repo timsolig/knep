@@ -1,0 +1,21 @@
+{
+ "id": "0129-baslinje-kedja-om-validering",
+ "spar": "baslinjer",
+ "syfte": "kedja_om på alla 16 valideringsdagar (2 fanns), baslinjen när en kedjekandidat valideras (driftens sparade kedja finns inte för valideringen).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "validering",
+   "--procs",
+   "2",
+   "--system",
+   "kedja_om"
+  ]
+ ],
+ "max_min": 900
+}
