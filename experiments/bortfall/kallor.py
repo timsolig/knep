@@ -13,6 +13,7 @@ molnmask (där det är klart kan det inte regna) och regnmätarna (som kommer en
   FylldOS     FylldO och satellitens torrmask
   FylldM      fylld gånger en kvot ur timmätarna i och kring hålet (perioder som slutat minst 60 min före)
   FylldOSM    FylldOS och mätarnas kvot
+  FylldO30    utfyllnaden de första 30 min av bortfallet, sedan OPERA (FylldO60 efter 60 min)
 
 OPERA läses ur /data/riksgransen/opera15/<dag>.npz (experiments/riksgransen/hamta.py --steg 15), satelliten
 ur /data/kallor/msgclm/<dag>.npz (experiments/kallor/satellit.py). Saknas en dag ändras ingenting.
@@ -48,6 +49,7 @@ class _Kallor(B.Fylld):
     satellit = False
     opera = False
     matare = False
+    opera_efter_min = 0   # OPERA först när bortfallet är äldre än så (utfyllnaden är bättre i början)
 
     def start(self, ind):
         dag = ind.meta["dag"]
@@ -94,7 +96,7 @@ class _Kallor(B.Fylld):
         out = super().steg(k, ind).copy()
         hal = ind.hal & ~np.isfinite(ind.bild)
         t = ind.tid
-        if self.op is not None:
+        if self.op is not None and 5 * (k + 1) > self.opera_efter_min:
             o = self._opera(t)
             if o is not None:
                 ta = hal & np.isfinite(o)
@@ -136,3 +138,15 @@ class FylldM(_Kallor):
 class FylldOSM(_Kallor):
     namn = "kallor_FylldOSM"
     opera = satellit = matare = True
+
+
+class FylldO30(FylldO):
+    """Utfyllnaden de första 30 minuterna, sedan OPERA (kön 0222: OPERA förlorar bara vid 0 till 30 min)."""
+
+    namn = "kallor_FylldO30"
+    opera_efter_min = 30
+
+
+class FylldO60(FylldO):
+    namn = "kallor_FylldO60"
+    opera_efter_min = 60

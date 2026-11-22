@@ -18,15 +18,16 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 
 | spår | idé | tak (källa) | startad | budget kvar | läge |
 |---|---|---|---|---|---|
-| kallor-analys (nytt, användarens beställning 2026-11-20) | andra källor i analyssteget: satellitens molnmask som torrmask (A0S, A0S2, A1S) och OPERA i glappet bara där satelliten ser moln (A0OS) | falska ekon är spärren som fällt både bias-v1 och A0O; masken angriper just dem | 2026-11-20 | 4 experiment och 3 valideringar på villkor, 3 veckor | i kön (0210 till 0213, 0230 till 0232) |
-| kallor-bortfall (nytt, användarens beställning 2026-11-20) | robusthet när en radar saknas: OPERA i hålet, satellitens torrmask och mätarnas kvot, ensamma och tillsammans, mot driftens utfyllnad | bortfallsdomaren, FSS och CSI per åldersklass | 2026-11-20 | 6 experiment och 6 valideringar på villkor, 3 veckor | i kön (0220 till 0225, 0240 till 0245) |
-| rorelse-lokal (nytt, kandidater) | ett rörelsefält som varierar över ytan (färre grannar och högre potens i interpoleringen, eller Farnebäck på historiken) i stället för kedjans nästan stela | lokal förskjutning CSI 1 mm +0,045 till +0,101 vid 15 min till 2 h (kön 0010) | 2026-11-20 | 12 experiment kvar av 18 (sex på snabb, sex på träningen, validering bara för de bättre), 3 veckor | i kön (0110 till 0135) |
-| lokal-forskjutning (tak) | lägestaket delat: förskjutning dominerar till 2 h, nybildning efter 2 h (+0,087 vid 2 h, +0,149 vid 5 h) | | 2026-11-19 | 2 experiment (samma tak på alla träningsdagar) | i kön (0140, 0141) |
+| opera-bortfall (nytt, ur kallor-bortfall) | vid radarbortfall driftens utfyllnad de första 30 eller 60 minuterna, sedan OPERA | OPERA i hålet: FSS 1 mm 30 km +0,63 vid 90 till 360 min (säkert, på träningen och valideringen), men sämre vid 0 till 30 min | 2026-11-22 | 4 experiment, 2 veckor | i kön (0300, 0301, 0310, 0311) |
 
 ## Vilande eller stängda
 
 | spår | varför | största säkra vinst | rapport |
 |---|---|---|---|
+| rorelse-lokal | stängt 2026-11-22, mättat: IDW-varianterna ger CSI +0,006 till +0,009 och sämre hopp, Farnebäck har 60 mått säkert sämre; taket för lokal förskjutning nås inte med rörelse ur historiken | +0,009 | kön 0110 till 0135 |
+| kallor-analys | stängt 2026-11-22: satellitens torrmask tar bort riktigt regn i fjällen och på lovartsidan (kvot våt över 400 m och på lovartsidan säkert sämre), A0OS har fortfarande fler falska ekon | +0,0002 | kön 0210 till 0232 |
+| kallor-bortfall | avgjort 2026-11-22: satelliten och mätarnas kvot gör ingen skillnad (kvoten troligen aldrig aktiv, se FylldM), OPERA är den stora vinsten och fortsätter som opera-bortfall | FSS 1 mm 30 km +0,63 (OPERA, 90 till 360 min) | kön 0220 till 0245 |
+| lokal-forskjutning (tak) | klart: förskjutning dominerar till 2 h, nybildning efter 2 h | | kön 0010 till 0141 |
 | terrangkvot | stängt 2026-11-20: kvoten per ruta, ledtimme och riktning ger CSI ±0,004 och säkert sämre toppar; kedjan har inget systematiskt fel per plats att lära | CSI 1 mm +0,004 | kön 0020 till 0023 |
 | bias-v1-filter | stängt 2026-11-20 (sista budgeten för bias-v1): med F4 efter är falska ekon fortfarande säkert sämre | kvot våt per kvart +0,039 | kön 0030, 0031 |
 | bias-v1 (ensam) | fyra försök fällda av falska ekon vid torra mätare; fortsätter bara som bias-v1-filter | kvot våt kvart +0,12 men spärren | uppgift 0024, 0025, 0027 |
@@ -38,6 +39,10 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 | glappet vid Riksgränsen (domaren) | fälld på falska ekon; H = 3 är på efter användarens beslut | | 0010 |
 
 ## Omprövningar
+
+### 2026-11-22, veckans genomgång
+
+Köns körskript hade inte startats om efter att `ko.py` ändrades, så domen för bortfallsdomaren saknades och `om_battre` ignorerades: valideringen kördes för alla kandidater i rorelse-lokal och kallor, inte bara de som var bättre på träningen. Ingen av dem var bättre på träningen, så inget valdes på valideringen, men valideringen är sedd en gång extra för de spåren. Körskriptet startar nu om sig självt när `ko.py` ändras. Det stora resultatet är OPERA vid radarbortfall. Nästa nya spår är nybildning ur satelliten (taket för nybildning är störst efter 2 h), som kräver en modell för var nya celler uppstår; det väljs nästa vecka.
 
 ### 2026-11-20, andra källor
 

@@ -1,0 +1,29 @@
+{
+ "id": "0310-opera-efter30-validering",
+ "spar": "opera-bortfall",
+ "syfte": "Valideringen av 0300, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldO30",
+   "--del",
+   "validering",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldO30",
+  "mot": "fylld",
+  "del": "validering"
+ },
+ "max_min": 600,
+ "om_battre": [
+  "0300-opera-efter30-traning"
+ ]
+}
