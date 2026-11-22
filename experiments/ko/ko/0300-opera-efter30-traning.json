@@ -1,0 +1,26 @@
+{
+ "id": "0300-opera-efter30-traning",
+ "spar": "opera-bortfall",
+ "syfte": "Driftens utfyllnad de första 30 minuterna av ett bortfall, sedan OPERA. OPERA gav FSS 1 mm 30 km +0,63 vid 90 till 360 min men förlorade vid 0 till 30 min (kön 0222).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldO30",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldO30",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

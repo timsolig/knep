@@ -1,0 +1,26 @@
+{
+ "id": "0301-opera-efter60-traning",
+ "spar": "opera-bortfall",
+ "syfte": "Som 0300 men OPERA först efter 60 minuter.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldO60",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldO60",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

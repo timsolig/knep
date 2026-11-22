@@ -303,8 +303,13 @@ def main() -> None:
     elif cmd == "ett":
         ett()
     elif cmd == "kör":
+        egen = Path(__file__).resolve()
+        mtid = egen.stat().st_mtime
         while True:
             hamta_main()
+            if egen.stat().st_mtime != mtid:   # en ny ko.py från main: starta om med den (annars körs den gamla
+                print(f"{nu()} ny ko.py, startar om", flush=True)   # koden vidare, som veckan 2026-11-20)
+                os.execv(sys.executable, [sys.executable, str(egen), "kör"])
             if not ett():
                 summera()
                 time.sleep(VILA)
