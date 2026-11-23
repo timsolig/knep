@@ -1,0 +1,17 @@
+{
+ "id": "0401-baslinje-a2t-traning",
+ "spar": "baslinjer",
+ "syfte": "A2T på träningsdagarna, baslinjen för sammanslagningens varianter.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/a2.py",
+   "kor_traning",
+   "--namn",
+   "A2T"
+  ]
+ ],
+ "max_min": 900
+}

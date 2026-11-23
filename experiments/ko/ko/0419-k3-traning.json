@@ -1,0 +1,34 @@
+{
+ "id": "0419-k3-traning",
+ "spar": "sammanslagning-korrelation",
+ "syfte": "Båda (K1 och K2).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "K3",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "K3",
+   "--mot",
+   "A2T",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_K3_mot_A2T_traning.json"
+ },
+ "max_min": 900
+}

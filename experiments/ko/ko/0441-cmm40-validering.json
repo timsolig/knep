@@ -1,0 +1,37 @@
+{
+ "id": "0441-cmm40-validering",
+ "spar": "sammanslagning-cm",
+ "syfte": "Valideringen av CMm40, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "CMm40",
+   "--del",
+   "validering"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "CMm40",
+   "--mot",
+   "A2T",
+   "--del",
+   "validering"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_CMm40_mot_A2T_validering.json"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0421-cmm40-traning"
+ ]
+}

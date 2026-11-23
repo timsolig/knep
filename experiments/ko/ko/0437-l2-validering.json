@@ -1,0 +1,37 @@
+{
+ "id": "0437-l2-validering",
+ "spar": "sammanslagning-lard",
+ "syfte": "Valideringen av L2, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "L2",
+   "--del",
+   "validering"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "L2",
+   "--mot",
+   "A2T",
+   "--del",
+   "validering"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_L2_mot_A2T_validering.json"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0417-l2-traning"
+ ]
+}

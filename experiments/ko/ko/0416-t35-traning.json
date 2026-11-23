@@ -1,0 +1,34 @@
+{
+ "id": "0416-t35-traning",
+ "spar": "sammanslagning-tvasteg",
+ "syfte": "Två steg med tröskeln 0,35.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "T35",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "T35",
+   "--mot",
+   "A2T",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_T35_mot_A2T_traning.json"
+ },
+ "max_min": 900
+}

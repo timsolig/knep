@@ -1,0 +1,34 @@
+{
+ "id": "0410-cm40-traning",
+ "spar": "sammanslagning-cm",
+ "syfte": "Conditional merging med L 40 km.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "CM40",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "CM40",
+   "--mot",
+   "A2T",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_CM40_mot_A2T_traning.json"
+ },
+ "max_min": 900
+}

@@ -1,0 +1,37 @@
+{
+ "id": "0439-k3-validering",
+ "spar": "sammanslagning-korrelation",
+ "syfte": "Valideringen av K3, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "K3",
+   "--del",
+   "validering"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "K3",
+   "--mot",
+   "A2T",
+   "--del",
+   "validering"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_K3_mot_A2T_validering.json"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0419-k3-traning"
+ ]
+}
