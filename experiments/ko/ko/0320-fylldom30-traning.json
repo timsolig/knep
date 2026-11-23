@@ -1,0 +1,26 @@
+{
+ "id": "0320-fylldom30-traning",
+ "spar": "opera-bortfall",
+ "syfte": "OPERA efter 30 min, skalad till SMHI:s nivå i ett band runt hålet (0300 fälldes av volymen och mätarna).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOM30",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOM30",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

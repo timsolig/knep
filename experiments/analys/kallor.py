@@ -13,6 +13,9 @@ men bara där satelliten säger moln, eftersom A0O fälldes av falska ekon.
   A0S2   som A0S men de två senaste molnmaskerna måste säga klart (färre ändrade rutor)
   A1S    A1 på A0S:s bilder
   A0OS   A0O (OPERA där SMHI är torr och strålen går över 3 km) bara där satelliten säger moln
+  A0OR   A0O med den villkorade ringmasken mot OPERA:s eget klotter kring de icke-svenska radarerna
+  A0OM   A0O med OPERA skalad till SMHI:s nivå där båda ser regn och SMHI:s stråle är under 2 km
+  A0ORM  båda
 
 Norr om cirka 66 N finns ingen molnmask (koden 3); där ändras ingenting.
 """
@@ -90,7 +93,57 @@ class A0OS(a0o.A0O):
         return domare.sums(fr[domare.Radardag.PRE + 1:])
 
 
-for _c in (A0S, A0S2, A1S, A0OS):
+class _A0Ovarianter(a0o.A0O):
+    """A0O med OPERA:s eget klotter borttaget (den villkorade ringmasken kring de icke-svenska OPERA-radarerna,
+    uppgift 0029) och/eller OPERA skalad till SMHI:s nivå där båda ser regn och den svenska strålen är låg."""
+
+    ring = False
+    niva = False
+
+    def falt(self, dag, matare):
+        fr = self.frames().copy()
+        z = zon.load_opera_day(self.rd.day_s)
+        if z is None:
+            raise FileNotFoundError(f"OPERA saknas för {self.rd.day_s}")
+        _, v = z
+        g = zon.grid_of(self.rd.grid)
+        far = composite.far_zone(g, self.H)
+        nara = ~composite.far_zone(g, 2.0)   # där SMHI:s stråle är låg och radarn pålitlig
+        src = np.zeros(fr.shape[1:], np.uint8)
+        for k in range(len(fr)):
+            o = zon.decode(v[a0o.opera_index(k)])
+            if self.ring:
+                o = composite.mask_opera_ring_villkor(o, g)
+            if self.niva:
+                o = o * nivakvot_overlapp(fr[k], o, nara)
+            fr[k], _ = composite.layer_far(fr[k], src, o, composite.SOURCE_OPERA, far, mode=self.regel)
+        return domare.sums(fr[domare.Radardag.PRE + 1:])
+
+
+def nivakvot_overlapp(smhi, opera, nara, prior: float = 5.0) -> float:
+    """SMHI/OPERA där båda har data, någon är våt och SMHI:s stråle är låg; prior mm/h, klippt till [1/3, 3]."""
+    m = nara & np.isfinite(smhi) & np.isfinite(opera) & ((np.nan_to_num(smhi) > 0.1) | (np.nan_to_num(opera) > 0.1))
+    if m.sum() < 50:
+        return 1.0
+    return float(np.clip((smhi[m].sum() + prior) / (opera[m].sum() + prior), 1 / 3, 3))
+
+
+class A0OR(_A0Ovarianter):
+    namn = "A0OR"
+    ring = True
+
+
+class A0OM(_A0Ovarianter):
+    namn = "A0OM"
+    niva = True
+
+
+class A0ORM(_A0Ovarianter):
+    namn = "A0ORM"
+    ring = niva = True
+
+
+for _c in (A0S, A0S2, A1S, A0OS, A0OR, A0OM, A0ORM):
     domare.SYSTEMS[_c.namn] = _c
 
 

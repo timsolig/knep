@@ -1,0 +1,27 @@
+{
+ "id": "0371-ensemble3-traning",
+ "spar": "ensemble-rorelse",
+ "syfte": "Ensemble3 på alla 28 träningsdagar.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "traning",
+   "--procs",
+   "2",
+   "--system",
+   "ensemble:Ensemble3"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "traning",
+  "system": "ensemble:Ensemble3",
+  "ref": "kedja_om"
+ },
+ "max_min": 900
+}

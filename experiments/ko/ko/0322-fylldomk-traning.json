@@ -1,0 +1,26 @@
+{
+ "id": "0322-fylldomk-traning",
+ "spar": "opera-bortfall",
+ "syfte": "Nivån och den mjuka kanten från bortfallets början, utan halvtimmen med utfyllnaden.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOMK",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOMK",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

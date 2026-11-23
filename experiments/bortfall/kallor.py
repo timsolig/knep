@@ -14,6 +14,8 @@ molnmask (där det är klart kan det inte regna) och regnmätarna (som kommer en
   FylldM      fylld gånger en kvot ur timmätarna i och kring hålet (perioder som slutat minst 60 min före)
   FylldOSM    FylldOS och mätarnas kvot
   FylldO30    utfyllnaden de första 30 min av bortfallet, sedan OPERA (FylldO60 efter 60 min)
+  FylldOM30   FylldO30 med OPERA skalad till SMHI:s nivå runt hålet; FylldOMK30 också med mjuk kant;
+              FylldOMK nivån och kanten från början
 
 OPERA läses ur /data/riksgransen/opera15/<dag>.npz (experiments/riksgransen/hamta.py --steg 15), satelliten
 ur /data/kallor/msgclm/<dag>.npz (experiments/kallor/satellit.py). Saknas en dag ändras ingenting.
@@ -40,6 +42,25 @@ KVOT_GRANS = (0.5, 2.0)
 KVOT_PRIOR = 2.0   # mm: krymper kvoten mot 1 när mätarna har lite regn
 
 
+def nivakvot(smhi: np.ndarray, opera: np.ndarray, hal: np.ndarray, band_px: int = 10, prior: float = 1.0) -> float:
+    """SMHI/OPERA i ett band utanför hålet där båda har data och någon är våt; prior mm/h i båda leden,
+    klippt till [1/3, 3]. Ger OPERA samma nivå som radarn runt omkring, så att volymen och sömmen stämmer."""
+    from scipy.ndimage import binary_dilation  # noqa: PLC0415
+
+    band = binary_dilation(hal, iterations=band_px) & ~hal & np.isfinite(smhi) & np.isfinite(opera)
+    band &= (smhi > 0.1) | (opera > 0.1)
+    if band.sum() < 20:
+        return 1.0
+    return float(np.clip((smhi[band].sum() + prior) / (opera[band].sum() + prior), 1 / 3, 3))
+
+
+def mjuk_kant(hal: np.ndarray, px: int) -> np.ndarray:
+    """0 vid hålets kant och 1 px rutor in, linjärt; utanför hålet 0."""
+    from scipy.ndimage import distance_transform_edt  # noqa: PLC0415
+
+    return np.clip(distance_transform_edt(hal) / px, 0, 1) * hal
+
+
 def _utsnitt(ind):
     r0, r1, c0, c1 = ind.meta["utsnitt"]
     return slice(r0, r1), slice(c0, c1)
@@ -50,6 +71,8 @@ class _Kallor(B.Fylld):
     opera = False
     matare = False
     opera_efter_min = 0   # OPERA först när bortfallet är äldre än så (utfyllnaden är bättre i början)
+    niva = False          # OPERA skalad till SMHI:s nivå i ett band runt hålet
+    kant_px = 0           # mjuk övergång från utfyllnaden till OPERA över så många rutor innanför kanten
 
     def start(self, ind):
         dag = ind.meta["dag"]
@@ -99,8 +122,14 @@ class _Kallor(B.Fylld):
         if self.op is not None and 5 * (k + 1) > self.opera_efter_min:
             o = self._opera(t)
             if o is not None:
+                if self.niva:
+                    o = o * nivakvot(ind.bild, o, hal)
                 ta = hal & np.isfinite(o)
-                out[ta] = o[ta]
+                if self.kant_px > 0:
+                    w = mjuk_kant(hal, self.kant_px)
+                    out[ta] = w[ta] * o[ta] + (1 - w[ta]) * out[ta]
+                else:
+                    out[ta] = o[ta]
         if self.matare:
             out[hal] = out[hal] * self._kvot(ind, t)
         if self.mm is not None:
@@ -150,3 +179,24 @@ class FylldO30(FylldO):
 class FylldO60(FylldO):
     namn = "kallor_FylldO60"
     opera_efter_min = 60
+
+
+class FylldOM30(FylldO30):
+    """FylldO30 med OPERA skalad till SMHI:s nivå runt hålet (kön 0300 fälldes av volymen och mätarna)."""
+
+    namn = "kallor_FylldOM30"
+    niva = True
+
+
+class FylldOMK30(FylldOM30):
+    """FylldOM30 med mjuk kant över 8 rutor (16 km) (kön 0300 fälldes av sömmen)."""
+
+    namn = "kallor_FylldOMK30"
+    kant_px = 8
+
+
+class FylldOMK(FylldOMK30):
+    """Nivån och den mjuka kanten från bortfallets början (ingen halvtimme med utfyllnaden först)."""
+
+    namn = "kallor_FylldOMK"
+    opera_efter_min = 0

@@ -18,7 +18,9 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 
 | spår | idé | tak (källa) | startad | budget kvar | läge |
 |---|---|---|---|---|---|
-| opera-bortfall (nytt, ur kallor-bortfall) | vid radarbortfall driftens utfyllnad de första 30 eller 60 minuterna, sedan OPERA | OPERA i hålet: FSS 1 mm 30 km +0,63 vid 90 till 360 min (säkert, på träningen och valideringen), men sämre vid 0 till 30 min | 2026-11-22 | 4 experiment, 2 veckor | i kön (0300, 0301, 0310, 0311) |
+| opera-analys (nytt) | OPERA i glappet vid Riksgränsen med ringmasken mot OPERA:s eget klotter och med nivån matchad mot SMHI; A0O fälldes bara av falska ekon | glappet: SMHI 0 där OPERA har regn i 59 % av rutbilderna med stråle över 2 km (0010) | 2026-11-23 | 6 experiment (3 och 3 valideringar på villkor), 2 veckor | i kön (0340 till 0352) |
+| ensemble-rorelse (nytt, en annan metod) | kedjan med flera rörelsefält, medelvärdet för läget och kedjans fördelning för värdena, så att topparna inte planas ut som med utjämningen | lokal förskjutning CSI 1 mm upp till +0,10 vid 1 h (0010) | 2026-11-23 | 7 experiment, 3 veckor | i kön (0360 till 0381) |
+| opera-bortfall (ur kallor-bortfall; 0300 och 0301 fällda av söm, volym och mätarna, nu med nivå och mjuk kant) | vid radarbortfall driftens utfyllnad de första 30 eller 60 minuterna, sedan OPERA | OPERA i hålet: FSS 1 mm 30 km +0,63 vid 90 till 360 min (säkert, på träningen och valideringen), men sämre vid 0 till 30 min | 2026-11-22 | 4 experiment, 2 veckor | i kön (0300, 0301, 0310, 0311) |
 
 ## Vilande eller stängda
 
@@ -39,6 +41,10 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 | glappet vid Riksgränsen (domaren) | fälld på falska ekon; H = 3 är på efter användarens beslut | | 0010 |
 
 ## Omprövningar
+
+### 2026-11-23, tillägg
+
+Användaren: bredda, inte bara en metod. Tre olika slags försök i kön samtidigt: hur OPERA fogas in vid bortfall (nivå och kant), OPERA i analysens glapp utan dess eget klotter, och en ensemble av kedjan över rörelsefälten. Principerna från en genomgång av hur andra kombinerar källor: vikta och rätta nivån mellan källorna innan de blandas, och ta bort klotter med oberoende data. Nästa vecka: fler observationer (grannländernas öppna stationsnät) i A2T, och en modell för var nya celler uppstår.
 
 ### 2026-11-22, veckans genomgång
 

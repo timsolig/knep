@@ -1,0 +1,34 @@
+{
+ "id": "0341-a0om-traning",
+ "spar": "opera-analys",
+ "syfte": "OPERA i glappet skalad till SMHI:s nivå där båda ser regn och SMHI:s stråle är låg.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "kor",
+   "A0OM",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "tabell",
+   "A0OM",
+   "--mot",
+   "A0",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_A0OM_mot_A0_traning.json"
+ },
+ "max_min": 900
+}

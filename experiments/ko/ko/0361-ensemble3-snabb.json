@@ -1,0 +1,27 @@
+{
+ "id": "0361-ensemble3-snabb",
+ "spar": "ensemble-rorelse",
+ "syfte": "Som Ensemble2 med en tredje medlem (lokalare interpolering).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "ensemble:Ensemble3"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "ensemble:Ensemble3",
+  "ref": "kedja_om"
+ },
+ "max_min": 240
+}
