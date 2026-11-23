@@ -1,0 +1,15 @@
+{
+ "id": "0402-sammanslagning-trana-lard",
+ "spar": "sammanslagning-lard",
+ "syfte": "Gradient boosting för L1 och L2, i två delar efter dag och på alla träningsdagar.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "trana_lard"
+  ]
+ ],
+ "max_min": 600
+}

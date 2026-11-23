@@ -1,0 +1,34 @@
+{
+ "id": "0421-cmm40-traning",
+ "spar": "sammanslagning-cm",
+ "syfte": "Conditional merging som kvot i stället för skillnad, L 40 km.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "CMm40",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "CMm40",
+   "--mot",
+   "A2T",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_CMm40_mot_A2T_traning.json"
+ },
+ "max_min": 900
+}

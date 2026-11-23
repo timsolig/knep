@@ -18,6 +18,10 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 
 | spår | idé | tak (källa) | startad | budget kvar | läge |
 |---|---|---|---|---|---|
+| sammanslagning-lard (nytt, användarens beställning 2026-11-23) | gradient boosting ur radarn, omgivningen, avståndet, höjden och årstiden, ensam eller som bakgrund till OI | A2T:s OI förutsätter normalfördelade fel och en fast korrelation; nederbörden har nollor, skevhet, intensitetsberoende fel och vädrets korrelation | 2026-11-23 | 3 till 4 varianter och valideringar på villkor, 3 veckor | i kön (0410 till 0441) |
+| sammanslagning-cm (nytt, användarens beställning 2026-11-23) | conditional merging: radarns form, mätarnas nivå, L 20, 40, 80 km och som kvot | A2T:s OI förutsätter normalfördelade fel och en fast korrelation; nederbörden har nollor, skevhet, intensitetsberoende fel och vädrets korrelation | 2026-11-23 | 3 till 4 varianter och valideringar på villkor, 3 veckor | i kön (0410 till 0441) |
+| sammanslagning-korrelation (nytt, användarens beställning 2026-11-23) | OI med korrelationslängden ur radarfältet och bakgrundsfel som växer med intensiteten | A2T:s OI förutsätter normalfördelade fel och en fast korrelation; nederbörden har nollor, skevhet, intensitetsberoende fel och vädrets korrelation | 2026-11-23 | 3 till 4 varianter och valideringar på villkor, 3 veckor | i kön (0410 till 0441) |
+| sammanslagning-tvasteg (nytt, användarens beställning 2026-11-23) | först om det regnar (indikator), sedan hur mycket | A2T:s OI förutsätter normalfördelade fel och en fast korrelation; nederbörden har nollor, skevhet, intensitetsberoende fel och vädrets korrelation | 2026-11-23 | 3 till 4 varianter och valideringar på villkor, 3 veckor | i kön (0410 till 0441) |
 | opera-analys (nytt) | OPERA i glappet vid Riksgränsen med ringmasken mot OPERA:s eget klotter och med nivån matchad mot SMHI; A0O fälldes bara av falska ekon | glappet: SMHI 0 där OPERA har regn i 59 % av rutbilderna med stråle över 2 km (0010) | 2026-11-23 | 6 experiment (3 och 3 valideringar på villkor), 2 veckor | i kön (0340 till 0352) |
 | ensemble-rorelse (nytt, en annan metod) | kedjan med flera rörelsefält, medelvärdet för läget och kedjans fördelning för värdena, så att topparna inte planas ut som med utjämningen | lokal förskjutning CSI 1 mm upp till +0,10 vid 1 h (0010) | 2026-11-23 | 7 experiment, 3 veckor | i kön (0360 till 0381) |
 | opera-bortfall (ur kallor-bortfall; 0300 och 0301 fällda av söm, volym och mätarna, nu med nivå och mjuk kant) | vid radarbortfall driftens utfyllnad de första 30 eller 60 minuterna, sedan OPERA | OPERA i hålet: FSS 1 mm 30 km +0,63 vid 90 till 360 min (säkert, på träningen och valideringen), men sämre vid 0 till 30 min | 2026-11-22 | 4 experiment, 2 veckor | i kön (0300, 0301, 0310, 0311) |
@@ -41,6 +45,10 @@ Taken (`"tak": true`) är diagnoser som ser facit; deras säkra vinst är svaret
 | glappet vid Riksgränsen (domaren) | fälld på falska ekon; H = 3 är på efter användarens beslut | | 0010 |
 
 ## Omprövningar
+
+### 2026-11-23, sammanslagningen
+
+Användaren: optimal interpolation passar dåligt för nederbörd; pröva fyra andra vägar och iterera över varianter i varje. Fyra spår samtidigt, mot A2T och inte mot A0, så att bara det som slår den bästa analysen räknas. Veckans genomgång itererar inom det spår som visar störst säker vinst, men reglerna gäller: budget per spår och en tredjedel till de andra.
 
 ### 2026-11-23, tillägg
 

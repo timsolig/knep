@@ -1,0 +1,15 @@
+{
+ "id": "0400-data-a1-traning",
+ "spar": "baslinjer",
+ "syfte": "A1:s fält för alla 28 träningsdagar (3 fanns), underlaget för att söka sammanslagningen på träningen (cirka 10 min per dag, 0,5 GB).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "a1falt"
+  ]
+ ],
+ "max_min": 600
+}

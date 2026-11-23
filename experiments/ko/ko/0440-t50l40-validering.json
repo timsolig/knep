@@ -1,0 +1,37 @@
+{
+ "id": "0440-t50l40-validering",
+ "spar": "sammanslagning-tvasteg",
+ "syfte": "Valideringen av T50L40, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "T50L40",
+   "--del",
+   "validering"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "T50L40",
+   "--mot",
+   "A2T",
+   "--del",
+   "validering"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_T50L40_mot_A2T_validering.json"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0420-t50l40-traning"
+ ]
+}

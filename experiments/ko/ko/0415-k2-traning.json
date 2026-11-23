@@ -1,0 +1,34 @@
+{
+ "id": "0415-k2-traning",
+ "spar": "sammanslagning-korrelation",
+ "syfte": "A2T med bakgrundsfelet som växer med intensiteten.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "K2",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "K2",
+   "--mot",
+   "A2T",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_K2_mot_A2T_traning.json"
+ },
+ "max_min": 900
+}

@@ -1,0 +1,34 @@
+{
+ "id": "0414-cm20-traning",
+ "spar": "sammanslagning-cm",
+ "syfte": "Conditional merging med L 20 km: mätarnas fält minus radarns vid mätarna läggs på radarn.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/sammanslagning.py",
+   "kor",
+   "CM20",
+   "--del",
+   "traning"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/domare.py",
+   "tabell",
+   "CM20",
+   "--mot",
+   "A2T",
+   "--del",
+   "traning"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_CM20_mot_A2T_traning.json"
+ },
+ "max_min": 900
+}
