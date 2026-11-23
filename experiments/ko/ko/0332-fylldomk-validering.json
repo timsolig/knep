@@ -1,0 +1,29 @@
+{
+ "id": "0332-fylldomk-validering",
+ "spar": "opera-bortfall",
+ "syfte": "Valideringen av FylldOMK, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOMK",
+   "--del",
+   "validering",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOMK",
+  "mot": "fylld",
+  "del": "validering"
+ },
+ "max_min": 600,
+ "om_battre": [
+  "0322-fylldomk-traning"
+ ]
+}

@@ -89,3 +89,14 @@ def test_farneback_ger_ratt_riktning():
     b[20:30, 23:33] = 5.0            # 3 rutor österut
     f = R.farneback(a, b, 9)
     assert 1.5 < f[0, 25, 26] < 4.5 and abs(f[1, 25, 26]) < 1.0
+
+
+def test_ensemble_matchning_behaller_kedjans_varden():
+    import ensemble as E
+
+    rng = np.random.default_rng(1)
+    bas = rng.gamma(0.5, 2.0, (40, 40)).astype(np.float32)
+    medel = (bas + np.roll(bas, 3, axis=1)) / 2
+    m = E.model.cdf_match(medel, bas)
+    assert np.allclose(np.sort(m.ravel()), np.sort(bas.ravel()))   # samma värden som kedjan
+    assert np.corrcoef(m.ravel(), medel.ravel())[0, 1] > 0.8       # men i medelvärdets ordning

@@ -1,0 +1,30 @@
+{
+ "id": "0381-ensemble3-validering",
+ "spar": "ensemble-rorelse",
+ "syfte": "Valideringen av Ensemble3, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "validering",
+   "--procs",
+   "2",
+   "--system",
+   "ensemble:Ensemble3"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "validering",
+  "system": "ensemble:Ensemble3",
+  "ref": "kedja_om"
+ },
+ "max_min": 1200,
+ "om_battre": [
+  "0371-ensemble3-traning"
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "id": "0350-a0or-validering",
+ "spar": "opera-analys",
+ "syfte": "Valideringen av A0OR, bara om bättre på träningen.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "kor",
+   "A0OR",
+   "--del",
+   "validering"
+  ],
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/analys/kallor.py",
+   "tabell",
+   "A0OR",
+   "--mot",
+   "A0",
+   "--del",
+   "validering"
+  ]
+ ],
+ "dom": {
+  "domare": "analys",
+  "fil": "/data/analys/domare_v2/tabell_A0OR_mot_A0_validering.json"
+ },
+ "max_min": 900,
+ "om_battre": [
+  "0340-a0or-traning"
+ ]
+}

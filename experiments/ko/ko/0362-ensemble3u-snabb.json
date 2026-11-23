@@ -1,0 +1,27 @@
+{
+ "id": "0362-ensemble3u-snabb",
+ "spar": "ensemble-rorelse",
+ "syfte": "Ensemble3 utan matchningen, för att se vad matchningen gör för toppar och form.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "ensemble:Ensemble3U"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "ensemble:Ensemble3U",
+  "ref": "kedja_om"
+ },
+ "max_min": 240
+}

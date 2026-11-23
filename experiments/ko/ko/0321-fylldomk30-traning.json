@@ -1,0 +1,26 @@
+{
+ "id": "0321-fylldomk30-traning",
+ "spar": "opera-bortfall",
+ "syfte": "Som FylldOM30 med mjuk kant över 16 km (0300 fälldes också av sömmen).",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/bortfall/bortfallsdomare.py",
+   "kor",
+   "kallor:FylldOMK30",
+   "--del",
+   "traning",
+   "--processer",
+   "2"
+  ]
+ ],
+ "dom": {
+  "domare": "bortfall",
+  "system": "kallor:FylldOMK30",
+  "mot": "fylld",
+  "del": "traning"
+ },
+ "max_min": 600
+}

@@ -1,0 +1,27 @@
+{
+ "id": "0360-ensemble2-snabb",
+ "spar": "ensemble-rorelse",
+ "syfte": "Kedjan med driftens rörelse och Farnebäck, medelvärdet för läget och kedjans fördelning för värdena.",
+ "kor": [
+  [
+   "uv",
+   "run",
+   "python",
+   "experiments/projektion/domare.py",
+   "kör",
+   "--läge",
+   "snabb",
+   "--procs",
+   "2",
+   "--system",
+   "ensemble:Ensemble2"
+  ]
+ ],
+ "dom": {
+  "domare": "prognos",
+  "läge": "snabb",
+  "system": "ensemble:Ensemble2",
+  "ref": "kedja_om"
+ },
+ "max_min": 240
+}
